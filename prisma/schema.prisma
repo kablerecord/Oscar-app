@@ -1,0 +1,308 @@
+// Oscar Database Schema
+// Multi-tenant ready design (single-user MVP for now)
+// PostgreSQL with pgvector for semantic search
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ============================================================================
+// USERS & WORKSPACES
+// ============================================================================
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String? // hashed password (nullable for OAuth later)
+  image     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaces Workspace[]
+  settings   UserSetting[]
+  accounts   Account[]
+  sessions   Session[]
+
+  @@index([email])
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  ownerId   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projects       Project[]
+  documents      Document[]
+  threads        ChatThread[]
+  agents         Agent[]
+  profileAnswers ProfileAnswer[]
+  artifacts      Artifact[]
+
+  @@index([ownerId])
+}
+
+// ============================================================================
+// PROJECTS
+// ============================================================================
+
+model Project {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  documents Document[]
+  threads   ChatThread[]
+
+  @@index([workspaceId])
+}
+
+// ============================================================================
+// KNOWLEDGE BASE (Documents & Embeddings)
+// ============================================================================
+
+model Document {
+  id               String   @id @default(cuid())
+  workspaceId      String
+  projectId        String? // nullable - some docs are workspace-level
+  title            String
+  sourceType       String // 'upload' | 'chat_export' | 'note' | 'other'
+  originalFilename String?
+  mimeType         String?
+  textContent      String    // Full text content
+  metadata         Json? // Additional metadata (file size, import source, etc.)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?          @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  chunks    DocumentChunk[]
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([sourceType])
+}
+
+model DocumentChunk {
+  id         String                       @id @default(cuid())
+  documentId String
+  content    String
+  embedding  Unsupported("vector(1536)")? // OpenAI ada-002 embeddings are 1536 dimensions
+  chunkIndex Int                          // Order within document
+  createdAt  DateTime                     @default(now())
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+}
+
+// ============================================================================
+// CHAT THREADS & MESSAGES
+// ============================================================================
+
+model ChatThread {
+  id          String   @id @default(cuid())
+  workspaceId String
+  projectId   String? // nullable - some threads are workspace-level
+  title       String
+  mode        String   @default("panel") // 'single_model' | 'panel'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project   Project?      @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  messages  ChatMessage[]
+
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([updatedAt])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  threadId  String
+  role      String // 'user' | 'assistant' | 'system'
+  provider  String? // 'openai' | 'anthropic' | 'mixed' | null
+  agentId   String? // ID of the agent that generated this (for panel mode)
+  content   String   
+  metadata  Json? // Additional context (model name, token count, etc.)
+  createdAt DateTime @default(now())
+
+  thread ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  agent  Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
+
+  @@index([threadId])
+  @@index([agentId])
+  @@index([createdAt])
+}
+
+// ============================================================================
+// AGENTS (AI Personas for Panel Mode)
+// ============================================================================
+
+model Agent {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String // e.g. "Builder Strategist", "Dev Architect"
+  description  String?
+  provider     String // 'openai' | 'anthropic'
+  modelName    String // e.g. 'gpt-4-turbo', 'claude-3-5-sonnet-20241022'
+  systemPrompt String   
+  isDefault    Boolean  @default(false) // Default agents for new users
+  isActive     Boolean  @default(true) // Can be toggled off
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([isActive])
+}
+
+// ============================================================================
+// USER SETTINGS & PROFILE
+// ============================================================================
+
+model UserSetting {
+  id     String @id @default(cuid())
+  userId String
+  key    String
+  value  Json
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, key])
+  @@index([userId])
+}
+
+model ProfileAnswer {
+  id          String   @id @default(cuid())
+  workspaceId String
+  questionId  String // Unique identifier for the question
+  category    String // 'personal' | 'goals' | 'preferences' | 'context'
+  question    String // The question text
+  answer      String // User's answer
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, questionId]) // One answer per question per workspace
+  @@index([workspaceId])
+  @@index([category])
+}
+
+// ============================================================================
+// NEXTAUTH MODELS (for authentication)
+// ============================================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? 
+  access_token      String? 
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? 
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================================
+// USAGE TRACKING & RATE LIMITING
+// ============================================================================
+
+model UsageRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  endpoint    String   // 'oscar/ask', 'knowledge/search', etc.
+  date        DateTime @db.Date // Day-level tracking
+  requestCount Int     @default(0)
+  tokenCount   Int     @default(0) // Optional: track token usage
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, endpoint, date])
+  @@index([userId])
+  @@index([date])
+}
+
+model RateLimitEvent {
+  id        String   @id @default(cuid())
+  userId    String?  // null for unauthenticated requests
+  ip        String
+  endpoint  String
+  timestamp DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([ip, timestamp])
+  @@index([endpoint, timestamp])
+}
+
+// ============================================================================
+// ARTIFACTS
+// ============================================================================
+
+model Artifact {
+  id          String   @id @default(cuid())
+  workspaceId String
+  messageId   String?  // Link to the message that created it
+  threadId    String?  // Link to the conversation
+  type        String   // 'code' | 'document' | 'diagram' | 'html' | 'svg' | 'json' | 'csv' | 'react'
+  title       String
+  content     String
+  language    String?  // For code artifacts (typescript, python, etc.)
+  description String?
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([threadId])
+  @@index([type])
+  @@index([createdAt])
+}

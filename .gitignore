@@ -30,8 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files - NEVER commit these
+.env
+.env.local
+.env.development
+.env.production.local
+# Keep .env.example for reference
+!.env.example
 
 # vercel
 .vercel
@@ -39,3 +44,17 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+/app/generated/prisma
+
+# SQLite dev database (we use Supabase in production)
+*.db
+*.db-journal
+
+# Local documents (user's personal files - not for git)
+/Documents/
+
+# IDE
+.idea/
+.vscode/
