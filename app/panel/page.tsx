@@ -3,6 +3,9 @@ import { OscarChat } from '@/components/oscar/OscarChat'
 import { OnboardingWrapper } from '@/components/onboarding/OnboardingWrapper'
 import { prisma } from '@/lib/db/prisma'
 
+// Prevent static generation at build time - this page needs database access
+export const dynamic = 'force-dynamic'
+
 export default async function PanelPage() {
   // Get the first workspace (for single-user MVP)
   const workspace = await prisma.workspace.findFirst({
