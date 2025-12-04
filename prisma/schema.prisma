@@ -35,11 +35,13 @@ model User {
 }
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  ownerId   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String    @id @default(cuid())
+  name                  String
+  ownerId               String
+  onboardingCompleted   Boolean   @default(false)
+  onboardingCompletedAt DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   projects       Project[]

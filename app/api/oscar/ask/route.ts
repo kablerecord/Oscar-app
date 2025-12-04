@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       )
     } else {
-      userId = session.user.id || session.user.email
+      userId = (session.user as { id?: string }).id || session.user.email
     }
 
     const ip = getClientIP(req)
@@ -261,7 +261,7 @@ export async function POST(req: NextRequest) {
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request', details: error.errors },
+        { error: 'Invalid request', details: error.issues },
         { status: 400 }
       )
     }

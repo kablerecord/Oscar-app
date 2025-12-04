@@ -82,7 +82,7 @@ export function withSecurity(options: SecureRouteOptions, handler: RouteHandler)
           )
         }
 
-        userId = session.user.id || session.user.email
+        userId = (session.user as { id?: string }).id || session.user.email
         userEmail = session.user.email
       }
 

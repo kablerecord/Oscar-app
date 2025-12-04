@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const userId = session.user.id || session.user.email
+    const userId = (session.user as { id?: string }).id || session.user.email
     const tier = 'free' // TODO: Get from user profile/subscription
 
     // Get usage stats
