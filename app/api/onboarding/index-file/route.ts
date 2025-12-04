@@ -2,12 +2,18 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/db/prisma'
 import { generateEmbedding, formatEmbeddingForPostgres } from '@/lib/ai/embeddings'
-import { ProviderRegistry } from '@/lib/ai/providers'
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Lazy initialization to avoid build-time errors
+let openaiClient: OpenAI | null = null
+function getOpenAI() {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openaiClient
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -78,7 +84,7 @@ export async function POST(req: NextRequest) {
     const truncatedContent = fileContent.slice(0, 15000)
 
     // Generate summary and suggested questions using GPT-4
-    const summaryResponse = await openai.chat.completions.create({
+    const summaryResponse = await getOpenAI().chat.completions.create({
       model: 'gpt-4-turbo',
       messages: [
         {
