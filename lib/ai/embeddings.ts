@@ -1,8 +1,15 @@
 import OpenAI from 'openai'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+// Lazy initialization to avoid build-time errors when API key isn't set
+let openaiClient: OpenAI | null = null
+function getOpenAI(): OpenAI {
+  if (!openaiClient) {
+    openaiClient = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  }
+  return openaiClient
+}
 
 // OpenAI's text-embedding-ada-002 produces 1536-dimensional vectors
 export const EMBEDDING_DIMENSION = 1536
@@ -11,7 +18,7 @@ export const EMBEDDING_DIMENSION = 1536
  * Generate embedding for a single text
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
-  const response = await openai.embeddings.create({
+  const response = await getOpenAI().embeddings.create({
     model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-ada-002',
     input: text,
   })
@@ -34,7 +41,7 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   for (let i = 0; i < texts.length; i += BATCH_SIZE) {
     const batch = texts.slice(i, i + BATCH_SIZE)
 
-    const response = await openai.embeddings.create({
+    const response = await getOpenAI().embeddings.create({
       model: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-ada-002',
       input: batch,
     })
