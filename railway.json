@@ -5,7 +5,7 @@
     "buildCommand": "DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate && npm run build"
   },
   "deploy": {
-    "startCommand": "npx prisma db push --skip-generate && node .next/standalone/server.js",
+    "startCommand": "npx prisma db push --skip-generate && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/ && node .next/standalone/server.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
