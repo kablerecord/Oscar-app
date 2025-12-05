@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Send, Brain, Loader2, ChevronDown, ChevronUp, Zap, Lightbulb, GraduationCap, PanelRight, X } from 'lucide-react'
 import { ProfileQuestionModal } from '@/components/profile/ProfileQuestionModal'
+import { ShareActions } from '@/components/share/ShareActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
@@ -268,6 +269,20 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
                       </div>
                     )}
                   </Card>
+
+                  {/* Share Actions - only show for completed responses */}
+                  {!message.thinking && message.content && (
+                    <ShareActions
+                      content={message.content}
+                      agentName="Oscar"
+                      isDebate={!!message.debug?.panelDiscussion}
+                      panelDiscussion={message.debug?.panelDiscussion?.map((p, i) => ({
+                        content: p.content,
+                        agentName: `Expert ${i + 1}`
+                      }))}
+                      className="mt-1"
+                    />
+                  )}
 
                   {/* Artifacts button */}
                   {message.artifacts && message.artifacts.length > 0 && (

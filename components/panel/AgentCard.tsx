@@ -4,6 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ShareActions } from '@/components/share/ShareActions'
 
 export interface Agent {
   id: string
@@ -95,11 +96,19 @@ export function AgentCard({
               <strong>Error:</strong> {response.error}
             </div>
           ) : (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <p className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">
-                {response.content}
-              </p>
-            </div>
+            <>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <p className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">
+                  {response.content}
+                </p>
+              </div>
+              {/* Share Actions for agent response */}
+              <ShareActions
+                content={response.content}
+                agentName={agent.name}
+                className="mt-2"
+              />
+            </>
           )}
         </div>
       )}
