@@ -57,6 +57,12 @@ export async function POST(req: NextRequest) {
       const pdfParse = (await import('pdf-parse')).default
       const pdfData = await pdfParse(buffer)
       fileContent = pdfData.text
+    } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx')) {
+      // Handle Word documents using mammoth
+      const buffer = Buffer.from(await file.arrayBuffer())
+      const mammoth = await import('mammoth')
+      const result = await mammoth.extractRawText({ buffer })
+      fileContent = result.value
     } else if (fileType === 'text/plain' || fileName.endsWith('.txt') || fileName.endsWith('.md')) {
       fileContent = await file.text()
     } else if (fileType === 'application/json' || fileName.endsWith('.json')) {
@@ -67,7 +73,7 @@ export async function POST(req: NextRequest) {
         fileContent = await file.text()
       } catch {
         return NextResponse.json(
-          { error: 'Unsupported file type. Please upload a PDF, TXT, MD, or JSON file.' },
+          { error: 'Unsupported file type. Please upload a PDF, DOCX, TXT, MD, or JSON file.' },
           { status: 400 }
         )
       }

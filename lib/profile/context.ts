@@ -1,7 +1,7 @@
 import { prisma } from '../db/prisma'
 
 /**
- * Get user profile context for Oscar
+ * Get user profile context for OSQR
  * Formats profile answers into a natural context string
  */
 export async function getProfileContext(workspaceId: string): Promise<string | undefined> {

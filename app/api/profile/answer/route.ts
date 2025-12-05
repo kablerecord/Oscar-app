@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
+import { indexProfileAnswer, indexInBackground } from '@/lib/knowledge/auto-index'
 
 const AnswerSchema = z.object({
   workspaceId: z.string(),
@@ -35,6 +36,16 @@ export async function POST(req: NextRequest) {
         answer,
       },
     })
+
+    // AUTO-INDEX: Index profile answer for semantic search
+    // This runs in background so it doesn't slow down the response
+    indexInBackground(() => indexProfileAnswer({
+      workspaceId,
+      questionId,
+      question,
+      answer,
+      category,
+    }))
 
     return NextResponse.json({ success: true, answer: profileAnswer })
   } catch (error) {

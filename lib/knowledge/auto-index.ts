@@ -1,7 +1,7 @@
 /**
  * Auto-Indexing Service
  *
- * This is Oscar's KEY DIFFERENTIATOR - automatically indexing everything.
+ * This is OSQR's KEY DIFFERENTIATOR - automatically indexing everything.
  * Every conversation, profile answer, and artifact gets embedded and searchable.
  */
 
@@ -10,23 +10,23 @@ import { generateEmbedding, formatEmbeddingForPostgres } from '@/lib/ai/embeddin
 import { TextChunker } from './chunker'
 
 /**
- * Index a conversation (both user message and Oscar's response)
- * Called after every Oscar response
+ * Index a conversation (both user message and OSQR's response)
+ * Called after every OSQR response
  */
 export async function indexConversation({
   workspaceId,
   threadId,
   userMessage,
-  oscarResponse,
+  osqrResponse,
 }: {
   workspaceId: string
   threadId: string
   userMessage: string
-  oscarResponse: string
+  osqrResponse: string
 }): Promise<void> {
   try {
     // Create a combined document from the conversation
-    const conversationText = `User: ${userMessage}\n\nOscar: ${oscarResponse}`
+    const conversationText = `User: ${userMessage}\n\nOSQR: ${osqrResponse}`
     const timestamp = new Date().toISOString().split('T')[0]
 
     // Create a document for this conversation
@@ -137,7 +137,7 @@ export async function indexProfileAnswer({
 
 /**
  * Index an artifact (code, document, etc.)
- * Called when Oscar generates an artifact
+ * Called when OSQR generates an artifact
  */
 export async function indexArtifact({
   workspaceId,

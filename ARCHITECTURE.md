@@ -9,6 +9,17 @@ Oscar is a multi-model AI companion (Jarvis-style) that combines:
 - **Adaptive Profile** that learns about the user over time
 - **Simple UX** (powerful under the hood, calm on the surface)
 
+## KEY DIFFERENTIATOR: Automatic Indexing of Everything
+
+**Oscar indexes EVERYTHING automatically.** This is what sets Oscar apart from every other AI assistant.
+
+- Every conversation with Oscar is automatically indexed and searchable
+- Every profile answer becomes part of Oscar's memory
+- Every uploaded document is chunked and embedded
+- Every artifact generated is stored and retrievable
+
+This creates **compounding value** - the longer you use Oscar, the more it knows about you, the better it serves you, and the harder it becomes to leave. Oscar can say "You mentioned last week..." or "Based on your goals from our conversation on..." because it remembers EVERYTHING.
+
 This document serves as the single source of truth for both humans and AI assistants (Claude, Copilot, etc.) working on Oscar.
 
 ---
@@ -313,14 +324,201 @@ Current monolith can be split as load grows:
 
 ---
 
-## 10. Open Questions / TODOs
+## 10. Pricing Tiers
 
-- [ ] Finalize exact plan tiers and usage limits
-- [ ] Define model costs and pass-through pricing
+### Oscar Lite - $19/mo ($168/yr)
+*"A taste of the second brain — without the full power."*
+
+- 2 AI models (Llama + GPT-3.5)
+- 1 AI-to-AI Discussion per day (6 back-and-forths max)
+- 50MB Knowledge Vault (first 2 files indexed)
+- Remembers last 3 interactions
+- 1 Daily Calibration question
+- Basic Tasks checklist (no Master Summary)
+
+### Oscar Pro - $49/mo ($399/yr) ⭐ CORE TIER
+*"Your fully indexed second brain. The 90-Day Transformation Tier."*
+
+- Everything in Lite
+- Full Personal Knowledge Vault (unlimited indexing)
+- Multi-model panel (Claude, GPT-4, etc.)
+- Oscar's Daily Calibration Questions (full sequence)
+- Master Summary Checklist
+- Unlimited long-context threads
+- Full chat memory
+- 2-3 concurrent model calls
+- **90-Day Transformation Guarantee (annual only)**
+
+### Oscar Master - $149/mo ($1,299/yr)
+*"Your personal team of AI agents."*
+
+- Everything in Pro
+- Personal AI Agents (automations)
+- Meeting summarizer, Task generator, Content engine
+- Unlimited document ingestion
+- Priority processing (faster calls)
+- Higher context limits
+- Custom agent builder
+- Team workflows (up to 3 teammates)
+- Exclusive templates
+- Early access to new features
+
+---
+
+## 11. 90-Day Transformation Guarantee
+
+*"Pay for the year. Use Oscar for 90 days. If you follow Oscar's prompts 5 minutes a day and don't feel dramatically more capable—faster decisions, better organization, clearer thinking—I'll give you 100% of your money back. No questions asked."*
+
+### Why This Works:
+- Forces enough interactions for Oscar to build indexed profile
+- Compounding value becomes obvious after 2-3 months
+- Screens out tire-kickers (usage requirement)
+- Signals confidence in the product
+- Pushes users to annual plan (guarantee only applies there)
+
+### Upgrade Credits:
+- 100% of Lite payments apply to Pro/Master upgrade
+- Credits carry forward (no penalty for upgrading)
+- Makes staying on Lite feel riskier than upgrading
+
+---
+
+## 12. Referral System
+
+### Core Structure: "Give X / Get X"
+**Give:** Friend gets 14 days of Oscar Pro for free (no credit card)
+**Get:** Referrer chooses reward based on tier
+
+### Rewards by Tier:
+
+**Lite Users:**
+- +25MB vault storage (stackable to +500MB)
+- OR +1 AI panel discussion/day (stackable to +5)
+- OR $5 credit toward Pro upgrade
+
+**Pro Users:**
+- +7 days added to subscription
+- OR +500MB vault storage
+- OR 1 month Master Summary Insights
+
+**Master Users:**
+- +10 days added to subscription
+- OR 1 Team Member seat for 30 days
+- OR double AI processing speed for 30 days
+
+### Milestone Bonus:
+🎯 **Refer 5 friends → Unlock 30 days of Oscar Master for free**
+
+### Badge System (Status Flywheel):
+- 🟦 **Connector** (1 referral): Badge + 7 days Pro
+- 🟩 **Architect** (3 referrals): Special avatar border + 14 days Pro/Master
+- 🟧 **Builder** (5 referrals): 30 days Master + leaderboard feature
+- 🟥 **Pioneer** (10+ referrals): Permanent badge + early access + quarterly Oscar Labs calls
+
+### Referral Triggers (contextual popups):
+1. After a breakthrough: "Want to give a friend 14 days of Oscar Pro?"
+2. When hitting a limit: "Refer a friend → get +25MB free"
+3. After upgrading: "Want 7 days free? Send your Pro trial link"
+4. After creating big indexed vault: "Know someone who needs this?"
+5. After super long-context question: "Your friend can do this too"
+
+---
+
+## 13. Viral Sharing Features
+
+### Make Sharing Frictionless (Low Dev, High Viral Impact)
+Every Oscar output should have:
+- **"Share as image"** - Screenshot-ready outputs
+- **"Copy to clipboard"** - One-click text copy
+- **"Share debate"** - AI Panel Discussion export
+- **"Share summary"** - Master Summary shareable card
+
+### Magic Moments (engineer into first 10 minutes):
+1. **Upload → Insight**: User uploads doc → Oscar gives immediate personalized insight
+2. **Memory Callback Surprise**: "You mentioned last week your goal was X — this connects to that"
+3. **AI Debate**: First two-AI discussion triggers "This is wild" reaction
+4. **Cross-Reference**: Oscar connects dots across uploaded documents
+5. **Master Summary**: First generated Master Summary moment
+
+### "Show Your Setup" Culture:
+- "Screenshot your vault"
+- "Share your AI panel setup"
+- "Show your Master Summary"
+- "Here's my Daily Calibration streak"
+
+### Weekly "Oscar Wins" Email:
+- User's insights, streak, wins, time saved
+- Master Summary highlights
+- Users forward these → passive virality
+
+### Public-Facing Outputs (Phase 3+):
+- Knowledge graph visualization
+- Life systems map
+- Personal summary poster
+- Monthly "Your Oscar Map"
+
+---
+
+## 14. Growth Roadmap
+
+### Phase 1 — Launch Prep (Now → Month 1)
+- Magic Moments in onboarding
+- Sharing Buttons
+- Referral System
+- Upgrade-Credit + Guarantee Limit Messaging
+- Weekly Oscar Wins Email
+- Build in Public Content Engine
+
+### Phase 2 — Early Traction (Months 2–4)
+- "Show Your Setup" Culture
+- Public Roadmap + Feature Voting
+
+### Phase 3 — Growth Tuning (Months 4–8)
+- Public-Facing Outputs (knowledge graph, etc.)
+- Oscar Personality Layer (brand voice)
+
+### Phase 4 — Expansion (Months 8–12+)
+- Creator Template Library / Marketplace
+- Monthly Oscar Intelligence Digest
+
+---
+
+## 15. Revenue Projections
+
+### 12-Month Projections (End of 2026)
+| Scenario | Users | MRR | ARR |
+|----------|-------|-----|-----|
+| Base Case | ~3,500 | $143K/mo | $1.7M/yr |
+| Aggressive | ~7,000 | $328K/mo | $4.0M/yr |
+| Viral | ~15,000 | $756K/mo | $9.0M/yr |
+
+### 36-Month Projections (End of 2028)
+| Scenario | Users | MRR | ARR |
+|----------|-------|-----|-----|
+| Base Case | ~18,500 | $839K/mo | $10.0M/yr |
+| Aggressive | ~37,000 | $1.8M/mo | $22M/yr |
+| Viral | ~90,000 | $4.7M/mo | $56M/yr |
+
+### Key Assumptions:
+- Start with 200-300 new users Month 1
+- 15-25% monthly growth
+- Referral R₀ = 0.3-0.55
+- 60% Lite, 35% Pro, 5% Master initial mix
+- 20-30% Lite→Pro upgrade monthly
+- 5-8% Pro→Master upgrade monthly
+- Churn: Lite 12%, Pro 3%, Master 1%
+
+---
+
+## 16. Open Questions / TODOs
+
 - [ ] Master Summary editing UI
 - [ ] Knowledge Vault management (bulk delete, re-index)
 - [ ] Privacy explanation and opt-in flows
 - [ ] Mobile app API considerations
+- [ ] Team Accounts feature (2027-2028)
+- [ ] Oscar Agent Marketplace (Year 1+)
+- [ ] Enterprise Tier (SSO, SOC2, Year 3-4)
 
 ---
 

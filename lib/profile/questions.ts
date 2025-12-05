@@ -1,7 +1,7 @@
 /**
  * Profile Question Bank
  *
- * Questions to learn about the user and improve Oscar's responses
+ * Questions to learn about the user and improve OSQR's responses
  * Organized by category with priority levels
  */
 
@@ -24,7 +24,7 @@ export const QUESTION_BANK: ProfileQuestion[] = [
   {
     id: 'personal-name',
     category: 'personal',
-    question: "What's your first name? (So Oscar can address you personally)",
+    question: "What's your first name? (So OSQR can address you personally)",
     priority: 1,
     type: 'text',
   },

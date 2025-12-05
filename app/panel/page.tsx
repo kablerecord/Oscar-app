@@ -45,10 +45,10 @@ export default async function PanelPage() {
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-              Chat with Oscar
+              Chat with OSQR
             </h1>
             <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-              Your personal AI assistant. Oscar consults a panel of AI experts behind the scenes to give you the best possible answers.
+              Your personal AI assistant. OSQR consults a panel of AI experts behind the scenes to give you the best possible answers.
             </p>
           </div>
 

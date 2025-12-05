@@ -3,19 +3,19 @@ import { ProviderRegistry } from './providers'
 import type { AIMessage } from './types'
 
 /**
- * Oscar - The main AI orchestrator
+ * OSQR - The main AI orchestrator
  *
- * Oscar acts as your personal AI assistant (like Jarvis from Iron Man).
- * When you ask Oscar a question:
- * 1. Oscar consults a panel of specialized AI agents
+ * OSQR acts as your personal AI assistant (like Jarvis from Iron Man).
+ * When you ask OSQR a question:
+ * 1. OSQR consults a panel of specialized AI agents
  * 2. The panel discusses and debates privately
- * 3. Oscar synthesizes their insights
- * 4. Oscar presents you with a single, refined answer
+ * 3. OSQR synthesizes their insights
+ * 4. OSQR presents you with a single, refined answer
  */
 
 export type ResponseMode = 'quick' | 'thoughtful' | 'contemplate'
 
-export interface OscarRequest {
+export interface OSQRRequest {
   userMessage: string
   panelAgents: PanelAgent[]
   context?: string // RAG context from knowledge base
@@ -23,15 +23,15 @@ export interface OscarRequest {
   mode?: ResponseMode // Control response complexity and processing time
 }
 
-export interface OscarResponse {
-  answer: string // Oscar's final synthesized answer
+export interface OSQRResponse {
+  answer: string // OSQR's final synthesized answer
   panelDiscussion?: PanelResponse[] // Optional: panel responses (for transparency)
   roundtableDiscussion?: PanelResponse[] // Optional: panel reactions
-  reasoning?: string // Optional: Oscar's reasoning process
+  reasoning?: string // Optional: OSQR's reasoning process
 }
 
-export class Oscar {
-  private static readonly OSCAR_SYSTEM_PROMPT = `You are Oscar, an advanced AI assistant inspired by Jarvis from Iron Man.
+export class OSQR {
+  private static readonly OSQR_SYSTEM_PROMPT = `You are OSQR, an advanced AI assistant inspired by Jarvis from Iron Man.
 
 Your role is to synthesize insights from a panel of AI experts and give the user the best answer possible.
 
@@ -56,7 +56,7 @@ Your personality is like Jarvis:
 - Smart but approachable - explain things clearly without dumbing down
 - Proactive and efficient - anticipate needs when appropriate
 
-Speak as "Oscar" in first person. You're the user's trusted AI partner, not their butler or professor.
+Speak as "OSQR" in first person. You're the user's trusted AI partner, not their butler or professor.
 
 ## Artifact Generation
 
@@ -83,10 +83,10 @@ export async function login(email: string, password: string) {
 Always give artifacts descriptive titles and reference them in your text.`
 
   /**
-   * Ask Oscar a question
-   * Oscar will consult the panel and return a synthesized answer
+   * Ask OSQR a question
+   * OSQR will consult the panel and return a synthesized answer
    */
-  static async ask(request: OscarRequest): Promise<OscarResponse> {
+  static async ask(request: OSQRRequest): Promise<OSQRResponse> {
     const { userMessage, panelAgents, context, includeDebate = false, mode = 'thoughtful' } = request
 
     // Adjust processing based on response mode
@@ -108,10 +108,10 @@ Always give artifacts descriptive titles and reference them in your text.`
    * Best for: Simple questions, math, definitions, quick facts
    * Time: ~5-10 seconds
    */
-  private static async quickResponse(request: Omit<OscarRequest, 'mode'>): Promise<OscarResponse> {
+  private static async quickResponse(request: Omit<OSQRRequest, 'mode'>): Promise<OSQRResponse> {
     const { userMessage, panelAgents, context, includeDebate } = request
 
-    console.log('Oscar: Quick mode - using single agent...')
+    console.log('OSQR: Quick mode - using single agent...')
 
     // Use only the first agent for speed
     const singleAgent = panelAgents[0]
@@ -131,15 +131,15 @@ Always give artifacts descriptive titles and reference them in your text.`
   }
 
   /**
-   * Thoughtful mode: Standard Oscar behavior with panel + roundtable
+   * Thoughtful mode: Standard OSQR behavior with panel + roundtable
    * Best for: Most questions, balanced depth and speed
    * Time: ~20-40 seconds
    */
-  private static async thoughtfulResponse(request: Omit<OscarRequest, 'mode'>): Promise<OscarResponse> {
+  private static async thoughtfulResponse(request: Omit<OSQRRequest, 'mode'>): Promise<OSQRResponse> {
     const { userMessage, panelAgents, context, includeDebate } = request
 
     // Step 1: Get initial responses from the panel
-    console.log('Oscar: Thoughtful mode - consulting panel...')
+    console.log('OSQR: Thoughtful mode - consulting panel...')
     const panelResponses = await PanelOrchestrator.askPanel({
       userMessage,
       agents: panelAgents,
@@ -149,7 +149,7 @@ Always give artifacts descriptive titles and reference them in your text.`
     // Step 2: Run roundtable discussion with multiple agents
     let roundtableResponses: PanelResponse[] | undefined
     if (panelAgents.length > 1) {
-      console.log('Oscar: Facilitating roundtable discussion...')
+      console.log('OSQR: Facilitating roundtable discussion...')
       roundtableResponses = await PanelOrchestrator.roundtable(
         {
           userMessage,
@@ -160,8 +160,8 @@ Always give artifacts descriptive titles and reference them in your text.`
       )
     }
 
-    // Step 3: Oscar synthesizes the final answer
-    console.log('Oscar: Synthesizing insights...')
+    // Step 3: OSQR synthesizes the final answer
+    console.log('OSQR: Synthesizing insights...')
     const finalAnswer = await this.synthesize({
       userMessage,
       panelResponses,
@@ -181,10 +181,10 @@ Always give artifacts descriptive titles and reference them in your text.`
    * Best for: Complex decisions, strategic planning, nuanced topics
    * Time: ~60-90 seconds
    */
-  private static async contemplativeResponse(request: Omit<OscarRequest, 'mode'>): Promise<OscarResponse> {
+  private static async contemplativeResponse(request: Omit<OSQRRequest, 'mode'>): Promise<OSQRResponse> {
     const { userMessage, panelAgents, context, includeDebate } = request
 
-    console.log('Oscar: Contemplate mode - deep analysis with full panel...')
+    console.log('OSQR: Contemplate mode - deep analysis with full panel...')
 
     // Step 1: Get initial responses from ALL agents
     const panelResponses = await PanelOrchestrator.askPanel({
@@ -194,7 +194,7 @@ Always give artifacts descriptive titles and reference them in your text.`
     })
 
     // Step 2: Extended roundtable discussion
-    console.log('Oscar: Facilitating extended roundtable...')
+    console.log('OSQR: Facilitating extended roundtable...')
     const roundtableResponses = await PanelOrchestrator.roundtable(
       {
         userMessage,
@@ -205,7 +205,7 @@ Always give artifacts descriptive titles and reference them in your text.`
     )
 
     // Step 3: Second round of discussion for deeper insights
-    console.log('Oscar: Second round of deliberation...')
+    console.log('OSQR: Second round of deliberation...')
     const secondRoundResponses = await PanelOrchestrator.roundtable(
       {
         userMessage,
@@ -215,8 +215,8 @@ Always give artifacts descriptive titles and reference them in your text.`
       roundtableResponses || panelResponses
     )
 
-    // Step 4: Oscar synthesizes with extra depth instruction
-    console.log('Oscar: Deep synthesis of all insights...')
+    // Step 4: OSQR synthesizes with extra depth instruction
+    console.log('OSQR: Deep synthesis of all insights...')
     const finalAnswer = await this.synthesize({
       userMessage,
       panelResponses,
@@ -233,7 +233,7 @@ Always give artifacts descriptive titles and reference them in your text.`
   }
 
   /**
-   * Oscar synthesizes panel insights into a final answer
+   * OSQR synthesizes panel insights into a final answer
    */
   private static async synthesize(params: {
     userMessage: string
@@ -250,7 +250,7 @@ Always give artifacts descriptive titles and reference them in your text.`
     // System prompt
     messages.push({
       role: 'system',
-      content: this.OSCAR_SYSTEM_PROMPT,
+      content: this.OSQR_SYSTEM_PROMPT,
     })
 
     // Add user's original question
@@ -279,7 +279,7 @@ ${context}
       content: `Panel Discussion Summary:\n${panelSummary}`,
     })
 
-    // Ask Oscar to synthesize
+    // Ask OSQR to synthesize
     const synthesisPrompt = isDeepAnalysis
       ? `Now synthesize all of this into your answer for me. This is a complex topic, so take your time to be thorough. What's your best answer after hearing from everyone?`
       : `Now give me your answer based on what the panel discussed. What do you think is the best response?`
@@ -289,13 +289,13 @@ ${context}
       content: synthesisPrompt,
     })
 
-    // Use GPT-4 for Oscar synthesis (switched from Claude due to credit issues)
-    const oscarProvider = ProviderRegistry.getProvider('openai', {
+    // Use GPT-4 for OSQR synthesis (switched from Claude due to credit issues)
+    const osqrProvider = ProviderRegistry.getProvider('openai', {
       apiKey: process.env.OPENAI_API_KEY || '',
       model: 'gpt-4-turbo',
     })
 
-    const answer = await oscarProvider.generate({
+    const answer = await osqrProvider.generate({
       messages,
       temperature: 0.7,
     })
@@ -336,10 +336,10 @@ ${context}
   }
 
   /**
-   * Stream Oscar's response (for better UX)
+   * Stream OSQR's response (for better UX)
    * TODO: Implement streaming version
    */
-  static async *askStream(request: OscarRequest): AsyncIterable<string> {
+  static async *askStream(request: OSQRRequest): AsyncIterable<string> {
     // For now, just yield the full response
     const response = await this.ask(request)
     yield response.answer

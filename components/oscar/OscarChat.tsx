@@ -12,7 +12,7 @@ import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
 
 interface Message {
-  role: 'user' | 'oscar'
+  role: 'user' | 'osqr'
   content: string
   thinking?: boolean
   artifacts?: ArtifactBlock[]
@@ -81,7 +81,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
     setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
 
     // Add "thinking" placeholder
-    setMessages((prev) => [...prev, { role: 'oscar', content: '', thinking: true }])
+    setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true }])
 
     setIsLoading(true)
 
@@ -106,7 +106,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to get response from Oscar')
+        throw new Error('Failed to get response from OSQR')
       }
 
       const data = await response.json()
@@ -115,7 +115,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
       setMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = {
-          role: 'oscar',
+          role: 'osqr',
           content: data.answer,
           thinking: false,
           artifacts: data.artifacts,
@@ -135,12 +135,12 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
         setShowArtifacts(true)
       }
     } catch (error) {
-      console.error('Error asking Oscar:', error)
+      console.error('Error asking OSQR:', error)
       // Replace thinking placeholder with error
       setMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = {
-          role: 'oscar',
+          role: 'osqr',
           content: 'I apologize, but I encountered an error. Please try again.',
           thinking: false,
         }
@@ -223,7 +223,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
           <div className="flex h-full flex-col items-center justify-center text-center">
             <Brain className="mb-4 h-16 w-16 text-neutral-400" />
             <h3 className="mb-2 text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-              Hello, I'm Oscar
+              Hello, I'm OSQR
             </h3>
             <p className="max-w-md text-neutral-600 dark:text-neutral-400">
               Your personal AI assistant. I consult a panel of specialized AI experts to give you
@@ -248,7 +248,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
                   <div className="flex items-center space-x-2">
                     <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
-                      Oscar
+                      OSQR
                     </span>
                   </div>
                   <Card className="p-4">
@@ -274,7 +274,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
                   {!message.thinking && message.content && (
                     <ShareActions
                       content={message.content}
-                      agentName="Oscar"
+                      agentName="OSQR"
                       isDebate={!!message.debug?.panelDiscussion}
                       panelDiscussion={message.debug?.panelDiscussion?.map((p, i) => ({
                         content: p.content,
@@ -424,7 +424,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
         {/* Input */}
         <div className="flex space-x-3">
           <Textarea
-            placeholder="Ask Oscar anything..."
+            placeholder="Ask OSQR anything..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

@@ -208,7 +208,7 @@ export function ProfileQuestionModal({
 
           {/* Hint */}
           <p className="mt-3 text-center text-xs text-neutral-500 dark:text-neutral-400">
-            Press Enter to submit • Oscar will use this to personalize responses
+            Press Enter to submit • OSQR will use this to personalize responses
           </p>
         </div>
       </Card>

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Oscar, type OscarRequest } from '@/lib/ai/oscar'
+import { OSQR, type OSQRRequest } from '@/lib/ai/oscar'
 import { type PanelAgent } from '@/lib/ai/panel'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
 import { checkRateLimit, recordRequest } from '@/lib/security'
 import { getServerSession } from 'next-auth'
 import { parseArtifacts } from '@/lib/artifacts'
+import { indexConversation, indexArtifact, indexInBackground } from '@/lib/knowledge/auto-index'
 
 const RequestSchema = z.object({
   message: z.string().min(1),
@@ -130,8 +131,8 @@ export async function POST(req: NextRequest) {
         : `--- User Profile ---\n${profileContext}`
     }
 
-    // Ask Oscar
-    const oscarRequest: OscarRequest = {
+    // Ask OSQR
+    const osqrRequest: OSQRRequest = {
       userMessage: message,
       panelAgents,
       context,
@@ -139,9 +140,9 @@ export async function POST(req: NextRequest) {
       mode,
     }
 
-    const response = await Oscar.ask(oscarRequest)
+    const response = await OSQR.ask(osqrRequest)
 
-    // Parse artifacts from Oscar's response
+    // Parse artifacts from OSQR's response
     const parsedResponse = parseArtifacts(response.answer)
     const { text: cleanAnswer, artifacts } = parsedResponse
 
@@ -163,12 +164,12 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Save Oscar's response
-    const oscarMessage = await prisma.chatMessage.create({
+    // Save OSQR's response
+    const osqrMessage = await prisma.chatMessage.create({
       data: {
         threadId: thread.id,
         role: 'assistant',
-        provider: 'mixed', // Oscar synthesizes from multiple providers
+        provider: 'mixed', // OSQR synthesizes from multiple providers
         content: cleanAnswer,
         metadata: {
           panelSize: panelAgents.length,
@@ -186,7 +187,7 @@ export async function POST(req: NextRequest) {
           prisma.artifact.create({
             data: {
               workspaceId,
-              messageId: oscarMessage.id,
+              messageId: osqrMessage.id,
               threadId: thread.id,
               type: artifact.type,
               title: artifact.title,
@@ -199,6 +200,30 @@ export async function POST(req: NextRequest) {
         )
       )
     }
+
+    // AUTO-INDEX: Index conversation and artifacts for semantic search
+    // This runs in background so it doesn't slow down the response
+    indexInBackground(async () => {
+      // Index the conversation
+      await indexConversation({
+        workspaceId,
+        threadId: thread.id,
+        userMessage: message,
+        osqrResponse: cleanAnswer,
+      })
+
+      // Index any artifacts that were generated
+      for (const artifact of artifacts) {
+        await indexArtifact({
+          workspaceId,
+          artifactId: `${thread.id}-${artifact.title}`,
+          title: artifact.title,
+          content: artifact.content,
+          type: artifact.type,
+          description: artifact.description,
+        })
+      }
+    })
 
     // Optionally save panel discussion for transparency/debugging
     if (includeDebate && response.panelDiscussion) {
@@ -257,7 +282,7 @@ export async function POST(req: NextRequest) {
       }
     )
   } catch (error) {
-    console.error('Oscar ask error:', error)
+    console.error('OSQR ask error:', error)
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(

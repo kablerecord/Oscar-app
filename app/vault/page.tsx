@@ -74,7 +74,7 @@ export default async function VaultPage() {
             Memory Vault
           </h1>
           <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-            Browse and manage your indexed documents. Oscar uses this knowledge to give you personalized answers.
+            Browse and manage your indexed documents. OSQR uses this knowledge to give you personalized answers.
           </p>
         </div>
 
