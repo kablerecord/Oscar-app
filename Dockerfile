@@ -35,6 +35,9 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 
+# Install dumb-init for proper signal handling on Railway
+RUN apk add --no-cache dumb-init
+
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -46,12 +49,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-# Expose the port
+# Expose the port - Railway provides its own PORT
 EXPOSE 3000
 
-# Set environment variables
-ENV PORT=3000
+# Set environment variables - HOSTNAME must be 0.0.0.0
+# PORT will be overridden by Railway at runtime
 ENV HOSTNAME="0.0.0.0"
 
-# Start the server
+# Use dumb-init as PID 1 to properly handle signals
+# This fixes the SIGTERM issue on Railway
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "server.js"]
