@@ -49,11 +49,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
-# Expose the port - Railway provides its own PORT
-EXPOSE 3000
-
-# Set environment variables - HOSTNAME must be 0.0.0.0
-# PORT will be overridden by Railway at runtime
+# Railway automatically injects PORT - no EXPOSE needed
+# The HOSTNAME must be 0.0.0.0 to listen on all interfaces
 ENV HOSTNAME="0.0.0.0"
 
 # Use dumb-init as PID 1 to properly handle signals
