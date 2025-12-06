@@ -5,7 +5,7 @@
     "buildCommand": "DATABASE_URL=\"postgresql://dummy:dummy@localhost:5432/dummy\" npx prisma generate && npm run build && cp -r public .next/standalone/ && cp -r .next/static .next/standalone/.next/"
   },
   "deploy": {
-    "startCommand": "HOSTNAME=0.0.0.0 PORT=$PORT node .next/standalone/server.js",
+    "startCommand": "node .next/standalone/server.js",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",
