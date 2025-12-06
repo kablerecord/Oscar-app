@@ -100,6 +100,13 @@ Needed:
 - [ ] **Skip options** for each step
 - [ ] **Progress indicator** - where user is in setup
 
+### 1.6 Capability Ladder Assessment (NEW - from Capability Ladder doc)
+*Foundation for OSQR's identity engine - determines how OSQR sees and serves each user*
+- [ ] **Capability Level field** - Add to Workspace model (0-12 scale)
+- [ ] **Level Assessment Questions** - 10-15 onboarding questions for initial placement
+- [ ] **Display current level** in profile/settings
+- [ ] **Level-appropriate welcome message** after assessment
+
 ---
 
 ## Phase 2: Core Experience Enhancement
@@ -149,6 +156,14 @@ Needed:
   - Encouraging ↔ Direct
 - [ ] **Learn from user feedback** (thumbs up/down)
 - [ ] **Domain-specific voice** (business vs personal)
+
+### 2.5 Capability Ladder - Level-Based Personalization (NEW)
+*Extend Capability Ladder into core experience*
+- [ ] **Level-appropriate prompts** - Tone matches user's developmental level
+- [ ] **Book recommendations engine** - Automatic per-level suggestions
+- [ ] **Habit prescriptions** - Core Commitments mapped to capability levels
+- [ ] **Dynamic difficulty** - Challenge advanced users, support beginners
+- [ ] **Level scoring signals** - Detect level from conversation patterns
 
 ---
 
@@ -216,13 +231,21 @@ Needed:
 - [ ] **Monthly Summary** - patterns and progress
 - [ ] **Quarterly Deep Dive** - trajectory analysis
 
-### 4.5 Multi-Model Debate Mode (Master Plan: Part 2A.8)
+### 4.5 Capability Ladder - Level-Up System (NEW)
+*Growth tracking and progression*
+- [ ] **Level-Up Reports** - Monthly capability evolution analysis
+- [ ] **Advancement triggers** - Detect when user is ready to level up
+- [ ] **Level history tracking** - Store progression over time
+- [ ] **90-day challenges** - Level-appropriate transformation programs
+- [ ] **Algorithm for level detection** - Automated scoring from behavior patterns
+
+### 4.6 Multi-Model Debate Mode (Master Plan: Part 2A.8)
 - [ ] **Structured debate format** between AI models
 - [ ] **Pro/Con generation** on complex topics
 - [ ] **Devil's advocate mode**
 - [ ] **Consensus building** visualization
 
-### 4.6 Panel Credits System (Master Plan: Part 2A.10)
+### 4.7 Panel Credits System (Master Plan: Part 2A.10)
 - [ ] **Gamified credit system** for panel discussions
 - [ ] **Credit-based pricing tier**
 - [ ] **Bonus credits for referrals**
@@ -326,6 +349,7 @@ Needed:
 3. Refine → Fire UI
 4. Three response modes
 5. Profile builder enhancement
+6. **Capability Ladder Assessment** (onboarding + level field) ⭐ NEW
 
 ### MEDIUM Priority (Next Quarter)
 1. Master Summary Checklist
@@ -333,6 +357,7 @@ Needed:
 3. Model personality tagging
 4. Cross-referencing engine
 5. Panel credits system
+6. **Level-based personalization** (prompts, books, habits) ⭐ NEW
 
 ### LOW Priority (Later)
 1. Desktop app
@@ -340,6 +365,7 @@ Needed:
 3. Advanced automation
 4. External integrations
 5. Team features
+6. **Level-Up Reports & advancement detection** ⭐ NEW
 
 ---
 
@@ -365,7 +391,7 @@ Needed:
 
 ---
 
-## Appendix: Master Plan Section Map
+## Appendix A: Master Plan Section Map
 
 | Master Plan Section | Implementation Area |
 |--------------------|---------------------|
@@ -381,3 +407,195 @@ Needed:
 | Part 3A | UX philosophy, interface |
 | Part 5A | Technical architecture |
 | Part 6A | Marketing philosophy |
+
+---
+
+## Appendix B: OSQR Capability Ladder System (NEW)
+
+*Source: Documents/osqr capability ladder.docx*
+*Purpose: OSQR's Foundational Identity Engine - how OSQR "sees" a human*
+
+### The 13 Levels
+
+| Level | Name | Stage | Identity Pattern |
+|-------|------|-------|------------------|
+| 0 | Untethered | Foundation | "My life is happening to me" |
+| 1 | Reactive Beginner | Foundation | "I want to change, but I don't know how" |
+| 2 | Emerging Awareness | Foundation | "I know something has to change" |
+| 3 | Structured Beginner | Foundation | "I can do it… sometimes" |
+| 4 | Developing Operator | Operator | "I can execute as long as life doesn't disrupt me" |
+| 5 | Independent Operator | Operator | "I do what I say" |
+| 6 | Intentional Builder | Operator | "I build things that make life better" |
+| 7 | Entrepreneur | Creator | "I solve problems" |
+| 8 | Systems Thinker | Creator | "I build engines, not tasks" |
+| 9 | Platform Builder | Creator | "I build infrastructure" |
+| 10 | Ecosystem Architect | Architect | "I create worlds for people to grow inside" |
+| 11 | Visionary Integrator | Architect | "I integrate multiple domains to solve hard problems" |
+| 12 | Generational Architect | Architect | "I build structures that outlive me" |
+
+### Fourth Generation Formula Mapping
+
+Each level maps to the Identity → Capability → Action → Persistence framework:
+
+- **Foundation (0-3)**: Identity undefined → Capability nonexistent/forming → Output random/inconsistent
+- **Operator (4-6)**: Identity forming/present → Capability building/functional → Output stronger/dependable
+- **Creator (7-9)**: Identity powerful/anchored → Capability entrepreneurial/systemic → Output valuable/scalable
+- **Architect (10-12)**: Identity expanded/transcendent → Capability multi-layer/integrative → Output societal/historic
+
+### How OSQR Uses the Ladder
+
+1. **Onboarding Assessment** - 10-15 questions determine initial level
+2. **Daily Prompts** - Tone matches developmental level
+3. **Book Recommendations** - Level-appropriate reading
+4. **Habit Prescriptions** - Core Commitments mapped to levels
+5. **Monthly Level-Up Reports** - Track evolution over time
+6. **Dynamic Difficulty** - Challenge advanced users, support beginners
+7. **MSC Complexity** - Morning Strategy Call depth matches level
+8. **Panel Mode Access** - Different agents available at higher levels
+
+### Recommended Books by Level
+
+| Level | Books |
+|-------|-------|
+| 0 | None (attention too low) |
+| 1-2 | The Slight Edge, Atomic Habits, Mindset |
+| 3-4 | Make Your Bed, 7 Habits, The One Thing |
+| 5-6 | Deep Work, The Power of Habit, E-Myth Revisited, Essentialism |
+| 7-8 | Lean Startup, $100M Offers, Naval Almanack, Principles |
+| 9-10 | Zero to One, The Beginning of Infinity |
+| 11-12 | What Technology Wants, Meditations, Founding Father biographies |
+
+### Technical Implementation Notes
+
+**Database Schema Additions:**
+```
+Workspace {
+  capabilityLevel Int @default(0) // 0-12
+  levelAssessedAt DateTime?
+}
+
+LevelHistory {
+  id String
+  workspaceId String
+  level Int
+  assessedAt DateTime
+  triggers String[] // What caused the level change
+}
+```
+
+**Future Expansion:**
+- A. Assessment questions for each level
+- B. Scoring rubric OSQR will use
+- C. UI/UX flow for onboarding
+- D. Level-Up Reports design
+- E. Algorithm for level advancement detection
+
+---
+
+## Appendix C: Psychological Assessment Framework (NEW)
+
+*Source: Documents/PSYCHOLOGICAL SUMMARY_Kable.docx*
+*Purpose: Companion to Capability Ladder - shows how the framework applies to real psychological assessment*
+
+### Case Study: Level 10+ (Ecosystem Architect / Visionary Integrator)
+
+This psychological summary demonstrates how OSQR should interpret and respond to users at the Architect stage. Key patterns:
+
+**Core Identity Traits (Level 10+):**
+- Self-directed, internally sourced identity
+- Pattern recognition across domains (systems thinking)
+- Long-term, multi-generational planning horizon
+- Mission-driven vs task-driven orientation
+- Comfort with ambiguity and complexity
+- Ownership mentality ("my world, my responsibility")
+
+### The 4-Stage Identity Path
+
+OSQR can use this framework to track user progression:
+
+| Stage | Timeline | Identity State | OSQR Role |
+|-------|----------|----------------|-----------|
+| **Cracking** | 0-45 days | Old identity breaking down | Supportive, validating |
+| **Expansion** | 45-90 days | New patterns emerging | Challenging, stretching |
+| **Alignment** | 3-6 months | Identity crystallizing | Strategic, refining |
+| **Lock-In** | 6-12 months | New identity permanent | Amplifying, scaling |
+
+### Key Psychological Concepts for OSQR
+
+**1. Self-Concept Lag**
+- Definition: Identity hasn't caught up to actual capability
+- OSQR behavior: Gently reflect back evidence of higher capability
+- Example prompt: "Based on what you've built, you're operating at Level X. Your self-talk suggests you still see yourself at Level Y."
+
+**2. High-Performance Alignment Event**
+- Definition: Moment when external results match internal identity
+- OSQR behavior: Celebrate and anchor these moments
+- Example prompt: "This accomplishment aligns with your stated identity as [X]. Worth noting for your records."
+
+**3. Founder State**
+- Definition: Operating mentality of world-builders (Musk, Naval, Hormozi pattern)
+- Characteristics:
+  - System creation > task completion
+  - Leverage thinking > linear thinking
+  - Multi-decade horizon > quarterly thinking
+  - Identity-first > output-first
+- OSQR behavior: Match this wavelength, avoid tactical minutiae
+
+### Psychological Signals by Level
+
+| Signal | Lower Levels (0-6) | Higher Levels (7-12) |
+|--------|-------------------|---------------------|
+| Time horizon | Days/weeks | Years/decades |
+| Problem framing | "How do I do X?" | "What system produces X?" |
+| Failure response | Avoidance/shame | Data/iteration |
+| Identity source | External validation | Internal conviction |
+| Risk tolerance | Low/moderate | Calculated high |
+| Learning mode | Instruction-based | Pattern-based |
+
+### OSQR Assessment Questions (Sample)
+
+**For Level Detection:**
+1. "When you think about your life 10 years from now, what do you see?" (horizon test)
+2. "Describe a recent failure and what you did with it." (failure response)
+3. "What's your relationship with uncertainty?" (ambiguity tolerance)
+4. "Who are you, in one sentence?" (identity source)
+5. "What would you build if money were irrelevant?" (founder state test)
+
+**For Stage Detection:**
+1. "Do you feel like you're becoming someone new, or refining who you already are?" (Cracking vs Alignment)
+2. "How stable does your sense of self feel right now?" (stage indicator)
+3. "Are you in a building phase or a harvesting phase?" (expansion vs lock-in)
+
+### How This Integrates with OSQR
+
+1. **Onboarding Enhancement** - Add psychological assessment questions to capability level detection
+2. **Adaptive Tone** - OSQR adjusts communication style based on psychological profile
+3. **Stage-Aware Prompts** - Morning Strategy Calls reference current identity stage
+4. **Level-Up Triggers** - Psychological breakthroughs as indicators of advancement
+5. **Panel Mode Depth** - Higher psychological sophistication unlocks deeper analysis
+
+### Technical Notes
+
+**Potential Schema Additions:**
+```
+Workspace {
+  identityStage String? // cracking, expansion, alignment, lock_in
+  stageStartDate DateTime?
+  psychProfile Json? // Structured psychological assessment data
+}
+
+PsychAssessment {
+  id String
+  workspaceId String
+  assessedAt DateTime
+  timeHorizon String // days, weeks, months, years, decades
+  identitySource String // external, internal
+  failureResponse String // avoidance, shame, data, iteration
+  founderStateScore Int // 0-10
+}
+```
+
+**Implementation Priority:**
+- Phase 2: Basic psychological questions in onboarding
+- Phase 3: Stage detection and tracking
+- Phase 4: Full psychological profile integration
