@@ -19,12 +19,21 @@ import {
   ArrowRight,
   RotateCcw,
   CheckCircle2,
+  MessageSquare,
+  Users,
 } from 'lucide-react'
 import { ProfileQuestionModal } from '@/components/profile/ProfileQuestionModal'
 import { ShareActions } from '@/components/share/ShareActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
+
+interface AltOpinion {
+  answer: string
+  model: string
+  provider: string
+  loading?: boolean
+}
 
 interface Message {
   role: 'user' | 'osqr'
@@ -36,6 +45,7 @@ interface Message {
     roundtableDiscussion?: any[]
   }
   refinedQuestion?: string // Store the refined question that was fired
+  altOpinion?: AltOpinion // Alternate AI's opinion
 }
 
 interface RefineResult {
@@ -318,6 +328,68 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
     setShowArtifacts(true)
   }
 
+  // Get alternate AI opinion
+  const handleGetAltOpinion = async (messageIdx: number, question: string) => {
+    // Set loading state on the message
+    setMessages((prev) => {
+      const updated = [...prev]
+      updated[messageIdx] = {
+        ...updated[messageIdx],
+        altOpinion: { answer: '', model: '', provider: '', loading: true },
+      }
+      return updated
+    })
+
+    try {
+      const response = await fetch('/api/oscar/alt-opinion', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: question,
+          workspaceId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get alternate opinion')
+      }
+
+      const data = await response.json()
+
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[messageIdx] = {
+          ...updated[messageIdx],
+          altOpinion: {
+            answer: data.answer,
+            model: data.model,
+            provider: data.provider,
+            loading: false,
+          },
+        }
+        return updated
+      })
+    } catch (error) {
+      console.error('Error getting alt opinion:', error)
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[messageIdx] = {
+          ...updated[messageIdx],
+          altOpinion: undefined,
+        }
+        return updated
+      })
+    }
+  }
+
+  // Find the user question for a given OSQR response (look at previous message)
+  const getQuestionForResponse = (responseIdx: number): string => {
+    if (responseIdx > 0 && messages[responseIdx - 1]?.role === 'user') {
+      return messages[responseIdx - 1].content
+    }
+    return ''
+  }
+
   return (
     <div className="flex h-[calc(100vh-12rem)] gap-0">
       {/* Main chat area */}
@@ -446,6 +518,45 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                             </div>
                           </Card>
                         )}
+                      </div>
+                    )}
+
+                    {/* "See what another AI thinks" button */}
+                    {!message.thinking && message.content && !message.altOpinion && (
+                      <div className="mt-3">
+                        <button
+                          onClick={() => handleGetAltOpinion(idx, getQuestionForResponse(idx))}
+                          className="flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          <span>See what another AI thinks</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Alternate AI Opinion Display */}
+                    {message.altOpinion && (
+                      <div className="mt-4">
+                        <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MessageSquare className="h-4 w-4 text-purple-600" />
+                              <span className="text-sm font-semibold text-purple-800 dark:text-purple-300">
+                                {message.altOpinion.loading ? 'Getting another perspective...' : `${message.altOpinion.model} says:`}
+                              </span>
+                            </div>
+                            {message.altOpinion.loading ? (
+                              <div className="flex items-center space-x-2 text-sm text-neutral-500">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                <span>Consulting alternate AI...</span>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
+                                {message.altOpinion.answer}
+                              </p>
+                            )}
+                          </CardContent>
+                        </Card>
                       </div>
                     )}
                   </div>
