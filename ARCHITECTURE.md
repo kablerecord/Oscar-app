@@ -1,9 +1,9 @@
-# Oscar Architecture
+# OSQR Architecture
 
-**Last updated:** 2025-12-03
+**Last updated:** 2025-12-08
 **Owner:** Kable Record
 
-Oscar is a multi-model AI companion (Jarvis-style) that combines:
+OSQR is a multi-model AI companion (Jarvis-style) that combines:
 - **Multiple LLMs** (OpenAI, Anthropic, etc.)
 - **Personal Knowledge Vault** (indexed user files, chats, notes)
 - **Adaptive Profile** that learns about the user over time

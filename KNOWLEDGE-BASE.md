@@ -1,8 +1,8 @@
-# 🧠 Oscar's Knowledge Base System
+# 🧠 OSQR's Knowledge Base System
 
 ## Overview
 
-Oscar's Knowledge Base is designed to handle **messy, unorganized collections** of files and turn them into a structured, searchable, AI-powered knowledge vault. Perfect for indexing your ChatGPT and Claude export files along with everything else.
+OSQR's Knowledge Base is designed to handle **messy, unorganized collections** of files and turn them into a structured, searchable, AI-powered knowledge vault. Perfect for indexing your ChatGPT and Claude export files along with everything else.
 
 ### Key Features
 
@@ -11,7 +11,7 @@ Oscar's Knowledge Base is designed to handle **messy, unorganized collections** 
 ✅ **Smart Extraction** - Text from .txt, .md, .json, .pdf, .docx, code files
 ✅ **Duplicate Detection** - Finds identical files by content hash
 ✅ **Chunking & Embedding** - Breaks large documents into searchable chunks
-✅ **RAG Integration** - Oscar uses your knowledge to answer questions
+✅ **RAG Integration** - OSQR uses your knowledge to answer questions
 
 ---
 
@@ -22,8 +22,8 @@ Oscar's Knowledge Base is designed to handle **messy, unorganized collections** 
 Create a dedicated folder for your knowledge base:
 
 ```bash
-mkdir -p ~/Documents/OscarKnowledge
-cd ~/Documents/OscarKnowledge
+mkdir -p ~/Documents/OSQRKnowledge
+cd ~/Documents/OSQRKnowledge
 
 # Create structure
 mkdir -p 01-raw-imports    # Drop ChatGPT/Claude exports here
@@ -39,7 +39,7 @@ mkdir -p 05-archives       # Old versions & duplicates
 - Can be shared across projects
 - Doesn't clutter the app repo
 
-### Option 2: Inside Oscar App
+### Option 2: Inside OSQR App
 
 ```bash
 cd /Users/kablerecord/Desktop/oscar-app
@@ -61,27 +61,27 @@ mkdir -p knowledge-base/{raw,organized,projects,notes,archives}
 1. Go to ChatGPT settings
 2. Data Controls → Export Data
 3. Download the ZIP file
-4. Extract to `~/Documents/OscarKnowledge/01-raw-imports/chatgpt/`
+4. Extract to `~/Documents/OSQRKnowledge/01-raw-imports/chatgpt/`
 
 **Claude:**
 1. Go to Claude settings
 2. Export conversations
-3. Save to `~/Documents/OscarKnowledge/01-raw-imports/claude/`
+3. Save to `~/Documents/OSQRKnowledge/01-raw-imports/claude/`
 
 ### Step 2: Add Any Other Files
 
-Drop in whatever you want Oscar to know about:
+Drop in whatever you want OSQR to know about:
 - PDFs, documents, notes
 - Code files, project docs
 - Markdown files, text files
 - Research papers, articles
 
-**Don't worry about organization** - Oscar will analyze and categorize them!
+**Don't worry about organization** - OSQR will analyze and categorize them!
 
 ### Step 3: Run the Indexer
 
 ```bash
-npm run index-knowledge ~/Documents/OscarKnowledge/01-raw-imports
+npm run index-knowledge ~/Documents/OSQRKnowledge/01-raw-imports
 ```
 
 **What happens:**
@@ -91,14 +91,14 @@ npm run index-knowledge ~/Documents/OscarKnowledge/01-raw-imports
 4. 🤖 **AI analyzes & proposes organization** (optional)
 5. 📥 Extracts text and indexes into database
 6. ✂️ Chunks documents for embedding
-7. 🧠 Stores in Oscar's knowledge base
+7. 🧠 Stores in OSQR's knowledge base
 
 ### Interactive Process
 
 ```
-🧠 Oscar Knowledge Indexer
+🧠 OSQR Knowledge Indexer
 
-📂 Target directory: /Users/you/Documents/OscarKnowledge/01-raw-imports
+📂 Target directory: /Users/you/Documents/OSQRKnowledge/01-raw-imports
 
 🔍 Step 1: Scanning files...
 
@@ -140,7 +140,7 @@ npm run index-knowledge ~/Documents/OscarKnowledge/01-raw-imports
    - Merge similar conversation exports
    - Archive old versions to 05-archives/
 
-📥 Index 247 files into Oscar's knowledge base? (Y/n): Y
+📥 Index 247 files into OSQR's knowledge base? (Y/n): Y
 
 📥 Indexing files...
 
@@ -157,18 +157,18 @@ npm run index-knowledge ~/Documents/OscarKnowledge/01-raw-imports
 
 ---
 
-## 💬 Using Knowledge Base with Oscar
+## 💬 Using Knowledge Base with OSQR
 
-Once indexed, Oscar automatically has access to your knowledge!
+Once indexed, OSQR automatically has access to your knowledge!
 
 ### In the Chat Interface
 
 1. Check **"Use Knowledge Base"** checkbox
-2. Ask Oscar anything related to your files
-3. Oscar will:
+2. Ask OSQR anything related to your files
+3. OSQR will:
    - Search your knowledge base
    - Find relevant chunks
-   - Ground his answer in YOUR data
+   - Ground the answer in YOUR data
 
 ### Example Questions
 
@@ -182,7 +182,7 @@ Once indexed, Oscar automatically has access to your knowledge!
 "Find all conversations where I mentioned 'Jarvis' or 'AI assistant'"
 ```
 
-Oscar will cite your documents and give you context-aware answers!
+OSQR will cite your documents and give you context-aware answers!
 
 ---
 
@@ -198,7 +198,7 @@ npm run index-knowledge ~/Documents/ChatGPT-Exports --ext=.json,.txt
 
 ```bash
 # TODO: Add force flag to script
-npm run index-knowledge ~/Documents/OscarKnowledge --force
+npm run index-knowledge ~/Documents/OSQRKnowledge --force
 ```
 
 ### View Indexed Documents
@@ -245,7 +245,7 @@ Then update `lib/knowledge/text-extractor.ts` (instructions in comments)
 
 ## 🤖 How AI Organization Works
 
-When you enable AI organization analysis, Oscar:
+When you enable AI organization analysis, OSQR:
 
 1. **Samples your files** (analyzes ~30-50 for efficiency)
 2. **Extracts text previews** from each file
@@ -285,7 +285,7 @@ The AI is given context about:
 1. **Your question** is converted to an embedding vector
 2. **pgvector searches** the DocumentChunk table for similar vectors
 3. **Top K chunks** are retrieved (most relevant content)
-4. **Context is added** to Oscar's panel discussion
+4. **Context is added** to OSQR's panel discussion
 5. **Agents use your data** to formulate answers
 
 ### Chunk Strategy
@@ -353,7 +353,7 @@ Embeddings are stored as **pgvector** type for fast semantic search!
 - [ ] Embedding generation (OpenAI)
 - [ ] pgvector integration
 - [ ] RAG query implementation
-- [ ] Oscar uses knowledge base
+- [ ] OSQR uses knowledge base
 
 ### Phase 3 (Future)
 - [ ] Watch mode (auto-index new files)
@@ -361,7 +361,7 @@ Embeddings are stored as **pgvector** type for fast semantic search!
 - [ ] Manual file upload interface
 - [ ] Category management
 - [ ] Advanced search filters
-- [ ] Citation in Oscar's responses
+- [ ] Citation in OSQR's responses
 - [ ] Export organized structure
 
 ---
@@ -386,7 +386,7 @@ Embeddings are stored as **pgvector** type for fast semantic search!
 2. **Review AI suggestions** - They're usually good but not perfect
 3. **Keep originals** - Don't delete unorganized files yet
 4. **Iterate** - Re-index as you add more files
-5. **Use debug mode** - See what Oscar is using from your knowledge
+5. **Use debug mode** - See what OSQR is using from your knowledge
 
 ### Performance
 
@@ -432,4 +432,4 @@ Embeddings are stored as **pgvector** type for fast semantic search!
 
 ---
 
-**Your messy files → Oscar's organized knowledge → Intelligent answers** 🧠✨
+**Your messy files → OSQR's organized knowledge → Intelligent answers** 🧠✨

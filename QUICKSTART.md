@@ -1,6 +1,6 @@
-# ⚡ Oscar Quick Start Guide
+# ⚡ OSQR Quick Start Guide
 
-**Get Oscar running in 5 minutes**
+**Get OSQR running in 5 minutes**
 
 ## Prerequisites
 
@@ -32,11 +32,11 @@ ANTHROPIC_API_KEY="sk-ant-your-key"
 npm run db:setup
 ```
 
-✅ **Done!** Oscar is ready.
+✅ **Done!** OSQR is ready.
 
 ---
 
-## Using Oscar
+## Using OSQR
 
 ### Start the App
 ```bash
@@ -45,11 +45,11 @@ npm run dev
 
 Open **http://localhost:3000**
 
-### Chat with Oscar
+### Chat with OSQR
 
 1. Type your question
 2. Click "Ask" (or press Enter)
-3. Oscar consults his panel and responds
+3. OSQR consults the panel and responds
 
 **Debug Mode:** Check "Debug Mode" to see the panel discussion
 
@@ -65,7 +65,7 @@ Open **http://localhost:3000**
 ### Step 2: Create Knowledge Folder
 
 ```bash
-mkdir -p ~/Documents/OscarKnowledge/raw-imports
+mkdir -p ~/Documents/OSQRKnowledge/raw-imports
 ```
 
 Put your exports there (don't worry about organization!)
@@ -73,7 +73,7 @@ Put your exports there (don't worry about organization!)
 ### Step 3: Index Files
 
 ```bash
-npm run index-knowledge ~/Documents/OscarKnowledge/raw-imports
+npm run index-knowledge ~/Documents/OSQRKnowledge/raw-imports
 ```
 
 Follow the prompts:
@@ -82,7 +82,7 @@ Follow the prompts:
 
 ### Step 4: Use It
 
-In Oscar's chat, check **"Use Knowledge Base"**
+In OSQR's chat, check **"Use Knowledge Base"**
 
 Ask: "What did I discuss about [topic]?"
 
@@ -91,7 +91,7 @@ Ask: "What did I discuss about [topic]?"
 ## Common Commands
 
 ```bash
-# Start Oscar
+# Start OSQR
 npm run dev
 
 # Index knowledge
@@ -109,7 +109,7 @@ npm run db:setup
 ## Folder Structure
 
 ```
-~/Documents/OscarKnowledge/
+~/Documents/OSQRKnowledge/
 ├── raw-imports/          # Drop everything here
 │   ├── chatgpt/
 │   ├── claude/
@@ -126,4 +126,4 @@ npm run db:setup
 - **Database:** `npx prisma studio`
 - **Docs:** [SETUP.md](./SETUP.md), [KNOWLEDGE-BASE.md](./KNOWLEDGE-BASE.md)
 
-**You now have Jarvis!** 🤖✨
+**You now have your AI companion!** 🤖✨

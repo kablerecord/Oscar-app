@@ -1,17 +1,17 @@
-# Oscar Setup Guide
+# OSQR Setup Guide
 
-Welcome! This guide will help you get Oscar (your Jarvis-like AI assistant) up and running locally.
+Welcome! This guide will help you get OSQR (your Jarvis-like AI assistant) up and running locally.
 
-## 🎯 What is Oscar?
+## 🎯 What is OSQR?
 
-Oscar is your personal AI assistant inspired by Jarvis from Iron Man. When you ask Oscar a question:
+OSQR is your personal AI assistant inspired by Jarvis from Iron Man. When you ask OSQR a question:
 
-1. **Oscar consults a panel of specialized AI agents** (Strategic Thinker, Technical Expert, Creative Problem Solver, Practical Analyst)
+1. **OSQR consults a panel of specialized AI agents** (Strategic Thinker, Technical Expert, Creative Problem Solver, Practical Analyst)
 2. **The panel discusses privately** - they debate and refine ideas behind the scenes
-3. **Oscar synthesizes their insights** - combining the best from each perspective
-4. **Oscar presents you with one unified answer** - clear, comprehensive, and actionable
+3. **OSQR synthesizes their insights** - combining the best from each perspective
+4. **OSQR presents you with one unified answer** - clear, comprehensive, and actionable
 
-Plus, Oscar has access to your **Knowledge Base** - all your indexed documents and files, making responses grounded in your own data.
+Plus, OSQR has access to your **Knowledge Base** - all your indexed documents and files, making responses grounded in your own data.
 
 ---
 
@@ -88,7 +88,7 @@ This will:
    - Default workspace
    - 4 specialized AI agents (Strategic Thinker, Technical Expert, Creative Problem Solver, Practical Analyst)
 
-You should see output like:
+You should see OSQR's panel agents created:
 ```
 ✅ Created user: test@panelbrain.ai
 ✅ Created workspace: My Workspace
@@ -106,17 +106,17 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-You should see Oscar's chat interface! 🎉
+You should see OSQR's chat interface! 🎉
 
 ---
 
-## 💬 Using Oscar
+## 💬 Using OSQR
 
 ### Basic Usage
 
 1. Type your question in the chat box
 2. Click "Ask" or press Enter
-3. Oscar will:
+3. OSQR will:
    - Show "Consulting panel and synthesizing insights..."
    - Consult the 4 AI agents privately
    - Synthesize their responses
@@ -127,12 +127,12 @@ You should see Oscar's chat interface! 🎉
 Want to see what the panel is actually discussing?
 
 - Check the **"Debug Mode (show panel)"** checkbox
-- After Oscar responds, click **"View panel discussion"**
+- After OSQR responds, click **"View panel discussion"**
 - You'll see all 4 agents' individual responses and their roundtable discussion
 
 ### Knowledge Base
 
-Check **"Use Knowledge Base"** to have Oscar ground responses in your indexed documents.
+Check **"Use Knowledge Base"** to have OSQR ground responses in your indexed documents.
 
 *(Note: File indexing system coming soon - for now this is a toggle)*
 
@@ -140,7 +140,7 @@ Check **"Use Knowledge Base"** to have Oscar ground responses in your indexed do
 
 ## 🧠 Understanding the Panel
 
-Oscar consults 4 specialized agents:
+OSQR consults 4 specialized agents:
 
 1. **Strategic Thinker** (Claude Sonnet)
    - Long-term strategy and vision
@@ -211,9 +211,9 @@ await prisma.agent.create({
 
 ---
 
-## 🎨 Customizing Oscar
+## 🎨 Customizing OSQR
 
-### Change Oscar's personality
+### Change OSQR's personality
 
 Edit `lib/ai/oscar.ts` and modify the `OSCAR_SYSTEM_PROMPT` constant.
 
@@ -231,7 +231,7 @@ Use Prisma Studio (see above) to edit any agent's `systemPrompt` field.
 
 ## 🐛 Troubleshooting
 
-### "Failed to get response from Oscar"
+### "Failed to get response from OSQR"
 
 **Check:**
 1. API keys are correct in `.env`
@@ -289,7 +289,7 @@ oscar-app/
 
 ## 🚀 Next Steps
 
-Now that Oscar is running:
+Now that OSQR is running:
 
 1. **Try asking a complex question** - see how the panel collaborates
 2. **Enable debug mode** - understand how agents think differently
@@ -306,4 +306,4 @@ Now that Oscar is running:
 
 ---
 
-**Built with ❤️ as your personal Jarvis**
+**Built with ❤️ as your personal AI companion**
