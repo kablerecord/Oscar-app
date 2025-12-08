@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+// Card components available if needed in future
+// import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Target,
   FolderKanban,

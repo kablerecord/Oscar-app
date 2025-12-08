@@ -525,7 +525,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         <div className="flex items-start space-x-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/30">
           <Sparkles className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
           <p className="text-sm text-neutral-700 dark:text-neutral-300">
-            In the next few minutes, you'll experience 5 "magic moments" that show why OSQR is different from any AI you've used before.
+            In the next few minutes, you&apos;ll experience 5 &quot;magic moments&quot; that show why OSQR is different from any AI you&apos;ve used before.
           </p>
         </div>
 
@@ -546,7 +546,7 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         size="lg"
         className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
       >
-        Let's Go
+        Let&apos;s Go
         <ArrowRight className="ml-2 h-5 w-5" />
       </Button>
     </div>
@@ -573,7 +573,7 @@ function IdentityStep({
           <MessageSquare className="h-6 w-6 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
-          Let's get to know each other
+          Let&apos;s get to know each other
         </h2>
         <p className="mt-1 text-neutral-600 dark:text-neutral-400">
           3 quick questions to personalize OSQR
@@ -609,7 +609,7 @@ function IdentityStep({
 
         <div>
           <label className="mb-2 block text-sm font-medium text-neutral-900 dark:text-white">
-            What's frustrating you right now? <span className="text-neutral-400">(optional)</span>
+            What&apos;s frustrating you right now? <span className="text-neutral-400">(optional)</span>
           </label>
           <Textarea
             value={data.frustration}

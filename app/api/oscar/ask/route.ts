@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
     // Save artifacts to database if any were generated
     if (artifacts.length > 0) {
       await Promise.all(
-        artifacts.map((artifact, index) =>
+        artifacts.map((artifact) =>
           prisma.artifact.create({
             data: {
               workspaceId,
