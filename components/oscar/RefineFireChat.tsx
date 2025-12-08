@@ -46,6 +46,7 @@ interface Message {
   }
   refinedQuestion?: string // Store the refined question that was fired
   altOpinion?: AltOpinion // Alternate AI's opinion
+  mode?: ResponseMode // Which mode was used for this response
 }
 
 interface RefineResult {
@@ -179,8 +180,8 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
       { role: 'user', content: finalQuestion, refinedQuestion: refineResult?.originalQuestion !== finalQuestion ? refineResult?.originalQuestion : undefined },
     ])
 
-    // Add "thinking" placeholder
-    setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true }])
+    // Add "thinking" placeholder with mode
+    setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true, mode: responseMode }])
 
     // Show profile question during wait time
     const nextQuestion = getNextQuestion(answeredQuestionIds)
@@ -216,6 +217,7 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
           content: data.answer,
           thinking: false,
           artifacts: data.artifacts,
+          mode: responseMode, // Preserve the mode used for this response
           debug: showDebug
             ? {
                 panelDiscussion: data.panelDiscussion,
@@ -441,6 +443,20 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                       <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                         OSQR
                       </span>
+                      {/* Mode badge */}
+                      {message.mode && !message.thinking && (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          message.mode === 'quick'
+                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            : message.mode === 'thoughtful'
+                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                            : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                        }`}>
+                          {message.mode === 'quick' && 'Quick'}
+                          {message.mode === 'thoughtful' && 'Thoughtful'}
+                          {message.mode === 'contemplate' && 'Contemplate'}
+                        </span>
+                      )}
                     </div>
                     <Card className="p-4">
                       {message.thinking ? (
@@ -521,8 +537,8 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                       </div>
                     )}
 
-                    {/* "See what another AI thinks" button */}
-                    {!message.thinking && message.content && !message.altOpinion && (
+                    {/* "See what another AI thinks" button - Quick Mode only */}
+                    {!message.thinking && message.content && !message.altOpinion && message.mode === 'quick' && (
                       <div className="mt-3">
                         <button
                           onClick={() => handleGetAltOpinion(idx, getQuestionForResponse(idx))}

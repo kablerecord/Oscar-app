@@ -35,11 +35,11 @@ This roadmap extracts actionable implementation items from the OSQR Master Plan 
 *Focus: Solidify core experience, rebrand to OSQR, complete essential features*
 
 ### 1.1 Branding & Identity
-- [ ] **Rename Oscar → OSQR** across all code, UI, docs
-  - Update all file references
-  - Update UI copy and branding
-  - Update API route naming conventions
+- [x] **Rename Oscar → OSQR** across documentation and UI copy
+  - [x] Update UI copy and branding
+  - [ ] Update API route naming conventions (deferred - would break existing calls)
   - *Master Plan: Part 1A - Naming*
+  - *Note: Internal routes kept as `/api/oscar/` per AUTONOMOUS-GUIDELINES.md*
 
 ### 1.2 Refine → Fire System (Master Plan: Part 2A.3)
 Current: Basic panel mode
@@ -50,13 +50,14 @@ Needed:
 - [ ] **Visual state changes** between modes
 - [ ] **Question refinement suggestions** before firing
 
-### 1.3 Three Response Modes (Master Plan: Part 2A.4)
-Current: Thoughtful mode only
-Needed:
-- [ ] **Quick Mode** - Single fast model, immediate response
-- [ ] **Thoughtful Mode** - Panel + synthesis (current)
-- [ ] **Contemplate Mode** - Extended multi-round + deep synthesis
-- [ ] **Mode selector UI** in chat interface
+### 1.3 Three Response Modes (Master Plan: Part 2A.4) ✅ COMPLETE
+Implemented:
+- [x] **Quick Mode** - Single fast model, immediate response (~5-10s)
+- [x] **Thoughtful Mode** - Panel + synthesis (default, ~20-40s)
+- [x] **Contemplate Mode** - Extended multi-round + deep synthesis (~60-90s)
+- [x] **Mode selector UI** in chat interface (Quick/Thoughtful/Contemplate buttons)
+- [x] **Mode badge** on responses showing which mode was used
+Remaining:
 - [ ] **Auto-suggest mode** based on question complexity
 
 ### 1.3.1 "See What Another AI Thinks" Button ⭐ NEW
@@ -70,11 +71,14 @@ Needed:
 - Optionally synthesizes: "Here's where they agree / disagree"
 
 **Implementation:**
-- [ ] **Add "See another perspective" button** to Quick Mode responses
-- [ ] **Model selector** - let user pick which AI to compare (or auto-select)
+- [x] **Add "See another perspective" button** to Quick Mode responses only
+- [x] **Auto-select model** - randomly picks GPT-4, GPT-4o, or Claude
+- [x] **Inline view** - shows alternate response below original
+- [x] **Model attribution badges** - clear labeling of which AI said what
+Remaining:
+- [ ] **Model selector** - let user pick which AI to compare
 - [ ] **Side-by-side view** - show original + alternate response
 - [ ] **Agreement/disagreement synthesis** - optional quick comparison
-- [ ] **Model attribution badges** - clear labeling of which AI said what
 
 **Why this is genius:**
 - Low compute cost (single additional API call)
