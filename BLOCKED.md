@@ -11,7 +11,22 @@ This file tracks items that are blocked during autonomous development and need u
 **Resolution:** Run `npm run seed-msc` when database is back online
 **Code:** Script complete at `scripts/seed-msc.ts`
 
-### 2. Claude Data Folder Indexing Verification
+### 2. Capability Ladder Migration
+**Date:** 2025-12-08
+**What:** Prisma migration for capability ladder schema changes
+**Why:** Database at `aws-1-us-east-1.pooler.supabase.com:5432` is unreachable
+**Resolution:** When database is online, run:
+```bash
+cd /Users/kablerecord/Desktop/oscar-app
+npx prisma migrate dev --name add_capability_ladder
+```
+**Code:** Schema ready in `prisma/schema.prisma` with:
+- `Workspace.capabilityLevel` (Int, default 0)
+- `Workspace.capabilityAssessedAt` (DateTime?)
+- `Workspace.identityStage` (String?)
+- New `CapabilityAssessment` model for history tracking
+
+### 3. Claude Data Folder Indexing Verification
 **Date:** 2025-12-08
 **What:** Cannot verify if folder is indexed: `/Users/kablerecord/Desktop/Personal Brand/AI GPT/Export data/Claude/Claude Data Dec 1 2025`
 **Why:** Database unreachable, cannot query documents table

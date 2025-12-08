@@ -41,19 +41,27 @@ model Workspace {
   onboardingCompleted   Boolean   @default(false)
   onboardingCompletedAt DateTime?
   tier                  String    @default("free") // 'free' | 'pro' | 'master'
+
+  // Capability Ladder - OSQR's identity engine
+  capabilityLevel       Int       @default(0) // 0-12 scale (Foundation → Architect)
+  capabilityAssessedAt  DateTime? // When last assessed
+  identityStage         String?   // 'cracking' | 'expansion' | 'alignment' | 'lock_in'
+
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
-  owner          User            @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  projects       Project[]
-  documents      Document[]
-  threads        ChatThread[]
-  agents         Agent[]
-  profileAnswers ProfileAnswer[]
-  artifacts      Artifact[]
-  mscItems       MSCItem[]
+  owner                User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  projects             Project[]
+  documents            Document[]
+  threads              ChatThread[]
+  agents               Agent[]
+  profileAnswers       ProfileAnswer[]
+  artifacts            Artifact[]
+  mscItems             MSCItem[]
+  capabilityHistory    CapabilityAssessment[]
 
   @@index([ownerId])
+  @@index([capabilityLevel])
 }
 
 // ============================================================================
@@ -309,6 +317,27 @@ model Artifact {
   @@index([threadId])
   @@index([type])
   @@index([createdAt])
+}
+
+// ============================================================================
+// CAPABILITY LADDER (Identity Engine)
+// ============================================================================
+
+model CapabilityAssessment {
+  id          String   @id @default(cuid())
+  workspaceId String
+  level       Int      // 0-12 capability level
+  stage       String?  // 'foundation' | 'operator' | 'creator' | 'architect'
+  assessedAt  DateTime @default(now())
+  triggers    String[] // What caused the level change/assessment
+  answers     Json?    // Assessment answers at this point in time
+  notes       String?  // Any notes about the assessment
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([assessedAt])
+  @@index([level])
 }
 
 // ============================================================================

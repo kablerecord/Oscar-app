@@ -15,6 +15,7 @@
 | `checkpoint/see-another-ai` | Alt-opinion button feature | 2025-12-08 |
 | `checkpoint/msc-populated` | MSC seed script ready | 2025-12-08 |
 | `checkpoint/three-modes-complete` | Three response modes + mode badges | 2025-12-08 |
+| `checkpoint/capability-ladder` | Capability assessment (code ready, migration pending) | 2025-12-08 |
 
 ---
 
@@ -56,10 +57,17 @@
 - [ ] Skip options for each step
 - [ ] Progress indicator
 
-### 1.6 Capability Ladder Assessment ⏳ NOT STARTED
-- [ ] Add capabilityLevel field to Workspace model
-- [ ] Create 10-15 assessment questions
-- [ ] Display current level in profile
+### 1.6 Capability Ladder Assessment ⏳ IN PROGRESS (code ready, migration blocked)
+- [x] Add capabilityLevel field to Workspace model (`prisma/schema.prisma`)
+- [x] Add CapabilityAssessment model for history tracking
+- [x] Create 13 level definitions (`lib/capability/levels.ts`)
+- [x] Create 10 assessment questions (`lib/capability/assessment.ts`)
+- [x] Create assessment API endpoints (`/api/capability/assess`, `/api/capability/level`)
+- [x] Create CapabilityBadge component (`components/capability/`)
+- [x] Create CapabilityAssessment quiz component
+- [ ] Run Prisma migration (BLOCKED - database unreachable)
+- [ ] Integrate assessment into onboarding flow
+- [ ] Display current level in profile/settings
 - [ ] Level-appropriate welcome message
 
 ---
@@ -70,7 +78,8 @@ See [BLOCKED.md](./BLOCKED.md) for items waiting on external factors.
 
 Current blocks:
 1. **MSC Seed Script** - Database unreachable, script ready at `scripts/seed-msc.ts`
-2. **Claude Data Indexing** - Can't verify if indexed until database online
+2. **Capability Ladder Migration** - Database unreachable, schema ready in `prisma/schema.prisma`
+3. **Claude Data Indexing** - Can't verify if indexed until database online
 
 ---
 
@@ -84,6 +93,12 @@ Current blocks:
 | `PROGRESS.md` | This file - quick status reference |
 | `scripts/seed-msc.ts` | MSC seed script (ready to run) |
 | `app/api/oscar/alt-opinion/route.ts` | Alternate AI opinion endpoint |
+| `lib/capability/levels.ts` | 13-level Capability Ladder definitions |
+| `lib/capability/assessment.ts` | 10 assessment questions + scoring |
+| `app/api/capability/assess/route.ts` | Assessment submission endpoint |
+| `app/api/capability/level/route.ts` | Get current capability level |
+| `components/capability/CapabilityBadge.tsx` | Level display badge |
+| `components/capability/CapabilityAssessment.tsx` | Quiz component |
 
 ---
 
@@ -93,10 +108,11 @@ Current blocks:
 1. File Upload Enhancement (1.4) - add progress indicators
 
 **Medium Effort (2-3 hours):**
-2. Capability Ladder Assessment (1.6) - schema + questions
-3. Onboarding Polish (1.5) - UX improvements
+2. Onboarding Polish (1.5) - UX improvements
+3. Integrate Capability Assessment into onboarding flow
 
 **When Database Online:**
+- Run `npx prisma migrate dev --name add_capability_ladder` for capability schema
 - Run `npm run seed-msc` to populate MSC
 - Verify Claude export folder indexing
 
