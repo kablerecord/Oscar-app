@@ -15,7 +15,7 @@ async function main() {
   })
 
   console.log(`✅ Disabled ${result.count} Claude agents`)
-  console.log('\nOscar will now use only GPT-4 agents.')
+  console.log('\nOSQR will now use only GPT-4 agents.')
   console.log('Once Anthropic credits are active, run: npx tsx scripts/enable-claude-agents.ts')
 
   await prisma.$disconnect()

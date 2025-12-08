@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/db/prisma'
 import { generateEmbedding, formatEmbeddingForPostgres } from '@/lib/ai/embeddings'
+import { canUploadDocument, canUploadFileSize } from '@/lib/tiers/check'
 import OpenAI from 'openai'
 
 // Lazy initialization to avoid build-time errors
@@ -43,6 +44,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: 'workspaceId is required' },
         { status: 400 }
+      )
+    }
+
+    // Check tier limits - document count
+    const docCheck = await canUploadDocument(workspaceId)
+    if (!docCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'Limit reached',
+          message: docCheck.reason,
+          upgrade: true,
+          currentTier: docCheck.tier,
+        },
+        { status: 403 }
+      )
+    }
+
+    // Check tier limits - file size
+    const sizeCheck = await canUploadFileSize(workspaceId, file.size)
+    if (!sizeCheck.allowed) {
+      return NextResponse.json(
+        {
+          error: 'File too large',
+          message: sizeCheck.reason,
+          upgrade: true,
+          currentTier: sizeCheck.tier,
+        },
+        { status: 403 }
       )
     }
 
@@ -219,7 +248,12 @@ function chunkText(text: string, chunkSize: number, overlap: number): string[] {
   const chunks: string[] = []
   let start = 0
 
-  while (start < text.length) {
+  // Safety: limit max chunks to prevent runaway
+  const maxChunks = Math.ceil(text.length / (chunkSize - overlap)) + 10
+  let iterations = 0
+
+  while (start < text.length && iterations < maxChunks) {
+    iterations++
     const end = Math.min(start + chunkSize, text.length)
     let chunk = text.slice(start, end)
 
@@ -233,10 +267,20 @@ function chunkText(text: string, chunkSize: number, overlap: number): string[] {
       }
     }
 
-    chunks.push(chunk.trim())
-    start += chunk.length - overlap
-    if (start <= 0) start = end // Prevent infinite loop
+    const trimmedChunk = chunk.trim()
+    if (trimmedChunk.length > 0) {
+      chunks.push(trimmedChunk)
+    }
+
+    // Calculate next start position, ensuring we always advance
+    const advance = Math.max(chunk.length - overlap, 1)
+    start += advance
+
+    // Additional safety: if we're not making progress, force advance
+    if (start <= iterations - 1) {
+      start = end
+    }
   }
 
-  return chunks.filter(c => c.length > 0)
+  return chunks
 }

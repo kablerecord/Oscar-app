@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { question, workspaceId, context } = await req.json()
+    const { question, workspaceId, documentId, context } = await req.json()
 
     if (!question) {
       return NextResponse.json(
@@ -25,9 +25,34 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Get any knowledge base context if available
+    // Get document context - prioritize direct document fetch if we have documentId
     let knowledgeContext = ''
-    if (workspaceId) {
+
+    // If we have a specific documentId (from onboarding), fetch that document directly
+    if (documentId) {
+      try {
+        const document = await prisma.document.findUnique({
+          where: { id: documentId },
+          select: {
+            title: true,
+            textContent: true,
+            originalFilename: true
+          }
+        })
+        if (document?.textContent) {
+          const docName = document.originalFilename || document.title
+          // Truncate to avoid token limits
+          const truncatedContent = document.textContent.slice(0, 12000)
+          knowledgeContext = `[Document: ${docName}]\n${truncatedContent}`
+          console.log(`[First Question] Using direct document content from ${docName} (${truncatedContent.length} chars)`)
+        }
+      } catch (e) {
+        console.log('Error fetching document by ID:', e)
+      }
+    }
+
+    // Fallback to semantic search if no direct document content
+    if (!knowledgeContext && workspaceId) {
       try {
         const { searchKnowledge } = await import('@/lib/knowledge/search')
         knowledgeContext = await searchKnowledge({
@@ -58,18 +83,28 @@ User context:
       messages: [
         {
           role: 'system',
-          content: `You are Oscar, a helpful AI assistant. Give a thoughtful, personalized response based on what you know about the user. Be conversational and helpful. Keep your response focused and under 200 words.
+          content: `You're OSQR. Give ONE surprising insight about their document in 3-4 sentences MAX.
+
+RULES:
+- NO bullet points or numbered lists
+- NO "The key takeaways are..."
+- NO "Based on the document..."
+- Sound like a smart friend who just read their stuff and noticed something interesting
+
+Start with something like "Oh interesting..." or "The thing that jumped out to me..." or just dive right into the insight.
+
+Make them think "wow, that's a good point" — not "thanks for the summary."
 
 ${personalContext}
 
-${knowledgeContext ? `Relevant information from their knowledge base:\n${knowledgeContext}` : 'Note: The user hasn\'t uploaded any documents yet, so give a thoughtful general response based on their question and the context they provided.'}`
+${knowledgeContext ? `THEIR DOCUMENT:\n${knowledgeContext}\n\nPick ONE interesting angle. Be conversational. 3-4 sentences max.` : 'No doc uploaded — give them something sharp based on what they shared about themselves.'}`
         },
         {
           role: 'user',
           content: question
         }
       ],
-      temperature: 0.7,
+      temperature: 0.85,
     })
 
     return NextResponse.json({

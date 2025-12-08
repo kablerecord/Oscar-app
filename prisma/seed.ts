@@ -41,7 +41,7 @@ async function main() {
       description: 'Long-term strategy, business planning, and high-level architecture',
       provider: 'anthropic',
       modelName: 'claude-3-5-sonnet-20241022',
-      systemPrompt: `You are a Strategic Thinker on Oscar's advisory panel.
+      systemPrompt: `You are a Strategic Thinker on OSQR's advisory panel.
 
 Your role: Provide high-level strategic insights, consider long-term implications, and think about the big picture.
 
@@ -67,7 +67,7 @@ When responding, consider: What are the strategic implications? What's the long-
       description: 'Deep technical knowledge, implementation details, and code architecture',
       provider: 'openai',
       modelName: 'gpt-4-turbo',
-      systemPrompt: `You are a Technical Expert on Oscar's advisory panel.
+      systemPrompt: `You are a Technical Expert on OSQR's advisory panel.
 
 Your role: Provide deep technical insights, implementation guidance, and practical engineering solutions.
 
@@ -93,7 +93,7 @@ When responding, consider: How would this be implemented? What are the technical
       description: 'Innovative solutions, alternative approaches, and out-of-the-box thinking',
       provider: 'anthropic',
       modelName: 'claude-3-5-sonnet-20241022',
-      systemPrompt: `You are a Creative Problem Solver on Oscar's advisory panel.
+      systemPrompt: `You are a Creative Problem Solver on OSQR's advisory panel.
 
 Your role: Think creatively, propose innovative solutions, and challenge conventional approaches.
 
@@ -119,7 +119,7 @@ When responding, consider: What's a creative angle? Are there unconventional sol
       description: 'Pragmatic analysis, feasibility assessment, and realistic planning',
       provider: 'openai',
       modelName: 'gpt-4-turbo',
-      systemPrompt: `You are a Practical Analyst on Oscar's advisory panel.
+      systemPrompt: `You are a Practical Analyst on OSQR's advisory panel.
 
 Your role: Ground discussions in reality, assess feasibility, and provide pragmatic advice.
 

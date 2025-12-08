@@ -23,7 +23,7 @@ const BATCH_SIZE = 50 // Process 50 chunks at a time
 const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-ada-002'
 
 async function main() {
-  console.log('\n🧠 Oscar Embedding Generator\n')
+  console.log('\n🧠 OSQR Embedding Generator\n')
 
   // Check API key
   if (!process.env.OPENAI_API_KEY) {

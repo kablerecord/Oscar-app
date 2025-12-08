@@ -27,6 +27,7 @@ This roadmap extracts actionable implementation items from the OSQR Master Plan 
 ### Phase 3: Intelligence Layer (Months 4-6)
 ### Phase 4: Advanced Features (Months 6-9)
 ### Phase 5: OS-Level Features (Months 9-12+)
+### Phase X: VS Code Dev Companion Extension (Future)
 
 ---
 
@@ -599,3 +600,244 @@ PsychAssessment {
 - Phase 2: Basic psychological questions in onboarding
 - Phase 3: Stage detection and tracking
 - Phase 4: Full psychological profile integration
+
+---
+
+## Phase X: VS Code Dev Companion Extension (Future)
+*Focus: Native VS Code extension connecting to OSQR backend for developer workflows*
+
+### Overview
+
+A VS Code extension that connects to OSQR's backend and leverages PKV, MSC, and multi-model routing specifically for software development workflows. The extension enables developers to use OSQR's "Refine → Fire" methodology directly inside their development environment.
+
+### X.1 Core Goals for v1
+
+- [ ] **VS Code Sidebar** - OSQR panel accessible while coding
+- [ ] **Refine → Fire on Selected Code** - Highlight code, ask OSQR, get multi-model insight
+- [ ] **PKV Integration** - Context from user's personal knowledge vault available in extension
+- [ ] **MSC Integration** - Morning Strategy Call patterns applied to dev tasks
+- [ ] **Multi-model routing** - Same panel/debate mode as web app
+
+### X.2 Extension UX: OSQR Dev Panel
+
+Three collapsible sections in the sidebar:
+
+#### Context Panel
+- [ ] **Project binding** - Associate VS Code workspace with OSQR project
+- [ ] **Active context display** - Show what PKV + MSC context is loaded
+- [ ] **Quick context toggle** - Enable/disable specific knowledge sources
+- [ ] **Context indicators** - Visual badges for active PKV, MSC, project docs
+
+#### Tasks & Questions Panel
+- [ ] **Question input field** - Type or voice-to-text questions
+- [ ] **Suggested questions** - Based on current file/selection
+- [ ] **Active task list** - Synced with OSQR web app
+- [ ] **Task completion** - Mark tasks done from VS Code
+- [ ] **Code-aware suggestions** - "Explain this function", "Find bugs", etc.
+
+#### Insights Panel
+- [ ] **Recent answers** - Last 5 OSQR responses (clickable to expand)
+- [ ] **Pinned insights** - User-pinned important responses
+- [ ] **Code snippets** - Generated code ready to insert
+- [ ] **Apply to editor** - One-click insert of generated code
+
+### X.3 Commands & Behaviors
+
+#### Refine & Fire on Selection
+- [ ] **Keyboard shortcut** - `Cmd+Shift+O` (Mac) / `Ctrl+Shift+O` (Windows)
+- [ ] **Context menu item** - "Ask OSQR about this"
+- [ ] **Auto-detect question type** - Code explanation, bug finding, refactoring
+- [ ] **Language detection** - Adjust prompts based on file type
+- [ ] **Multi-file context** - Include related files automatically
+
+#### Generate Project TODO
+- [ ] **Scan current workspace** - Extract TODO/FIXME comments
+- [ ] **OSQR synthesis** - Generate prioritized task list
+- [ ] **Task assignment** - Suggest which tasks to tackle first
+- [ ] **Sync to web app** - Push generated tasks to OSQR web
+
+#### Summarize Recent Work
+- [ ] **Git integration** - Analyze recent commits
+- [ ] **Change detection** - Summarize what files changed
+- [ ] **Progress report** - Generate summary of work done
+- [ ] **Share to MSC** - Export to Morning Strategy Call context
+
+### X.4 PKV Integration
+
+#### Project Binding
+- [ ] **Workspace ↔ Project mapping** - Link VS Code workspace to OSQR project
+- [ ] **Auto-suggest binding** - Detect project from git remote or package.json
+- [ ] **Multi-project support** - Handle monorepos with multiple bindings
+- [ ] **Binding indicators** - Show which PKV context is active
+
+#### Read Path (PKV → Extension)
+- [ ] **Semantic search** - Query PKV from VS Code
+- [ ] **Context injection** - Include relevant PKV docs in AI prompts
+- [ ] **Reference display** - Show which PKV documents informed the answer
+- [ ] **Quick preview** - Hover to see PKV document excerpts
+
+#### Write Path (Extension → PKV)
+- [ ] **Index code snippets** - Save important code to PKV
+- [ ] **Index decisions** - Document architectural decisions
+- [ ] **Index learnings** - Capture "aha moments" during coding
+- [ ] **Auto-index option** - Automatically save starred responses
+
+### X.5 MSC Integration
+
+#### Daily Dev Standup
+- [ ] **Morning prompt** - "What are you building today?"
+- [ ] **Context-aware suggestions** - Based on recent git activity
+- [ ] **Goal setting** - Set 1-3 daily coding goals
+- [ ] **End-of-day review** - Summary of what was accomplished
+
+#### Pattern Detection
+- [ ] **Coding patterns** - Detect user's coding habits
+- [ ] **Time tracking** - Optional tracking of coding sessions
+- [ ] **Productivity insights** - "You're most productive at X time"
+- [ ] **Break reminders** - Based on user preferences
+
+### X.6 "One-Prompt Build" (Advanced Feature)
+
+A future capability for scaffolding entire features:
+
+- [ ] **Feature description input** - "Build a user authentication system"
+- [ ] **Multi-step generation** - Files, tests, documentation
+- [ ] **Preview mode** - Review before applying changes
+- [ ] **Rollback support** - Undo generated changes
+- [ ] **Iterative refinement** - "Make this more secure"
+
+### X.7 Technical Implementation Notes
+
+#### Extension Architecture
+```
+osqr-vscode/
+├── src/
+│   ├── extension.ts      # Entry point
+│   ├── panels/           # Webview panels
+│   ├── commands/         # VS Code commands
+│   ├── api/              # OSQR backend client
+│   └── context/          # Context management
+├── webview/              # React-based sidebar UI
+└── package.json          # Extension manifest
+```
+
+#### Authentication Flow
+- [ ] **OAuth redirect** - Login via browser, return to VS Code
+- [ ] **Token storage** - Secure storage in VS Code secrets
+- [ ] **Session management** - Auto-refresh tokens
+- [ ] **Multi-account** - Support multiple OSQR accounts
+
+#### API Endpoints Required
+- [ ] `POST /api/vscode/refine` - Refine question with code context
+- [ ] `POST /api/vscode/fire` - Multi-model query with code context
+- [ ] `GET /api/vscode/pkv/search` - Search PKV from extension
+- [ ] `POST /api/vscode/pkv/index` - Index code/decisions to PKV
+- [ ] `GET /api/vscode/context` - Get current project context
+- [ ] `POST /api/vscode/tasks` - Sync tasks with web app
+
+### X.8 Success Criteria for v1
+
+1. **User can ask questions** about selected code and get multi-model responses
+2. **PKV context** improves answer quality compared to vanilla AI
+3. **Seamless sync** between VS Code and OSQR web app
+4. **Sub-3-second** response time for Quick Mode
+5. **Zero-config setup** for existing OSQR users (just login)
+6. **Works offline** for basic features (cached context)
+
+### X.9 Implementation Priority
+
+| Priority | Feature | Complexity |
+|----------|---------|------------|
+| P0 | Authentication + basic sidebar | Medium |
+| P0 | Refine → Fire on selection | Medium |
+| P1 | PKV read integration | High |
+| P1 | Context panel | Medium |
+| P2 | PKV write integration | Medium |
+| P2 | Task sync | Medium |
+| P3 | MSC integration | High |
+| P3 | One-Prompt Build | Very High |
+
+---
+
+## Appendix D: Autonomous Developer Mode
+
+*Trigger: Run `/autonomous` or say "run in autonomous mode"*
+
+### Instructions for Claude
+
+When running in Autonomous Developer Mode, follow these rules:
+
+1. **Break the project into tasks and subtasks** - Read this ROADMAP.md and create a dependency graph
+2. **Build a dependency graph** - Understand what depends on what
+3. **Execute tasks in optimal order** - Parallelize where possible
+4. **When a task is blocked, store the question and pivot** - Don't stop, move to the next task
+5. **Only stop when no tasks remain executable** - Maximize progress before asking for input
+6. **Batch all questions and deliver them together** - One interruption, not many
+7. **If a missing detail is minor, make a reasonable assumption** - Document it in ASSUMPTIONS.md and keep building
+
+### Your Goal
+
+**Maximum forward progress with minimum interruption.**
+
+### Checkpoint Strategy
+
+Create git branches/tags at major milestones for rollback safety:
+
+```
+main (current stable)
+  └── feature/autonomous-phase-1
+        ├── checkpoint/branding-complete      # After Oscar → OSQR rename
+        ├── checkpoint/see-another-ai         # After "See another AI thinks" feature
+        ├── checkpoint/msc-populated          # After MSC functionality
+        ├── checkpoint/auth-complete          # After authentication is working
+        └── checkpoint/phase-1-complete       # After all Phase 1 items
+```
+
+### Before Starting Autonomous Mode
+
+1. `git checkout -b feature/autonomous-phase-1` (create feature branch)
+2. Read ROADMAP.md HIGH Priority items
+3. Check ARCHITECTURE.md for code patterns
+4. Use TodoWrite to track progress visibly
+
+### When Blocked
+
+Create/update `BLOCKED.md` with:
+- What you were trying to do
+- What information you need
+- Your best guess if you had to proceed
+
+### When Complete
+
+1. Create a summary of all changes made
+2. List any assumptions made (from ASSUMPTIONS.md)
+3. Present batched questions from BLOCKED.md
+4. Show `git log --oneline` of commits
+
+### Autonomous Phase 1 Scope (Beta)
+
+Items Claude can complete without user input:
+
+| Task | Confidence | Notes |
+|------|------------|-------|
+| Oscar → OSQR branding | HIGH | Find/replace across codebase |
+| "See another AI thinks" button | HIGH | Add to Quick Mode per spec |
+| Fix console errors | HIGH | DialogTitle bug, etc. |
+| MSC UI population | HIGH | Create sample items |
+| Code cleanup/refactoring | HIGH | Follow ARCHITECTURE.md |
+| Add new UI components | HIGH | Match existing patterns |
+| API endpoint additions | MEDIUM | May need to clarify specs |
+| Capability Ladder questions | MEDIUM | Content needs approval |
+| Memory system architecture | MEDIUM | Design decisions |
+
+### Items Requiring User Input
+
+- Stripe pricing/products setup
+- Production deployment credentials
+- Content/copy decisions for user-facing text
+- Major UX flow changes
+- Database schema changes affecting production data
+
+---
+
+**To activate:** Say "run in autonomous mode" or `/autonomous`

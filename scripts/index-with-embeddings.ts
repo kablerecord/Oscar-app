@@ -36,7 +36,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log('\n🧠 Oscar Knowledge Indexer (with Embeddings)\n')
+  console.log('\n🧠 OSQR Knowledge Indexer (with Embeddings)\n')
   console.log(`📂 Target directory: ${targetDir}\n`)
 
   // Scan files

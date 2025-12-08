@@ -1,5 +1,5 @@
 /**
- * Oscar Artifact System
+ * OSQR Artifact System
  *
  * Artifacts are structured outputs that can be rendered, previewed, and exported.
  * Unlike plain text responses, artifacts have:
@@ -46,7 +46,7 @@ export interface ParsedResponse {
   artifacts: ArtifactBlock[]      // Extracted artifacts
 }
 
-// Artifact markers that Oscar will use in responses
+// Artifact markers that OSQR will use in responses
 export const ARTIFACT_MARKERS = {
   // Format: <artifact type="code" title="My Code" language="typescript">
   openTag: /<artifact\s+type="([^"]+)"\s+title="([^"]+)"(?:\s+language="([^"]+)")?(?:\s+description="([^"]*)")?>/gi,

@@ -66,7 +66,7 @@ export async function vectorSearch(options: VectorSearchOptions): Promise<string
     return `Note: These results have lower confidence matches.\n\n${context}`
   }
 
-  // Format context for Oscar
+  // Format context for OSQR
   const context = relevantResults
     .map((result, idx) => {
       return `[Source ${idx + 1}: ${result.documentTitle} (${Math.round(result.similarity * 100)}% match)]\n${result.content}`
@@ -128,7 +128,7 @@ export async function hybridSearch(options: VectorSearchOptions): Promise<string
     return undefined
   }
 
-  // Format context for Oscar
+  // Format context for OSQR
   const context = results
     .map((result, idx) => {
       const matchInfo = result.similarity > 0

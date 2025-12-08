@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 /**
- * Oscar Knowledge Indexer CLI
+ * OSQR Knowledge Indexer CLI
  *
  * Scans, organizes, and indexes your messy file collection
  * Usage: npm run index-knowledge <directory>
@@ -33,7 +33,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log('\n🧠 Oscar Knowledge Indexer\n')
+  console.log('\n🧠 OSQR Knowledge Indexer\n')
   console.log(`📂 Target directory: ${targetDir}\n`)
 
   // Step 1: Scan files
@@ -109,7 +109,7 @@ async function main() {
 
   // Step 5: Index into database
   const shouldIndex = await question(
-    `\n📥 Index ${files.length} files into Oscar's knowledge base? (Y/n): `
+    `\n📥 Index ${files.length} files into OSQR's knowledge base? (Y/n): `
   )
 
   if (shouldIndex.toLowerCase() === 'n') {

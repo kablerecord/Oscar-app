@@ -15,7 +15,7 @@ async function main() {
   })
 
   console.log(`✅ Enabled ${result.count} Claude agents`)
-  console.log('\nOscar will now use both GPT-4 and Claude agents!')
+  console.log('\nOSQR will now use both GPT-4 and Claude agents!')
 
   await prisma.$disconnect()
 }

@@ -91,7 +91,7 @@ graph TD
 `
 
 /**
- * Get the artifact instruction for Oscar's system prompt
+ * Get the artifact instruction for OSQR's system prompt
  */
 export function getArtifactInstructions(): string {
   return ARTIFACT_SYSTEM_PROMPT

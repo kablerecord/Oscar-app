@@ -14,7 +14,40 @@ export interface ProfileQuestion {
   priority: number // 1 = highest priority, 10 = lowest
   type: 'text' | 'choice' // Future: support multiple choice
   choices?: string[] // For choice type questions
+  isV1Essential?: boolean // Critical for V1 launch - minimum viable profile
 }
+
+/**
+ * V1 Essential Questions (The Minimum Viable Profile)
+ * These 3 questions give OSQR enough context to feel magical from Day 1
+ * Used in quick onboarding flow
+ */
+export const V1_ESSENTIAL_QUESTIONS: ProfileQuestion[] = [
+  {
+    id: 'v1-working-on',
+    category: 'goals',
+    question: "What are you working on right now?",
+    priority: 1,
+    type: 'text',
+    isV1Essential: true,
+  },
+  {
+    id: 'v1-goal',
+    category: 'goals',
+    question: "What's your #1 goal right now?",
+    priority: 1,
+    type: 'text',
+    isV1Essential: true,
+  },
+  {
+    id: 'v1-constraint',
+    category: 'context',
+    question: "What's your biggest constraint or blocker?",
+    priority: 1,
+    type: 'text',
+    isV1Essential: true,
+  },
+]
 
 /**
  * Question bank - ordered by priority within each category

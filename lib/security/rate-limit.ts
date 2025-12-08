@@ -24,6 +24,7 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
     requestsPerDay: 100,
     endpointLimits: {
       'oscar/ask': { perMinute: 5, perDay: 50 },
+      'oscar/refine': { perMinute: 15, perDay: 150 }, // Refine is cheaper, allow more
       'knowledge/search': { perMinute: 20, perDay: 200 },
     },
   },
@@ -32,7 +33,17 @@ export const RATE_LIMITS: Record<string, RateLimitConfig> = {
     requestsPerDay: 1000,
     endpointLimits: {
       'oscar/ask': { perMinute: 15, perDay: 500 },
+      'oscar/refine': { perMinute: 30, perDay: 1000 },
       'knowledge/search': { perMinute: 60, perDay: 2000 },
+    },
+  },
+  master: {
+    requestsPerMinute: 60,
+    requestsPerDay: 5000,
+    endpointLimits: {
+      'oscar/ask': { perMinute: 30, perDay: 2000 },
+      'oscar/refine': { perMinute: 60, perDay: 5000 },
+      'knowledge/search': { perMinute: 120, perDay: 10000 },
     },
   },
   unlimited: {

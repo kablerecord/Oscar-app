@@ -1,4 +1,4 @@
-// Oscar Database Schema
+// OSQR Database Schema
 // Multi-tenant ready design (single-user MVP for now)
 // PostgreSQL with pgvector for semantic search
 
@@ -40,6 +40,7 @@ model Workspace {
   ownerId               String
   onboardingCompleted   Boolean   @default(false)
   onboardingCompletedAt DateTime?
+  tier                  String    @default("free") // 'free' | 'pro' | 'master'
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
@@ -50,6 +51,7 @@ model Workspace {
   agents         Agent[]
   profileAnswers ProfileAnswer[]
   artifacts      Artifact[]
+  mscItems       MSCItem[]
 
   @@index([ownerId])
 }
@@ -307,4 +309,25 @@ model Artifact {
   @@index([threadId])
   @@index([type])
   @@index([createdAt])
+}
+
+// ============================================================================
+// MASTER SUMMARY CHECKLIST (MSC)
+// ============================================================================
+
+model MSCItem {
+  id          String   @id @default(cuid())
+  workspaceId String
+  category    String   // 'goal' | 'project' | 'idea' | 'principle' | 'habit'
+  content     String
+  isPinned    Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@index([category])
+  @@index([isPinned])
 }

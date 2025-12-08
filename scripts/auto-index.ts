@@ -21,7 +21,7 @@ async function main() {
     process.exit(1)
   }
 
-  console.log('\n🧠 Oscar Knowledge Indexer (Auto Mode)\n')
+  console.log('\n🧠 OSQR Knowledge Indexer (Auto Mode)\n')
   console.log(`📂 Target directory: ${targetDir}\n`)
 
   // Step 1: Scan files

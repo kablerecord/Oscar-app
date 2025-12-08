@@ -1,5 +1,5 @@
 import { MainLayout } from '@/components/layout/MainLayout'
-import { OscarChat } from '@/components/oscar/OscarChat'
+import { RefineFireChat } from '@/components/oscar/RefineFireChat'
 import { OnboardingWrapper } from '@/components/onboarding/OnboardingWrapper'
 import { prisma } from '@/lib/db/prisma'
 
@@ -41,18 +41,18 @@ export default async function PanelPage() {
       workspaceId={workspace.id}
       initialOnboardingCompleted={workspace.onboardingCompleted}
     >
-      <MainLayout user={user} workspaceName={workspace.name}>
+      <MainLayout user={user} workspaceName={workspace.name} workspaceId={workspace.id} showMSC={true}>
         <div className="space-y-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
               Chat with OSQR
             </h1>
             <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-              Your personal AI assistant. OSQR consults a panel of AI experts behind the scenes to give you the best possible answers.
+              Refine your question, then fire it to a panel of AI experts for the best possible answer.
             </p>
           </div>
 
-          <OscarChat workspaceId={workspace.id} />
+          <RefineFireChat workspaceId={workspace.id} />
         </div>
       </MainLayout>
     </OnboardingWrapper>

@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SessionProvider } from "@/components/providers/SessionProvider";
 
 export const metadata: Metadata = {
-  title: "PanelBrain - Multi-Model AI Master Brain",
-  description: "Your personal multi-model AI panel discussion and knowledge base",
+  title: "OSQR - Your AI Operating System for Capability",
+  description: "Think sharper, decide faster, and build capability that compounds with OSQR.",
 };
 
 export default function RootLayout({
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="font-sans antialiased">
-        {children}
+        <SessionProvider>
+          {children}
+        </SessionProvider>
       </body>
     </html>
   );

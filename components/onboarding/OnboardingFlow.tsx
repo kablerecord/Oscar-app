@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
 } from '@/components/ui/dialog'
 import {
   Brain,
@@ -23,6 +24,9 @@ import {
   Lightbulb,
   Crown,
   Bot,
+  Shield,
+  X,
+  Settings2,
 } from 'lucide-react'
 
 interface OnboardingFlowProps {
@@ -54,7 +58,6 @@ type Step =
   | 'identity'
   | 'upload'
   | 'indexing'
-  | 'first-question'
   | 'panel-debate'
   | 'memory-callback'
   | 'master-summary'
@@ -64,7 +67,7 @@ const STEPS: Step[] = [
   'identity',
   'upload',
   'indexing',
-  'first-question',
+  // 'first-question' is now merged into 'indexing'
   'panel-debate',
   'memory-callback',
   'master-summary'
@@ -78,9 +81,11 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
     frustration: '',
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [isAnswering, setIsAnswering] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [fileSummary, setFileSummary] = useState<string>('')
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([])
+  const [indexedDocumentId, setIndexedDocumentId] = useState<string | null>(null)
   const [selectedQuestion, setSelectedQuestion] = useState<string>('')
   const [firstAnswer, setFirstAnswer] = useState<string>('')
   const [panelDebate, setPanelDebate] = useState<{gpt: string, claude: string, synthesis: string} | null>(null)
@@ -148,6 +153,9 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
   return (
     <Dialog open={isOpen}>
       <DialogContent className="max-w-2xl overflow-hidden p-0 [&>button]:hidden">
+        {/* Hidden title for screen reader accessibility */}
+        <DialogTitle className="sr-only">OSQR Onboarding</DialogTitle>
+
         {/* Progress bar */}
         <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-800">
           <div
@@ -195,32 +203,24 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
                 setCurrentStep('indexing')
                 await handleIndexFile()
               }}
-              onSkip={() => setCurrentStep('first-question')}
+              onSkip={() => setCurrentStep('panel-debate')}
             />
           )}
 
-          {/* Step 4: Indexing Animation */}
+          {/* Step 4: Indexing + First Question (merged) */}
           {currentStep === 'indexing' && (
             <IndexingStep
               fileName={uploadedFile?.name || ''}
               summary={fileSummary}
               suggestedQuestions={suggestedQuestions}
               isComplete={!!fileSummary}
+              documentId={indexedDocumentId}
               onNext={goNext}
-            />
-          )}
-
-          {/* Step 5: First Long-Context Question */}
-          {currentStep === 'first-question' && (
-            <FirstQuestionStep
-              suggestedQuestions={suggestedQuestions}
               selectedQuestion={selectedQuestion}
               setSelectedQuestion={setSelectedQuestion}
               answer={firstAnswer}
-              isLoading={isLoading}
-              onAsk={handleFirstQuestion}
-              onNext={goNext}
-              onBack={goBack}
+              isAnswering={isAnswering}
+              onAskQuestion={handleAskQuestion}
             />
           )}
 
@@ -284,6 +284,7 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
       if (response.ok) {
         const result = await response.json()
         setFileSummary(result.summary)
+        setIndexedDocumentId(result.documentId || null)
         setSuggestedQuestions(result.suggestedQuestions || [
           "Summarize the key points from this document",
           "What are the main action items or next steps?",
@@ -334,13 +335,50 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
         const result = await response.json()
         setFirstAnswer(result.answer)
       } else {
-        setFirstAnswer("I've analyzed your question based on your knowledge base. This is where Oscar's deep understanding of your context shines - every response is personalized to your specific situation, goals, and documents.")
+        setFirstAnswer("I've analyzed your question based on your knowledge base. This is where OSQR's deep understanding of your context shines - every response is personalized to your specific situation, goals, and documents.")
       }
     } catch (error) {
       console.error('Question error:', error)
-      setFirstAnswer("Oscar is ready to help with questions like this. The more context you give, the more personalized and actionable the responses become.")
+      setFirstAnswer("OSQR is ready to help with questions like this. The more context you give, the more personalized and actionable the responses become.")
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  async function handleAskQuestion(question: string) {
+    if (!question.trim()) return
+
+    console.log('[handleAskQuestion] Called with documentId:', indexedDocumentId)
+
+    setIsAnswering(true)
+    setSelectedQuestion(question)
+    try {
+      const response = await fetch('/api/onboarding/first-question', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question,
+          workspaceId,
+          documentId: indexedDocumentId,
+          context: {
+            name: data.name,
+            workingOn: data.workingOn,
+            frustration: data.frustration,
+          },
+        }),
+      })
+
+      if (response.ok) {
+        const result = await response.json()
+        setFirstAnswer(result.answer)
+      } else {
+        setFirstAnswer("I've analyzed your question based on your knowledge base. This is where OSQR's deep understanding of your context shines - every response is personalized to your specific situation, goals, and documents.")
+      }
+    } catch (error) {
+      console.error('Question error:', error)
+      setFirstAnswer("OSQR is ready to help with questions like this. The more context you give, the more personalized and actionable the responses become.")
+    } finally {
+      setIsAnswering(false)
     }
   }
 
@@ -355,6 +393,8 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
         body: JSON.stringify({
           question,
           userName: data.name,
+          documentId: indexedDocumentId,
+          workspaceId,
           context: {
             workingOn: data.workingOn,
             frustration: data.frustration,
@@ -423,7 +463,7 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
         setMasterSummary(`# ${data.name}'s Master Summary
 
 ## What You're Working On
-${data.workingOn || "Getting started with Oscar"}
+${data.workingOn || "Getting started with OSQR"}
 
 ## Current Challenge
 ${data.frustration || "Organizing information and making progress"}
@@ -433,22 +473,22 @@ ${uploadedFile ? `- ${uploadedFile.name} (indexed)` : "- Ready to add documents"
 
 ## Suggested Next Steps
 1. Upload more documents to build your knowledge base
-2. Ask Oscar questions about your specific situation
+2. Ask OSQR questions about your specific situation
 3. Use the Panel to get multiple perspectives on decisions
 
 ## Open Questions to Explore
 - What's the one thing that would make the biggest difference?
 - What resources or connections would accelerate progress?
-- What's blocking you that Oscar can help with?
+- What's blocking you that OSQR can help with?
 
 ---
-*This is a preview. Oscar Pro includes weekly auto-generated summaries, goal tracking, and personalized insights.*`)
+*This is a preview. OSQR Pro includes weekly auto-generated summaries, goal tracking, and personalized insights.*`)
       }
     } catch (error) {
       console.error('Summary error:', error)
-      setMasterSummary(`# Your Oscar Journey Begins
+      setMasterSummary(`# Your OSQR Journey Begins
 
-Oscar is now personalized to you, ${data.name}. Your knowledge base is ready, and your AI panel is standing by.
+OSQR is now personalized to you, ${data.name}. Your knowledge base is ready, and your AI panel is standing by.
 
 **Next Steps:**
 1. Keep adding documents to your Vault
@@ -474,18 +514,18 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
       </div>
 
       <h1 className="mb-3 text-3xl font-bold text-neutral-900 dark:text-white">
-        Welcome to Oscar
+        Welcome to OSQR
       </h1>
 
       <p className="mb-6 text-lg text-neutral-600 dark:text-neutral-400">
-        Your AI advisory panel that actually knows you
+        Your AI operating system for capability and reasoning
       </p>
 
       <div className="mb-8 space-y-4 text-left">
         <div className="flex items-start space-x-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/30">
           <Sparkles className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
           <p className="text-sm text-neutral-700 dark:text-neutral-300">
-            In the next few minutes, you'll experience 5 "magic moments" that show why Oscar is different from any AI you've used before.
+            In the next few minutes, you'll experience 5 "magic moments" that show why OSQR is different from any AI you've used before.
           </p>
         </div>
 
@@ -536,7 +576,7 @@ function IdentityStep({
           Let's get to know each other
         </h2>
         <p className="mt-1 text-neutral-600 dark:text-neutral-400">
-          3 quick questions to personalize Oscar
+          3 quick questions to personalize OSQR
         </p>
       </div>
 
@@ -615,9 +655,34 @@ function UploadStep({
   onSkip: () => void
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [showPrivacyInfo, setShowPrivacyInfo] = useState(false)
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
+    if (file) {
+      setUploadedFile(file)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    const file = e.dataTransfer.files?.[0]
     if (file) {
       setUploadedFile(file)
     }
@@ -633,18 +698,131 @@ function UploadStep({
           Magic Moment #1: Upload
         </h2>
         <p className="mt-1 text-neutral-600 dark:text-neutral-400">
-          Give Oscar something to remember about you
+          Give OSQR something to remember about you
         </p>
       </div>
 
-      <div className="mb-6 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 p-4 dark:from-emerald-950/30 dark:to-teal-950/30">
+      <div className="mb-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 p-4 dark:from-emerald-950/30 dark:to-teal-950/30">
         <p className="text-sm text-neutral-700 dark:text-neutral-300">
-          <strong>Upload one file you always forget about.</strong> A note, a project doc, a chat export, or a PDF. Oscar will index it and show you what it learned.
+          <strong>Upload one file you always forget about.</strong> A note, a project doc, a chat export, or a PDF. OSQR will index it and show you what it learned.
         </p>
         <p className="mt-2 text-xs text-neutral-500 dark:text-neutral-400">
-          The more you upload, the smarter Oscar becomes about your world.
+          The more you upload, the smarter OSQR becomes about your world.
         </p>
       </div>
+
+      {/* Privacy Info Button */}
+      <button
+        onClick={() => setShowPrivacyInfo(true)}
+        className="mb-6 flex w-full items-center justify-center space-x-2 rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-600 transition-all hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-neutral-700 dark:bg-neutral-800/50 dark:text-neutral-400 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/30 dark:hover:text-emerald-400"
+      >
+        <Shield className="h-4 w-4" />
+        <span>Your files are private. Learn more about our privacy commitment.</span>
+      </button>
+
+      {/* Privacy Info Modal */}
+      {showPrivacyInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="relative max-h-[80vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-neutral-900">
+            <button
+              onClick={() => setShowPrivacyInfo(false)}
+              className="absolute right-4 top-4 rounded-full p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="mb-4 flex items-center space-x-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500">
+                <Shield className="h-5 w-5 text-white" />
+              </div>
+              <h3 className="text-xl font-bold text-neutral-900 dark:text-white">
+                Your Privacy, Protected
+              </h3>
+            </div>
+
+            <div className="space-y-4 text-sm">
+              <div className="rounded-lg bg-emerald-50 p-4 dark:bg-emerald-950/30">
+                <p className="font-semibold text-emerald-800 dark:text-emerald-300">
+                  "Your data belongs to you."
+                </p>
+                <p className="mt-1 text-emerald-700 dark:text-emerald-400">
+                  OSQR exists to make you more capable — not to extract anything from you.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-start space-x-3">
+                  <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
+                    <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-white">Your vault is yours alone</p>
+                    <p className="text-neutral-600 dark:text-neutral-400">
+                      No one — not even OSQR staff — can see your files, chats, or uploads.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
+                    <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-white">Never used for training</p>
+                    <p className="text-neutral-600 dark:text-neutral-400">
+                      OSQR never trains any AI model on your data. Not now. Not ever.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
+                    <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-white">Encrypted & secure</p>
+                    <p className="text-neutral-600 dark:text-neutral-400">
+                      Your data is encrypted at rest and in transit. Only you can access it.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-start space-x-3">
+                  <div className="mt-0.5 flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
+                    <Check className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-neutral-900 dark:text-white">"Burn It" button</p>
+                    <p className="text-neutral-600 dark:text-neutral-400">
+                      Delete everything instantly. One click. Irreversible. Total wipe.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-neutral-200 pt-4 dark:border-neutral-700">
+                <p className="text-xs text-neutral-500 dark:text-neutral-400">
+                  Privacy creates capability. If you can't trust your AI, you can't use it fully.
+                  {' '}
+                  <a
+                    href="/privacy"
+                    className="font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                  >
+                    Read our full privacy policy →
+                  </a>
+                </p>
+              </div>
+            </div>
+
+            <Button
+              onClick={() => setShowPrivacyInfo(false)}
+              className="mt-6 w-full bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600"
+            >
+              Got it
+            </Button>
+          </div>
+        </div>
+      )}
 
       <input
         ref={fileInputRef}
@@ -658,11 +836,18 @@ function UploadStep({
       {!uploadedFile ? (
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="cursor-pointer rounded-xl border-2 border-dashed border-neutral-300 bg-neutral-50 p-8 text-center transition-all hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/20"
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-all ${
+            isDragging
+              ? 'border-emerald-500 bg-emerald-50 dark:border-emerald-400 dark:bg-emerald-950/40'
+              : 'border-neutral-300 bg-neutral-50 hover:border-emerald-400 hover:bg-emerald-50/50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-emerald-600 dark:hover:bg-emerald-950/20'
+          }`}
         >
           <FileText className="mx-auto mb-3 h-10 w-10 text-neutral-400" />
           <p className="font-medium text-neutral-900 dark:text-white">
-            Click to upload a file
+            {isDragging ? 'Drop your file here' : 'Click or drag to upload'}
           </p>
           <p className="mt-1 text-sm text-neutral-500">
             .txt, .md, .pdf, .doc, .json
@@ -722,89 +907,225 @@ function IndexingStep({
   summary,
   suggestedQuestions,
   isComplete,
+  documentId,
   onNext,
+  selectedQuestion,
+  setSelectedQuestion,
+  answer,
+  isAnswering,
+  onAskQuestion,
 }: {
   fileName: string
   summary: string
   suggestedQuestions: string[]
   isComplete: boolean
+  documentId: string | null
   onNext: () => void
+  selectedQuestion: string
+  setSelectedQuestion: (q: string) => void
+  answer: string
+  isAnswering: boolean
+  onAskQuestion: (question: string) => void
 }) {
-  const [dots, setDots] = useState('')
+  // Log documentId for debugging
+  console.log('[IndexingStep] documentId:', documentId, 'isComplete:', isComplete)
+  const [customQuestion, setCustomQuestion] = useState('')
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null)
+  const hasAutoSubmitted = useRef(false)
 
+  // Default questions to show while indexing
+  const defaultQuestions = [
+    "What are the key takeaways from this document?",
+    "How does this relate to what I'm working on?",
+    "What should I focus on first?",
+  ]
+
+  const questionsToShow = suggestedQuestions.length > 0 ? suggestedQuestions : defaultQuestions
+
+  // Auto-submit when indexing completes if user has a pending question
   useEffect(() => {
-    if (!isComplete) {
-      const interval = setInterval(() => {
-        setDots(d => d.length >= 3 ? '' : d + '.')
-      }, 500)
-      return () => clearInterval(interval)
+    if (isComplete && pendingQuestion && !hasAutoSubmitted.current && !isAnswering) {
+      hasAutoSubmitted.current = true
+      setSelectedQuestion(pendingQuestion)
+      onAskQuestion(pendingQuestion)
     }
-  }, [isComplete])
+  }, [isComplete, pendingQuestion, isAnswering, setSelectedQuestion, onAskQuestion])
+
+  const handleQuestionClick = (question: string) => {
+    if (isComplete) {
+      // Indexing done - submit immediately
+      setSelectedQuestion(question)
+      onAskQuestion(question)
+    } else {
+      // Indexing in progress - queue the question
+      setPendingQuestion(question)
+      setCustomQuestion('') // Clear custom input if they picked a suggested one
+    }
+  }
+
+  const handleCustomSubmit = () => {
+    if (!customQuestion.trim()) return
+
+    if (isComplete) {
+      // Indexing done - submit immediately
+      setSelectedQuestion(customQuestion)
+      onAskQuestion(customQuestion)
+    } else {
+      // Indexing in progress - queue the question
+      setPendingQuestion(customQuestion)
+    }
+  }
+
+  // The active question is either pending (waiting for indexing) or selected (submitted)
+  const activeQuestion = pendingQuestion || selectedQuestion
 
   return (
     <div>
-      <div className="mb-6 text-center">
-        <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full ${isComplete ? 'bg-gradient-to-br from-emerald-500 to-teal-500' : 'bg-neutral-200 dark:bg-neutral-700'}`}>
+      {/* Status Banner - changes when complete */}
+      <div className={`mb-6 rounded-xl p-4 transition-all duration-500 ${
+        isComplete
+          ? 'bg-gradient-to-r from-emerald-500 to-teal-500'
+          : 'bg-gradient-to-r from-blue-500 to-purple-500'
+      }`}>
+        <div className="flex items-center space-x-3">
           {isComplete ? (
-            <Check className="h-6 w-6 text-white" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+              <Check className="h-5 w-5 text-white" />
+            </div>
           ) : (
-            <Loader2 className="h-6 w-6 animate-spin text-neutral-500" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20">
+              <Loader2 className="h-5 w-5 animate-spin text-white" />
+            </div>
           )}
+          <div>
+            <p className="font-semibold text-white">
+              {isComplete
+                ? `I've indexed "${fileName}" and added it to your knowledge base.`
+                : `Indexing "${fileName}"...`
+              }
+            </p>
+            {!isComplete && pendingQuestion && (
+              <p className="text-sm text-white/80">Your question is queued and will be asked automatically</p>
+            )}
+            {!isComplete && !pendingQuestion && (
+              <p className="text-sm text-white/80">Pick a question while you wait</p>
+            )}
+          </div>
         </div>
-        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
-          {isComplete ? "Here's what I learned" : `Indexing${dots}`}
-        </h2>
-        <p className="mt-1 text-neutral-600 dark:text-neutral-400">
-          {isComplete ? `From "${fileName}"` : `Reading "${fileName}"...`}
-        </p>
       </div>
 
-      {isComplete ? (
+      {/* Show answer if we have one */}
+      {answer ? (
         <>
-          <div className="mb-6 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 p-4 dark:from-blue-950/30 dark:to-purple-950/30">
-            <div className="mb-2 flex items-center space-x-2">
-              <Brain className="h-5 w-5 text-purple-500" />
-              <span className="font-semibold text-neutral-900 dark:text-white">Oscar's Understanding</span>
-            </div>
-            <p className="text-sm text-neutral-700 dark:text-neutral-300">
-              {summary}
+          <div className="mb-4 rounded-lg bg-blue-50 p-3 dark:bg-blue-950/30">
+            <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+              {selectedQuestion}
             </p>
           </div>
 
-          <div className="mb-6">
-            <p className="mb-3 text-sm font-medium text-neutral-900 dark:text-white">
-              Try asking me:
-            </p>
-            <div className="space-y-2">
-              {suggestedQuestions.map((q, i) => (
-                <div
-                  key={i}
-                  className="flex items-center space-x-2 rounded-lg bg-neutral-100 p-3 dark:bg-neutral-800"
-                >
-                  <Lightbulb className="h-4 w-4 flex-shrink-0 text-yellow-500" />
-                  <p className="text-sm text-neutral-700 dark:text-neutral-300">{q}</p>
-                </div>
-              ))}
+          <div className="mb-6 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+            <div className="mb-2 flex items-center space-x-2">
+              <Brain className="h-5 w-5 text-purple-500" />
+              <span className="font-semibold text-neutral-900 dark:text-white">OSQR</span>
             </div>
+            <p className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">
+              {answer}
+            </p>
           </div>
 
           <Button
             onClick={onNext}
             className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
           >
-            Continue to Ask a Question
-            <ArrowRight className="ml-2 h-4 w-4" />
+            See Something Wild
+            <Zap className="ml-2 h-4 w-4" />
           </Button>
         </>
       ) : (
-        <div className="space-y-3">
-          <div className="h-2 overflow-hidden rounded-full bg-neutral-200 dark:bg-neutral-700">
-            <div className="h-full w-2/3 animate-pulse bg-gradient-to-r from-emerald-500 to-teal-500" />
+        <>
+          {/* Main content - always visible */}
+          <div className="mb-4 text-center">
+            <h2 className="text-xl font-bold text-neutral-900 dark:text-white">
+              {isAnswering ? "Thinking..." : isComplete ? "Ask me something:" : "While we wait, pick a question:"}
+            </h2>
+            {isComplete && summary && !isAnswering && (
+              <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">
+                {summary}
+              </p>
+            )}
           </div>
-          <p className="text-center text-sm text-neutral-500">
-            Adding to your knowledge base...
-          </p>
-        </div>
+
+          {/* Custom question input */}
+          <div className="mb-4">
+            <div className="flex space-x-2">
+              <Textarea
+                value={customQuestion}
+                onChange={(e) => {
+                  setCustomQuestion(e.target.value)
+                  if (e.target.value.trim()) {
+                    setPendingQuestion(null) // Clear pending if typing custom
+                  }
+                }}
+                placeholder="Type your own question..."
+                disabled={isAnswering}
+                rows={2}
+                className="text-sm flex-1"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault()
+                    handleCustomSubmit()
+                  }
+                }}
+              />
+              <Button
+                onClick={handleCustomSubmit}
+                disabled={!customQuestion.trim() || isAnswering}
+                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-4"
+              >
+                {isAnswering ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowRight className="h-4 w-4" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <p className="mb-3 text-xs text-neutral-500 text-center">Or try one of these:</p>
+
+          {/* Questions as clickable buttons */}
+          <div className="space-y-2">
+            {questionsToShow.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => handleQuestionClick(q)}
+                disabled={isAnswering}
+                className={`w-full flex items-center space-x-3 rounded-lg p-4 text-left transition-all ${
+                  pendingQuestion === q
+                    ? 'bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-500'
+                    : isAnswering
+                    ? 'bg-neutral-100 dark:bg-neutral-800 opacity-60 cursor-wait'
+                    : 'bg-neutral-100 dark:bg-neutral-800 hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:border-blue-300 border border-transparent hover:border-blue-400 cursor-pointer'
+                }`}
+              >
+                {isAnswering && activeQuestion === q ? (
+                  <Loader2 className="h-5 w-5 flex-shrink-0 text-blue-500 animate-spin" />
+                ) : pendingQuestion === q ? (
+                  <Check className="h-5 w-5 flex-shrink-0 text-blue-500" />
+                ) : (
+                  <Lightbulb className="h-5 w-5 flex-shrink-0 text-yellow-500" />
+                )}
+                <p className="text-sm text-neutral-700 dark:text-neutral-300">{q}</p>
+                {pendingQuestion === q && !isComplete && (
+                  <span className="ml-auto text-xs text-blue-500">Queued</span>
+                )}
+                {!pendingQuestion && !isAnswering && (
+                  <ArrowRight className="h-4 w-4 ml-auto text-neutral-400" />
+                )}
+              </button>
+            ))}
+          </div>
+        </>
       )}
     </div>
   )
@@ -891,7 +1212,7 @@ function FirstQuestionStep({
                 </>
               ) : (
                 <>
-                  Ask Oscar
+                  Ask OSQR
                   <Sparkles className="ml-2 h-4 w-4" />
                 </>
               )}
@@ -909,7 +1230,7 @@ function FirstQuestionStep({
           <div className="mb-6 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
             <div className="mb-2 flex items-center space-x-2">
               <Brain className="h-5 w-5 text-purple-500" />
-              <span className="font-semibold text-neutral-900 dark:text-white">Oscar</span>
+              <span className="font-semibold text-neutral-900 dark:text-white">OSQR</span>
             </div>
             <p className="whitespace-pre-wrap text-sm text-neutral-700 dark:text-neutral-300">
               {answer}
@@ -949,10 +1270,10 @@ function PanelDebateStep({
           <Users className="h-6 w-6 text-white" />
         </div>
         <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
-          Magic Moment #3: AI Debate
+          Magic Moment #3: AI Panel
         </h2>
         <p className="mt-1 text-neutral-600 dark:text-neutral-400">
-          Watch two AIs debate your problem
+          Watch two AIs think through your question together
         </p>
       </div>
 
@@ -960,23 +1281,63 @@ function PanelDebateStep({
         <>
           <div className="mb-6 rounded-xl bg-gradient-to-r from-orange-50 to-red-50 p-4 dark:from-orange-950/30 dark:to-red-950/30">
             <p className="text-sm text-neutral-700 dark:text-neutral-300">
-              This is <strong>not possible anywhere else</strong>. Oscar will have GPT-4 and Claude debate your problem, then synthesize their best insights into actionable advice.
+              This is <strong>not possible anywhere else</strong>. OSQR will have GPT-4 and Claude both analyze your question, then synthesize their best insights into one powerful answer.
             </p>
           </div>
 
-          <div className="mb-6 flex items-center justify-center space-x-4">
-            <div className="flex flex-col items-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/50">
-                <Bot className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
+          {/* Two Brains Graphic */}
+          <div className="mb-6 flex items-center justify-center">
+            <div className="relative flex items-center justify-center">
+              {/* Left Brain (GPT-4) */}
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/30">
+                    <Brain className="h-8 w-8 text-white" />
+                  </div>
+                  {/* Pulse effect */}
+                  <div className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-20" style={{ animationDuration: '2s' }} />
+                </div>
+                <span className="mt-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">GPT-4</span>
               </div>
-              <span className="mt-2 text-sm font-medium">GPT-4</span>
+
+              {/* Connection Lines / Sparks */}
+              <div className="mx-4 flex flex-col items-center space-y-1">
+                <div className="flex space-x-1">
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400" style={{ animationDelay: '0ms' }} />
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" style={{ animationDelay: '150ms' }} />
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400" style={{ animationDelay: '300ms' }} />
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="h-0.5 w-8 bg-gradient-to-r from-emerald-400 to-transparent" />
+                  <Zap className="h-5 w-5 text-yellow-500 animate-pulse" />
+                  <div className="h-0.5 w-8 bg-gradient-to-l from-orange-400 to-transparent" />
+                </div>
+                <div className="flex space-x-1">
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" style={{ animationDelay: '100ms' }} />
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-400" style={{ animationDelay: '250ms' }} />
+                  <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" style={{ animationDelay: '400ms' }} />
+                </div>
+              </div>
+
+              {/* Right Brain (Claude) */}
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg shadow-orange-500/30">
+                    <Brain className="h-8 w-8 text-white" />
+                  </div>
+                  {/* Pulse effect */}
+                  <div className="absolute inset-0 animate-ping rounded-full bg-orange-400 opacity-20" style={{ animationDuration: '2s', animationDelay: '1s' }} />
+                </div>
+                <span className="mt-2 text-sm font-semibold text-orange-600 dark:text-orange-400">Claude</span>
+              </div>
             </div>
-            <span className="text-2xl text-neutral-400">⚔️</span>
-            <div className="flex flex-col items-center">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/50">
-                <Bot className="h-7 w-7 text-orange-600 dark:text-orange-400" />
-              </div>
-              <span className="mt-2 text-sm font-medium">Claude</span>
+          </div>
+
+          {/* Customization teaser */}
+          <div className="mb-6 flex items-center justify-center">
+            <div className="inline-flex items-center space-x-2 rounded-full bg-neutral-100 dark:bg-neutral-800 px-4 py-2 text-xs text-neutral-600 dark:text-neutral-400">
+              <Settings2 className="h-3.5 w-3.5" />
+              <span>Inside the app, you can customize which AI models think through your questions</span>
             </div>
           </div>
 
@@ -989,16 +1350,47 @@ function PanelDebateStep({
               onClick={onStartDebate}
               className="bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600"
             >
-              Start the Debate
+              Start the Panel
               <Zap className="ml-2 h-4 w-4" />
             </Button>
           </div>
         </>
       ) : isLoading ? (
         <div className="py-8 text-center">
-          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-orange-500" />
+          {/* Animated thinking brains while loading */}
+          <div className="mb-6 flex items-center justify-center">
+            <div className="relative flex items-center justify-center">
+              {/* Left Brain (GPT-4) - Active */}
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-lg shadow-emerald-500/40 animate-pulse">
+                    <Brain className="h-7 w-7 text-white" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Animated connection */}
+              <div className="mx-3 flex items-center">
+                <div className="flex space-x-1">
+                  <div className="h-2 w-2 animate-bounce rounded-full bg-yellow-400" style={{ animationDelay: '0ms' }} />
+                  <div className="h-2 w-2 animate-bounce rounded-full bg-orange-400" style={{ animationDelay: '150ms' }} />
+                  <div className="h-2 w-2 animate-bounce rounded-full bg-yellow-400" style={{ animationDelay: '300ms' }} />
+                  <div className="h-2 w-2 animate-bounce rounded-full bg-orange-400" style={{ animationDelay: '450ms' }} />
+                </div>
+              </div>
+
+              {/* Right Brain (Claude) - Active */}
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-orange-400 to-orange-600 shadow-lg shadow-orange-500/40 animate-pulse" style={{ animationDelay: '500ms' }}>
+                    <Brain className="h-7 w-7 text-white" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <p className="text-neutral-600 dark:text-neutral-400">
-            The panel is deliberating...
+            The panel is thinking...
           </p>
         </div>
       ) : debate ? (
@@ -1023,7 +1415,7 @@ function PanelDebateStep({
             <div className="rounded-lg border-l-4 border-purple-500 bg-purple-50 p-3 dark:bg-purple-950/30">
               <div className="mb-1 flex items-center space-x-2">
                 <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">Oscar's Synthesis</span>
+                <span className="text-sm font-semibold text-purple-700 dark:text-purple-300">OSQR's Synthesis</span>
               </div>
               <p className="text-sm text-neutral-700 dark:text-neutral-300">{debate.synthesis}</p>
             </div>
@@ -1073,7 +1465,7 @@ function MemoryCallbackStep({
           Magic Moment #4: I Remember
         </h2>
         <p className="mt-1 text-neutral-600 dark:text-neutral-400">
-          Oscar builds a relationship with you over time
+          OSQR builds a relationship with you over time
         </p>
       </div>
 
@@ -1152,7 +1544,7 @@ function MasterSummaryStep({
           Magic Moment #5: Master Summary
         </h2>
         <p className="mt-1 text-neutral-600 dark:text-neutral-400">
-          Oscar organizes your chaos into clarity
+          OSQR organizes your chaos into clarity
         </p>
       </div>
 
@@ -1197,7 +1589,7 @@ function MasterSummaryStep({
             <div className="flex items-center space-x-2">
               <Crown className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               <p className="text-sm font-medium text-purple-800 dark:text-purple-200">
-                Oscar Pro includes weekly auto-generated summaries
+                OSQR Pro includes weekly auto-generated summaries
               </p>
             </div>
           </div>
@@ -1207,7 +1599,7 @@ function MasterSummaryStep({
             size="lg"
             className="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 hover:from-blue-600 hover:via-purple-600 hover:to-pink-600"
           >
-            Start Using Oscar
+            Start Using OSQR
             <ArrowRight className="ml-2 h-5 w-5" />
           </Button>
         </>

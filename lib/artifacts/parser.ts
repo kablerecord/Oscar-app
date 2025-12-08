@@ -1,9 +1,9 @@
 import type { ArtifactBlock, ArtifactType, ParsedResponse } from './types'
 
 /**
- * Parse Oscar's response to extract artifacts
+ * Parse OSQR's response to extract artifacts
  *
- * Oscar will output artifacts in this format:
+ * OSQR will output artifacts in this format:
  *
  * Here's the code you requested:
  *
@@ -46,7 +46,7 @@ export function parseArtifacts(response: string): ParsedResponse {
 
 /**
  * Detect if a response likely contains artifact-worthy content
- * Used to prompt Oscar to format as artifacts when appropriate
+ * Used to prompt OSQR to format as artifacts when appropriate
  */
 export function shouldSuggestArtifact(content: string): ArtifactType | null {
   // Check for code blocks

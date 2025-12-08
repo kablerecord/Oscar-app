@@ -16,7 +16,7 @@ async function main() {
   })
 
   console.log(`✅ Updated ${result.count} Claude agents to claude-sonnet-4`)
-  console.log('\nOscar will now use:')
+  console.log('\nOSQR will now use:')
   console.log('  - 2x Claude Sonnet 4 agents')
   console.log('  - 2x GPT-4 Turbo agents')
   console.log('\nFull 4-agent panel is now active!')
