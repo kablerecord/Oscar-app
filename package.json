@@ -12,7 +12,8 @@
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "npx prisma migrate dev && npm run db:seed",
-    "index-knowledge": "tsx scripts/index-knowledge.ts"
+    "index-knowledge": "tsx scripts/index-knowledge.ts",
+    "seed-msc": "tsx scripts/seed-msc.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
