@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { CapabilityLevelIndicator } from '@/components/capability/CapabilityBadge'
 
 interface TopBarProps {
   user?: {
@@ -18,25 +19,31 @@ interface TopBarProps {
     email?: string | null
   }
   workspaceName?: string
+  capabilityLevel?: number | null
 }
 
-export function TopBar({ user, workspaceName = 'My Workspace' }: TopBarProps) {
+export function TopBar({ user, workspaceName = 'My Workspace', capabilityLevel }: TopBarProps) {
   return (
-    <header className="fixed left-64 right-0 top-0 z-30 h-16 border-b border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+    <header className="fixed left-64 right-0 top-0 z-30 h-16 border-b border-slate-700/50 bg-slate-900">
       <div className="flex h-full items-center justify-between px-6">
         {/* Left: Workspace selector (for future multi-workspace) */}
         <div className="flex items-center space-x-4">
           <div className="text-sm">
-            <div className="font-medium text-neutral-900 dark:text-neutral-100">
-              {workspaceName}
+            <div className="flex items-center space-x-2">
+              <span className="font-medium text-slate-100">
+                {workspaceName}
+              </span>
+              {capabilityLevel !== undefined && capabilityLevel !== null && (
+                <CapabilityLevelIndicator level={capabilityLevel} size="sm" />
+              )}
             </div>
-            <div className="text-xs text-neutral-500 dark:text-neutral-400">Personal workspace</div>
+            <div className="text-xs text-slate-400">Personal workspace</div>
           </div>
         </div>
 
         {/* Center: Search bar */}
         <div className="relative w-96">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type="search"
             placeholder="Search documents, chats, projects..."
@@ -58,7 +65,7 @@ export function TopBar({ user, workspaceName = 'My Workspace' }: TopBarProps) {
                   <p className="text-sm font-medium leading-none">
                     {user?.name || 'User'}
                   </p>
-                  <p className="text-xs leading-none text-neutral-500">
+                  <p className="text-xs leading-none text-slate-400">
                     {user?.email || 'user@example.com'}
                   </p>
                 </div>

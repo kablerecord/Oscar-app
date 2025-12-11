@@ -18,7 +18,7 @@ export async function getWorkspaceTier(workspaceId: string): Promise<TierName> {
     where: { id: workspaceId },
     select: { tier: true },
   })
-  return (workspace?.tier as TierName) || 'free'
+  return (workspace?.tier as TierName) || 'pro'
 }
 
 /**

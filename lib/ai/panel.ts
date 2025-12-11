@@ -183,6 +183,10 @@ ${context}
         return process.env.OPENAI_API_KEY || ''
       case 'anthropic':
         return process.env.ANTHROPIC_API_KEY || ''
+      case 'google':
+        return process.env.GOOGLE_AI_API_KEY || ''
+      case 'xai':
+        return process.env.XAI_API_KEY || ''
       default:
         throw new Error(`Unknown provider: ${provider}`)
     }

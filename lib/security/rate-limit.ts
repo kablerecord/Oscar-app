@@ -17,17 +17,8 @@ export interface RateLimitConfig {
   endpointLimits?: Record<string, { perMinute: number; perDay: number }>
 }
 
-// Default limits for different user tiers
+// Default limits for different user tiers (Pro and Master only - no free tier)
 export const RATE_LIMITS: Record<string, RateLimitConfig> = {
-  free: {
-    requestsPerMinute: 10,
-    requestsPerDay: 100,
-    endpointLimits: {
-      'oscar/ask': { perMinute: 5, perDay: 50 },
-      'oscar/refine': { perMinute: 15, perDay: 150 }, // Refine is cheaper, allow more
-      'knowledge/search': { perMinute: 20, perDay: 200 },
-    },
-  },
   pro: {
     requestsPerMinute: 30,
     requestsPerDay: 1000,
@@ -69,8 +60,8 @@ export async function checkRateLimit(params: {
   endpoint: string
   tier?: string
 }): Promise<RateLimitResult> {
-  const { userId, ip, endpoint, tier = 'free' } = params
-  const config = RATE_LIMITS[tier] || RATE_LIMITS.free
+  const { userId, ip, endpoint, tier = 'pro' } = params
+  const config = RATE_LIMITS[tier] || RATE_LIMITS.pro
 
   // Get endpoint-specific limits or fall back to defaults
   const limits = config.endpointLimits?.[endpoint] || {

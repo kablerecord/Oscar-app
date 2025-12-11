@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
         description: levelDetails.description,
         identityPattern: levelDetails.identityPattern,
         keyBehaviors: levelDetails.keyBehaviors,
-        coachingFocus: levelDetails.coachingFocus,
+        osqrApproach: levelDetails.osqrApproach,
       } : null,
       stageInfo: stageInfo ? {
         name: stageInfo.name,

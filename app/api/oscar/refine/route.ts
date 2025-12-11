@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       userId,
       ip,
       endpoint: 'oscar/refine',
-      tier: 'free',
+      tier: 'pro', // TODO: Get user's actual tier from database
     })
 
     if (!rateLimitResult.allowed) {
@@ -152,19 +152,19 @@ export async function POST(req: NextRequest) {
       model: 'gpt-4-turbo',
     })
 
-    const messages = [
-      { role: 'system' as const, content: REFINE_SYSTEM_PROMPT },
+    const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: REFINE_SYSTEM_PROMPT },
     ]
 
     if (userContext) {
       messages.push({
-        role: 'system' as const,
+        role: 'system',
         content: `Context about this user (use to ask better clarifying questions):${userContext}`,
       })
     }
 
     messages.push({
-      role: 'user' as const,
+      role: 'user',
       content: `User's question: "${question}"\n\nAnalyze this question and provide your refinement response as JSON.`,
     })
 

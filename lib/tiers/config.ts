@@ -4,7 +4,7 @@
  * Defines features and limits for each subscription tier
  */
 
-export type TierName = 'free' | 'pro' | 'master'
+export type TierName = 'pro' | 'master'
 
 export interface TierConfig {
   name: TierName
@@ -33,45 +33,20 @@ export interface TierConfig {
 }
 
 export const TIERS: Record<TierName, TierConfig> = {
-  free: {
-    name: 'free',
-    displayName: 'OSQR Lite',
-    price: 0,
-    description: 'Get a taste of the OSQR experience',
-    features: [
-      'Quick mode responses',
-      '5 documents in vault',
-      '10 panel queries/day',
-      'Basic memory',
-    ],
-    limits: {
-      maxDocuments: 5,
-      maxFileSizeMB: 10,
-      maxTotalStorageMB: 25,
-      panelQueriesPerDay: 10,
-      refineQueriesPerDay: 20,
-      hasRefineFire: true, // Let free users experience the magic
-      hasFullPanel: false, // Limited to 2 models
-      hasMSC: true, // Basic version
-      hasArtifacts: true,
-      hasAdvancedMemory: false,
-      hasWeeklyReviews: false,
-    },
-    stripePriceId: process.env.STRIPE_PRICE_FREE || undefined,
-  },
   pro: {
     name: 'pro',
     displayName: 'OSQR Pro',
     price: 49,
-    description: 'Full OSQR power for serious builders',
+    description: 'For high-performers who want elite clarity and multi-model thinking',
     features: [
-      'Everything in Lite',
+      'Multi-model panel (Claude + GPT-4o)',
+      'Quick, Thoughtful & Contemplate modes',
+      'Full Personal Knowledge Vault',
       'Unlimited Refine → Fire',
-      'Full 4-model panel',
       '25 documents in vault',
       '100 panel queries/day',
-      'Master Summary Checklist',
       'Advanced memory',
+      '90-day transformation guarantee',
     ],
     limits: {
       maxDocuments: 25,
@@ -92,14 +67,17 @@ export const TIERS: Record<TierName, TierConfig> = {
     name: 'master',
     displayName: 'OSQR Master',
     price: 149,
-    description: 'For legacy architects and serious operators',
+    description: 'For founders, operators, and elite thinkers who want OS-level intelligence',
     features: [
       'Everything in Pro',
-      'Unlimited everything',
+      'Advanced memory & personalized intelligence',
+      'Priority fast-lane processing',
       '100 documents in vault',
       'Weekly automated reviews',
-      'Priority support',
-      'Early access to new features',
+      'Custom Agent Builder (coming)',
+      'Council Mode (coming)',
+      'VS Code Extension (coming)',
+      'Early access to new models & features',
     ],
     limits: {
       maxDocuments: 100,
@@ -122,7 +100,7 @@ export const TIERS: Record<TierName, TierConfig> = {
  * Get tier config by name
  */
 export function getTierConfig(tier: TierName): TierConfig {
-  return TIERS[tier] || TIERS.free
+  return TIERS[tier] || TIERS.pro
 }
 
 /**

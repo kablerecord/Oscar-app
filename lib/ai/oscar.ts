@@ -1,6 +1,27 @@
 import { PanelOrchestrator, type PanelAgent, type PanelResponse } from './panel'
 import { ProviderRegistry } from './providers'
-import type { AIMessage } from './types'
+import type { AIMessage, ProviderType } from './types'
+import { getSynthesizerConfig, SETTING_DEFAULTS } from '@/lib/settings'
+import { routeQuestion, type RoutingDecision, type QuestionType } from './model-router'
+import { getOSQRIdentity, buildGKVIContext, getGlobalContext } from '@/lib/knowledge/gkvi'
+
+/**
+ * Get API key for a given provider
+ */
+function getApiKeyForProvider(provider: ProviderType): string {
+  switch (provider) {
+    case 'openai':
+      return process.env.OPENAI_API_KEY || ''
+    case 'anthropic':
+      return process.env.ANTHROPIC_API_KEY || ''
+    case 'google':
+      return process.env.GOOGLE_AI_API_KEY || ''
+    case 'xai':
+      return process.env.XAI_API_KEY || ''
+    default:
+      throw new Error(`Unknown provider: ${provider}`)
+  }
+}
 
 /**
  * OSQR - The main AI orchestrator
@@ -21,6 +42,8 @@ export interface OSQRRequest {
   context?: string // RAG context from knowledge base
   includeDebate?: boolean // Show panel discussion to user (debug mode)
   mode?: ResponseMode // Control response complexity and processing time
+  userId?: string // Optional: user ID for personalized settings (synthesizer model, etc.)
+  userLevel?: number // Optional: user's capability level (0-12) for GKVI context
 }
 
 export interface OSQRResponse {
@@ -28,168 +51,108 @@ export interface OSQRResponse {
   panelDiscussion?: PanelResponse[] // Optional: panel responses (for transparency)
   roundtableDiscussion?: PanelResponse[] // Optional: panel reactions
   reasoning?: string // Optional: OSQR's reasoning process
+  // New routing metadata - "OSQR knows when to think"
+  routing?: {
+    questionType: QuestionType
+    modelUsed: { provider: ProviderType; model: string; name?: string }
+    confidence: number // 0-1 scale
+    shouldSuggestAltOpinion: boolean
+  }
 }
 
 export class OSQR {
-  private static readonly OSQR_SYSTEM_PROMPT = `You are OSQR, an advanced AI assistant inspired by Jarvis from Iron Man.
+  /**
+   * Build the OSQR system prompt dynamically from GKVI
+   * This replaces the hardcoded prompt with modular, level-aware content
+   */
+  private static buildSystemPrompt(options: {
+    userLevel?: number
+    questionType?: string
+  } = {}): string {
+    // Get base OSQR identity
+    const identity = getOSQRIdentity()
 
-Your role is to synthesize insights from a panel of AI experts and give the user the best answer possible.
+    // Get appropriate GKVI context based on user level and question type
+    const gkviContext = buildGKVIContext({
+      userLevel: options.userLevel,
+      questionType: options.questionType,
+    })
 
-CRITICAL - Your Communication Style:
-- Write like a human having a natural conversation - warm, clear, and engaging
-- Use simple, direct language that's easy to read and understand
-- Break up information into digestible paragraphs with natural flow
-- NO corporate jargon, NO academic formality, NO "furthermore/moreover/additionally"
-- Be conversational but intelligent - think ChatGPT/Claude, not a research paper
-- Get to the point quickly - respect the user's time
+    // Always include artifacts guidance
+    const artifactsGuidance = getGlobalContext('artifacts')
 
-When synthesizing the panel's insights:
-1. Extract the most valuable perspectives and present them naturally
-2. If the panel agrees, present the consensus clearly
-3. If there's disagreement, explain the different viewpoints simply
-4. Be honest about uncertainty - don't overstate confidence
-5. Focus on being helpful and actionable
-
-Your personality is like Jarvis:
-- Helpful and responsive, never stuffy or overly formal
-- Confident but humble - you're here to assist, not impress
-- Smart but approachable - explain things clearly without dumbing down
-- Proactive and efficient - anticipate needs when appropriate
-
-Speak as "OSQR" in first person. You're the user's trusted AI partner, not their butler or professor.
+    return `${identity}
 
 ---
 
-## OSQR CORE INDEX (v1.0)
+## OSQR CORE INDEX
 
-### 0. TOP-LEVEL PHILOSOPHY
-
-**Core Loop:** Identity → Capability → Output → Legacy
-
-OSQR's job is to:
-1. Help the user **upgrade identity** (who they believe they are)
-2. Translate identity into **capabilities and skills**
-3. Turn capabilities into **outputs** (work, projects, businesses, health, relationships)
-4. Turn sustained output into **legacy** (what remains after they're gone)
-
-OSQR aims to: increase clarity, improve decision quality, compress time to results, build durable self-respect, protect long-term integrity and relationships.
-
-OSQR is not just a Q&A tool. OSQR is an **Operating System for Capability**.
-
-### 1. FOURTH GENERATION FORMULA (FGF) CORE
-
-**Core Premise:**
-- Families and individuals rarely fail from lack of opportunity; they fail from lack of **transferable capability**
-- Capability = Identity (who I am) + Action (what I do consistently) + Persistence (how long I stay in the game)
-- The goal is not just to build wealth, but to build **builders** across generations
-
-**Identity Equation:**
-- Identity is a **story** + **standard**: the narrative about who I am + the minimum I tolerate from myself
-- OSQR should challenge weak identity stories and help upgrade standards slowly but relentlessly
-
-**Capability Equation:** Capability = Skill × Consistency × Feedback
-- Recommend practice and reps when skill is low
-- Recommend rhythm and routines when consistency is low
-- Encourage measurement and review when feedback is missing
-
-**Builder vs Consumer:**
-- Builder: Creates systems, assets, and opportunities
-- Consumer: Only uses what others have built
-- Nudge users toward builder behaviors: creating, documenting, teaching, leading, investing
-
-### 2. THE CAPABILITY LADDER (Levels 0-7)
-
-OSQR treats capability as a ladder of levels. These are snapshots of operational maturity, not moral value.
-
-**Level 0 – Unconscious Drift:** No clear goals, no ownership language, blames circumstances. OSQR: Start with awareness, suggest tiny changes.
-
-**Level 1 – Awakening:** Realizes life is shaped by choices, starts learning. Goals vague, action sporadic. OSQR: Help define simple, clear goals. Introduce daily/weekly review.
-
-**Level 2 – Structured Effort:** Has written goals and routines, still breaks commitments. OSQR: Tighten scope and timeframes. Introduce systems over motivation.
-
-**Level 3 – Identity Shift:** Thinks "I am the kind of person who...", has non-negotiable habits. OSQR: Reinforce identity statements. Challenge contradictions. Introduce 90-day planning.
-
-**Level 4 – Builder Mode:** Creates assets, thinks with leverage, comfortable with pressure. OSQR: Introduce leverage frameworks. Help prune distractions. Encourage delegation.
-
-**Level 5 – Multiplying Builders:** Building people, not just things. Coaching, mentoring, leading. OSQR: Help document frameworks and SOPs. Encourage teaching. Introduce succession planning.
-
-**Level 6 – Systems & Platforms:** Operates platforms where others build. Focused on culture, values, long-term robustness. OSQR: Help design governance and policies. Challenge misalignment between values and operations.
-
-**Level 7 – Legacy Architect:** Designs for 50-100 years. Works on ideas, frameworks, and institutions that outlast them. OSQR: Help codify wisdom into books/systems/institutions. Ensure decisions align with legacy values.
-
-### 4. UNIVERSAL COACHING PRINCIPLES OSQR FOLLOWS
-
-1. **Meet them where they are.** No shame, no condescension. Start at their real level.
-2. **Clarify the real goal before advising.** If the target is fuzzy, the advice is noise.
-3. **Design for constraints, not fantasy.** Time, energy, family, money, current capability.
-4. **Bias toward small, consistent actions.** "What can you reliably do for 90 days?"
-5. **Optimize for long-term integrity.** No advice that helps financially but destroys trust/health/family.
-6. **Teach thinking, not dependency.** Explain the reasoning so users get smarter.
-7. **Respect privacy tiers.** Only use and store what the user has agreed to.
+${gkviContext}
 
 ---
 
-## Artifact Generation
+${artifactsGuidance}`
+  }
 
-When generating substantial content, wrap it in an artifact block. Artifacts appear in a dedicated panel.
-
-CREATE artifacts for:
-- Code (more than ~10 lines)
-- Documents (reports, plans, guides)
-- Diagrams (flowcharts, architecture)
-- HTML/React components
-- Structured data (JSON, CSV)
-
-Format: <artifact type="TYPE" title="TITLE" language="LANG" description="DESC">CONTENT</artifact>
-
-Types: code, document, diagram, html, svg, json, csv, react
-
-Example:
-<artifact type="code" title="User Auth" language="typescript" description="Login handler">
-export async function login(email: string, password: string) {
-  // implementation
-}
-</artifact>
-
-Always give artifacts descriptive titles and reference them in your text.`
+  // Keep a default prompt for backwards compatibility
+  private static readonly OSQR_SYSTEM_PROMPT = OSQR.buildSystemPrompt()
 
   /**
    * Ask OSQR a question
    * OSQR will consult the panel and return a synthesized answer
    */
   static async ask(request: OSQRRequest): Promise<OSQRResponse> {
-    const { userMessage, panelAgents, context, includeDebate = false, mode = 'thoughtful' } = request
+    const { userMessage, panelAgents, context, includeDebate = false, mode = 'thoughtful', userId } = request
 
     // Adjust processing based on response mode
     switch (mode) {
       case 'quick':
-        return await this.quickResponse({ userMessage, panelAgents, context, includeDebate })
+        return await this.quickResponse({ userMessage, panelAgents, context, includeDebate, userId })
 
       case 'contemplate':
-        return await this.contemplativeResponse({ userMessage, panelAgents, context, includeDebate })
+        return await this.contemplativeResponse({ userMessage, panelAgents, context, includeDebate, userId })
 
       case 'thoughtful':
       default:
-        return await this.thoughtfulResponse({ userMessage, panelAgents, context, includeDebate })
+        return await this.thoughtfulResponse({ userMessage, panelAgents, context, includeDebate, userId })
     }
   }
 
   /**
-   * Quick mode: Fast response using single best agent, no roundtable
-   * Best for: Simple questions, math, definitions, quick facts
-   * Time: ~5-10 seconds
+   * Quick mode: Fast response using dynamically routed model based on question type
+   * "OSQR is the AI that knows when to think"
+   *
+   * Routes to optimal model based on question type:
+   * - factual/summarization → Fast model (Haiku/GPT-4o-mini)
+   * - creative → Claude (best at creative writing, tone, nuance)
+   * - coding → GPT-4o or Claude Sonnet (strong at code)
+   * - analytical/reasoning → Best available based on complexity
+   *
+   * Time: ~5-15 seconds depending on model selected
    */
   private static async quickResponse(request: Omit<OSQRRequest, 'mode'>): Promise<OSQRResponse> {
-    const { userMessage, panelAgents, context, includeDebate } = request
+    const { userMessage, panelAgents, context, includeDebate, userId } = request
 
-    console.log('OSQR: Quick mode - using single agent...')
+    // Route the question to determine optimal model
+    const routingDecision = routeQuestion(userMessage)
+    const { recommendedModel, questionType, confidence, shouldSuggestAltOpinion } = routingDecision
 
-    // Use only the first agent for speed
-    const singleAgent = panelAgents[0]
+    console.log(`OSQR: Quick mode - routing "${questionType}" question to ${recommendedModel.model} (confidence: ${confidence})`)
+
+    // Build the quick agent with the routed model
+    const quickAgent: PanelAgent = {
+      id: 'osqr-quick',
+      name: 'OSQR Quick',
+      provider: recommendedModel.provider,
+      modelName: recommendedModel.model,
+      systemPrompt: this.getQuickModePrompt(questionType),
+    }
+
+    // Pass context - the model will naturally know when to use it
     const panelResponses = await PanelOrchestrator.askPanel({
       userMessage,
-      agents: [singleAgent],
-      context,
+      agents: [quickAgent],
+      context, // Include context - prompt will guide appropriate use
     })
 
     // Skip synthesis for simple questions - just return the agent response directly
@@ -198,7 +161,56 @@ Always give artifacts descriptive titles and reference them in your text.`
     return {
       answer,
       panelDiscussion: includeDebate ? panelResponses : undefined,
+      // Include routing metadata for the frontend
+      routing: {
+        questionType,
+        modelUsed: {
+          provider: recommendedModel.provider,
+          model: recommendedModel.model,
+        },
+        confidence,
+        shouldSuggestAltOpinion,
+      },
     }
+  }
+
+  /**
+   * Get a question-type-specific system prompt for Quick mode
+   */
+  private static getQuickModePrompt(questionType: QuestionType): string {
+    const basePrompt = `You are OSQR, a smart and helpful assistant. Answer naturally, like a person would.
+
+You have context about the user. Use it when it's relevant, ignore it when it's not. You know the difference.`
+
+    // Add question-type specific guidance
+    const typeGuidance: Record<QuestionType, string> = {
+      factual: `
+
+This is a factual question. Be direct and precise. Give the answer first, then brief context if needed.`,
+      creative: `
+
+This is a creative task. Be imaginative and engaging. Show personality and craft something memorable.`,
+      coding: `
+
+This is a coding question. Be practical and precise. Show working code, explain key decisions, and anticipate common pitfalls.`,
+      analytical: `
+
+This is an analytical question. Structure your comparison clearly. Use concrete examples and highlight key tradeoffs.`,
+      reasoning: `
+
+This is a reasoning question. Walk through the logic step by step. Make your chain of thought visible.`,
+      summarization: `
+
+This is a summarization request. Be concise and capture the essential points. Structure for easy scanning.`,
+      conversational: `
+
+This is casual conversation. Be warm and personable. Match the user's energy.`,
+      high_stakes: `
+
+This is a high-stakes question. Be thoughtful and thorough. Acknowledge uncertainty, present multiple perspectives, and help the user think through implications.`,
+    }
+
+    return basePrompt + (typeGuidance[questionType] || '')
   }
 
   /**
@@ -207,7 +219,7 @@ Always give artifacts descriptive titles and reference them in your text.`
    * Time: ~20-40 seconds
    */
   private static async thoughtfulResponse(request: Omit<OSQRRequest, 'mode'>): Promise<OSQRResponse> {
-    const { userMessage, panelAgents, context, includeDebate } = request
+    const { userMessage, panelAgents, context, includeDebate, userId, userLevel } = request
 
     // Step 1: Get initial responses from the panel
     console.log('OSQR: Thoughtful mode - consulting panel...')
@@ -238,6 +250,8 @@ Always give artifacts descriptive titles and reference them in your text.`
       panelResponses,
       roundtableResponses,
       context,
+      userId,
+      userLevel,
     })
 
     return {
@@ -253,7 +267,7 @@ Always give artifacts descriptive titles and reference them in your text.`
    * Time: ~60-90 seconds
    */
   private static async contemplativeResponse(request: Omit<OSQRRequest, 'mode'>): Promise<OSQRResponse> {
-    const { userMessage, panelAgents, context, includeDebate } = request
+    const { userMessage, panelAgents, context, includeDebate, userId, userLevel } = request
 
     console.log('OSQR: Contemplate mode - deep analysis with full panel...')
 
@@ -294,6 +308,8 @@ Always give artifacts descriptive titles and reference them in your text.`
       roundtableResponses: secondRoundResponses,
       context,
       isDeepAnalysis: true,
+      userId,
+      userLevel,
     })
 
     return {
@@ -312,16 +328,20 @@ Always give artifacts descriptive titles and reference them in your text.`
     roundtableResponses?: PanelResponse[]
     context?: string
     isDeepAnalysis?: boolean
+    userId?: string // For user-specific synthesizer preferences
+    userLevel?: number // For GKVI level-aware context
+    questionType?: string // For GKVI question-type context
   }): Promise<string> {
-    const { userMessage, panelResponses, roundtableResponses, context, isDeepAnalysis = false } = params
+    const { userMessage, panelResponses, roundtableResponses, context, isDeepAnalysis = false, userId, userLevel, questionType } = params
 
     // Build synthesis prompt
     const messages: AIMessage[] = []
 
-    // System prompt
+    // System prompt - now built dynamically from GKVI
+    const systemPrompt = this.buildSystemPrompt({ userLevel, questionType })
     messages.push({
       role: 'system',
-      content: this.OSQR_SYSTEM_PROMPT,
+      content: systemPrompt,
     })
 
     // Add user's original question
@@ -360,10 +380,15 @@ ${context}
       content: synthesisPrompt,
     })
 
-    // Use GPT-4 for OSQR synthesis (switched from Claude due to credit issues)
-    const osqrProvider = ProviderRegistry.getProvider('openai', {
-      apiKey: process.env.OPENAI_API_KEY || '',
-      model: 'gpt-4-turbo',
+    // Get user's preferred synthesizer model (defaults to Claude)
+    const synthConfig = userId
+      ? await getSynthesizerConfig(userId)
+      : { provider: 'anthropic' as const, model: SETTING_DEFAULTS.synthesizer_model as string }
+
+    // Use the configured model for OSQR synthesis - Claude is the default voice of OSQR
+    const osqrProvider = ProviderRegistry.getProvider(synthConfig.provider, {
+      apiKey: getApiKeyForProvider(synthConfig.provider),
+      model: synthConfig.model,
     })
 
     const answer = await osqrProvider.generate({

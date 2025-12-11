@@ -52,9 +52,12 @@ export async function GET(req: NextRequest) {
 // POST - Create a new MSC item
 const CreateSchema = z.object({
   workspaceId: z.string(),
-  category: z.enum(['goal', 'project', 'idea', 'principle', 'habit']),
+  category: z.string().min(1), // Allow any category string (including custom category IDs)
   content: z.string().min(1).max(500),
+  description: z.string().max(2000).optional(),
   isPinned: z.boolean().optional().default(false),
+  status: z.enum(['active', 'in_progress', 'completed', 'archived']).optional().default('active'),
+  dueDate: z.string().datetime().optional().nullable(),
 })
 
 export async function POST(req: NextRequest) {
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { workspaceId, category, content, isPinned } = CreateSchema.parse(body)
+    const { workspaceId, category, content, description, isPinned, status, dueDate } = CreateSchema.parse(body)
 
     // Get the next sort order for this category
     const lastItem = await prisma.mSCItem.findFirst({
@@ -81,7 +84,10 @@ export async function POST(req: NextRequest) {
         workspaceId,
         category,
         content,
+        description,
         isPinned,
+        status,
+        dueDate: dueDate ? new Date(dueDate) : null,
         sortOrder,
       },
     })
@@ -108,7 +114,10 @@ export async function POST(req: NextRequest) {
 const UpdateSchema = z.object({
   id: z.string(),
   content: z.string().min(1).max(500).optional(),
+  description: z.string().max(2000).optional().nullable(),
   isPinned: z.boolean().optional(),
+  status: z.enum(['active', 'in_progress', 'completed', 'archived']).optional(),
+  dueDate: z.string().datetime().optional().nullable(),
   sortOrder: z.number().optional(),
 })
 
@@ -122,11 +131,17 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { id, ...updates } = UpdateSchema.parse(body)
+    const { id, dueDate, ...updates } = UpdateSchema.parse(body)
+
+    // Handle dueDate conversion
+    const data: Record<string, unknown> = { ...updates }
+    if (dueDate !== undefined) {
+      data.dueDate = dueDate ? new Date(dueDate) : null
+    }
 
     const item = await prisma.mSCItem.update({
       where: { id },
-      data: updates,
+      data,
     })
 
     return NextResponse.json({ item })

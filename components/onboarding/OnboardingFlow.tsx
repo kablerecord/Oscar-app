@@ -27,7 +27,11 @@ import {
   Shield,
   X,
   Settings2,
+  Target,
 } from 'lucide-react'
+import { getQuickAssessment, type AssessmentResult } from '@/lib/capability/assessment'
+import { CapabilityBadge } from '@/components/capability/CapabilityBadge'
+import { getLevelDetails } from '@/lib/capability/levels'
 
 interface OnboardingFlowProps {
   isOpen: boolean
@@ -56,6 +60,7 @@ interface OnboardingData {
 type Step =
   | 'welcome'
   | 'identity'
+  | 'capability-assessment'
   | 'upload'
   | 'indexing'
   | 'panel-debate'
@@ -65,6 +70,7 @@ type Step =
 const STEPS: Step[] = [
   'welcome',
   'identity',
+  'capability-assessment',
   'upload',
   'indexing',
   // 'first-question' is now merged into 'indexing'
@@ -90,6 +96,7 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
   const [firstAnswer, setFirstAnswer] = useState<string>('')
   const [panelDebate, setPanelDebate] = useState<{gpt: string, claude: string, synthesis: string} | null>(null)
   const [masterSummary, setMasterSummary] = useState<string>('')
+  const [capabilityResult, setCapabilityResult] = useState<AssessmentResult | null>(null)
 
   const currentIndex = STEPS.indexOf(currentStep)
   const progress = ((currentIndex + 1) / STEPS.length) * 100
@@ -156,12 +163,22 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
         {/* Hidden title for screen reader accessibility */}
         <DialogTitle className="sr-only">OSQR Onboarding</DialogTitle>
 
-        {/* Progress bar */}
-        <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-800">
-          <div
-            className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+        {/* Progress bar with step indicator */}
+        <div className="relative">
+          <div className="h-1.5 w-full bg-neutral-200 dark:bg-neutral-800">
+            <div
+              className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 transition-all duration-500"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          {/* Step counter - shows on non-welcome steps */}
+          {currentStep !== 'welcome' && (
+            <div className="absolute left-4 top-3 flex items-center space-x-2">
+              <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                Step {currentIndex + 1} of {STEPS.length}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Skip button - appears after welcome step */}
@@ -179,7 +196,7 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
         <div className="max-h-[80vh] overflow-y-auto p-6">
           {/* Step 1: Welcome */}
           {currentStep === 'welcome' && (
-            <WelcomeStep onNext={goNext} />
+            <WelcomeStep onNext={goNext} onQuickStart={handleSkipOnboarding} />
           )}
 
           {/* Step 2: Identity Questions */}
@@ -192,7 +209,21 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
             />
           )}
 
-          {/* Step 3: File Upload */}
+          {/* Step 3: Capability Assessment */}
+          {currentStep === 'capability-assessment' && (
+            <CapabilityAssessmentStep
+              workspaceId={workspaceId}
+              userName={data.name}
+              onComplete={(result) => {
+                setCapabilityResult(result)
+                goNext()
+              }}
+              onSkip={goNext}
+              onBack={goBack}
+            />
+          )}
+
+          {/* Step 4: File Upload */}
           {currentStep === 'upload' && (
             <UploadStep
               uploadedFile={uploadedFile}
@@ -506,7 +537,7 @@ OSQR is now personalized to you, ${data.name}. Your knowledge base is ready, and
 // STEP COMPONENTS
 // =============================================================================
 
-function WelcomeStep({ onNext }: { onNext: () => void }) {
+function WelcomeStep({ onNext, onQuickStart }: { onNext: () => void; onQuickStart: () => void }) {
   return (
     <div className="text-center">
       <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 shadow-lg shadow-purple-500/25">
@@ -517,11 +548,19 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         Welcome to OSQR
       </h1>
 
-      <p className="mb-6 text-lg text-neutral-600 dark:text-neutral-400">
+      <p className="mb-2 text-lg text-neutral-600 dark:text-neutral-400">
         Your AI operating system for capability and reasoning
       </p>
 
-      <div className="mb-8 space-y-4 text-left">
+      {/* Time estimate badge */}
+      <div className="mb-6 inline-flex items-center space-x-1.5 rounded-full bg-neutral-100 dark:bg-neutral-800 px-3 py-1 text-xs text-neutral-600 dark:text-neutral-400">
+        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <span>~3 minutes to complete</span>
+      </div>
+
+      <div className="mb-6 space-y-4 text-left">
         <div className="flex items-start space-x-3 rounded-lg bg-blue-50 p-4 dark:bg-blue-950/30">
           <Sparkles className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
           <p className="text-sm text-neutral-700 dark:text-neutral-300">
@@ -530,25 +569,43 @@ function WelcomeStep({ onNext }: { onNext: () => void }) {
         </div>
 
         <div className="grid grid-cols-5 gap-2">
-          {['Upload', 'Ask', 'Debate', 'Remember', 'Organize'].map((step, i) => (
-            <div key={step} className="text-center">
-              <div className="mx-auto mb-1 flex h-8 w-8 items-center justify-center rounded-full bg-neutral-100 text-sm font-medium text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-                {i + 1}
+          {[
+            { name: 'Upload', icon: Upload },
+            { name: 'Ask', icon: MessageSquare },
+            { name: 'Debate', icon: Users },
+            { name: 'Remember', icon: Brain },
+            { name: 'Organize', icon: Crown },
+          ].map((step, i) => {
+            const StepIcon = step.icon
+            return (
+              <div key={step.name} className="text-center group">
+                <div className="mx-auto mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-neutral-100 dark:bg-neutral-800 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 transition-colors">
+                  <StepIcon className="h-4 w-4 text-neutral-500 dark:text-neutral-400 group-hover:text-blue-500 transition-colors" />
+                </div>
+                <p className="text-xs text-neutral-500">{step.name}</p>
               </div>
-              <p className="text-xs text-neutral-500">{step}</p>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
-      <Button
-        onClick={onNext}
-        size="lg"
-        className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
-      >
-        Let&apos;s Go
-        <ArrowRight className="ml-2 h-5 w-5" />
-      </Button>
+      <div className="space-y-3">
+        <Button
+          onClick={onNext}
+          size="lg"
+          className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+        >
+          Let&apos;s Go
+          <ArrowRight className="ml-2 h-5 w-5" />
+        </Button>
+
+        <button
+          onClick={onQuickStart}
+          className="w-full text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors py-2"
+        >
+          Skip setup → Start chatting immediately
+        </button>
+      </div>
     </div>
   )
 }
@@ -1604,6 +1661,245 @@ function MasterSummaryStep({
           </Button>
         </>
       )}
+    </div>
+  )
+}
+
+function CapabilityAssessmentStep({
+  workspaceId,
+  userName,
+  onComplete,
+  onSkip,
+  onBack,
+}: {
+  workspaceId: string
+  userName: string
+  onComplete: (result: AssessmentResult) => void
+  onSkip: () => void
+  onBack: () => void
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [answers, setAnswers] = useState<Record<string, number>>({})
+  const [result, setResult] = useState<AssessmentResult | null>(null)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Use quick assessment (6 questions) for onboarding
+  const questions = getQuickAssessment()
+  const currentQuestion = questions[currentIndex]
+  const progress = ((currentIndex + 1) / questions.length) * 100
+
+  const handleSelect = (optionIndex: number) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [currentQuestion.id]: optionIndex,
+    }))
+  }
+
+  const handleNext = async () => {
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(currentIndex + 1)
+    } else {
+      await submitAssessment()
+    }
+  }
+
+  const handleBack = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1)
+    } else {
+      onBack()
+    }
+  }
+
+  const submitAssessment = async () => {
+    setIsSubmitting(true)
+    try {
+      const response = await fetch('/api/capability/assess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          answers,
+          trigger: 'onboarding',
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setResult(data.result)
+      }
+    } catch (error) {
+      console.error('Assessment error:', error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  // Show results
+  if (result) {
+    const levelDetails = getLevelDetails(result.level)
+
+    // Level-appropriate welcome messages
+    const getWelcomeMessage = (level: number): { title: string; subtitle: string; focus: string } => {
+      if (level <= 3) {
+        return {
+          title: `Welcome to your journey, ${userName}`,
+          subtitle: "You're at the beginning of something powerful.",
+          focus: "OSQR will help you build consistent habits, clarify your goals, and develop a stronger sense of who you're becoming."
+        }
+      } else if (level <= 6) {
+        return {
+          title: `Ready to level up, ${userName}?`,
+          subtitle: "You've built a solid foundation.",
+          focus: "OSQR will help you optimize your systems, identify leverage points, and push beyond your current limits."
+        }
+      } else if (level <= 9) {
+        return {
+          title: `Let's build something great, ${userName}`,
+          subtitle: "You're already creating real value.",
+          focus: "OSQR will help you scale your systems, make better strategic decisions, and multiply your impact."
+        }
+      } else {
+        return {
+          title: `An honor to work with you, ${userName}`,
+          subtitle: "You're operating at the highest levels.",
+          focus: "OSQR will match your wavelength—helping with multi-domain integration, long-term thinking, and legacy-building decisions."
+        }
+      }
+    }
+
+    const welcomeMessage = getWelcomeMessage(result.level)
+
+    return (
+      <div>
+        <div className="mb-6 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500">
+            <Target className="h-6 w-6 text-white" />
+          </div>
+          <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
+            {welcomeMessage.title}
+          </h2>
+          <p className="mt-1 text-neutral-600 dark:text-neutral-400">
+            {welcomeMessage.subtitle}
+          </p>
+        </div>
+
+        <div className="flex justify-center py-4">
+          <CapabilityBadge level={result.level} size="lg" showStage />
+        </div>
+
+        {levelDetails && (
+          <div className="mb-4 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 p-4 dark:from-indigo-950/30 dark:to-purple-950/30">
+            <p className="mb-2 font-medium text-neutral-900 dark:text-white">
+              {levelDetails.name}: {levelDetails.description}
+            </p>
+            <p className="text-sm italic text-neutral-600 dark:text-neutral-400">
+              &quot;{levelDetails.identityPattern}&quot;
+            </p>
+          </div>
+        )}
+
+        <div className="mb-6 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20 p-3">
+          <p className="text-sm text-neutral-700 dark:text-neutral-300">
+            {welcomeMessage.focus}
+          </p>
+        </div>
+
+        <Button
+          onClick={() => onComplete(result)}
+          className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+        >
+          Continue
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+    )
+  }
+
+  // Show questions
+  return (
+    <div>
+      <div className="mb-6 text-center">
+        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-500">
+          <Target className="h-6 w-6 text-white" />
+        </div>
+        <h2 className="text-2xl font-bold text-neutral-900 dark:text-white">
+          Quick Capability Check
+        </h2>
+        <p className="mt-1 text-neutral-600 dark:text-neutral-400">
+          6 quick questions so OSQR can personalize your experience
+        </p>
+      </div>
+
+      {/* Progress bar */}
+      <div className="mb-6">
+        <div className="flex justify-between text-sm text-neutral-500 mb-2">
+          <span>Question {currentIndex + 1} of {questions.length}</span>
+          <span>{Math.round(progress)}%</span>
+        </div>
+        <div className="h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Question */}
+      <div className="mb-6">
+        <p className="text-xs uppercase tracking-wide text-neutral-500 mb-2">
+          {currentQuestion.category.replace('_', ' ')}
+        </p>
+        <h3 className="text-lg font-medium text-neutral-900 dark:text-white">
+          {currentQuestion.question}
+        </h3>
+      </div>
+
+      {/* Options */}
+      <div className="space-y-2 mb-6">
+        {currentQuestion.options.map((option, idx) => {
+          const isSelected = answers[currentQuestion.id] === idx
+          return (
+            <button
+              key={idx}
+              onClick={() => handleSelect(idx)}
+              className={`w-full p-3 text-left rounded-lg border-2 transition-all text-sm ${
+                isSelected
+                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/30'
+                  : 'border-neutral-200 dark:border-neutral-700 hover:border-indigo-300 dark:hover:border-indigo-600'
+              }`}
+            >
+              {option.text}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <Button variant="ghost" onClick={handleBack}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+        <div className="flex space-x-2">
+          {currentIndex === 0 && (
+            <Button variant="outline" onClick={onSkip}>
+              Skip for now
+            </Button>
+          )}
+          <Button
+            onClick={handleNext}
+            disabled={answers[currentQuestion.id] === undefined || isSubmitting}
+            className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600"
+          >
+            {isSubmitting
+              ? 'Calculating...'
+              : currentIndex === questions.length - 1
+              ? 'See My Level'
+              : 'Next'}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

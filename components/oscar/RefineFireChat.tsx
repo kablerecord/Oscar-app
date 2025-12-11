@@ -21,19 +21,45 @@ import {
   CheckCircle2,
   MessageSquare,
   Users,
+  Columns,
+  Check,
+  X,
+  Shuffle,
+  AlertCircle,
+  HelpCircle,
 } from 'lucide-react'
-import { ProfileQuestionModal } from '@/components/profile/ProfileQuestionModal'
+import { OSCARBubble } from '@/components/oscar/OSCARBubble'
 import { ShareActions } from '@/components/share/ShareActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
+import {
+  type OnboardingState,
+  getInitialOnboardingState,
+  progressOnboarding,
+} from '@/lib/onboarding/oscar-onboarding'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
+import { CouncilPanel, CouncilBadge, type PanelMemberResponse } from '@/components/council/CouncilPanel'
 
 interface AltOpinion {
   answer: string
   model: string
   provider: string
   loading?: boolean
+  comparison?: {
+    agreements: string[]
+    disagreements: string[]
+  }
 }
+
+// Available models for "See Another AI" feature
+const AVAILABLE_ALT_MODELS = [
+  { id: 'random', name: 'Surprise me', provider: null },
+  { id: 'claude', name: 'Claude', provider: 'anthropic' },
+  { id: 'gpt4', name: 'GPT-4', provider: 'openai' },
+  { id: 'gpt4o', name: 'GPT-4o', provider: 'openai' },
+] as const
+
+type AltModelId = typeof AVAILABLE_ALT_MODELS[number]['id']
 
 interface Message {
   role: 'user' | 'osqr'
@@ -44,9 +70,19 @@ interface Message {
     panelDiscussion?: any[]
     roundtableDiscussion?: any[]
   }
+  // J-4: Council Mode - structured panel responses for visible reasoning
+  councilResponses?: PanelMemberResponse[]
+  councilRoundtable?: PanelMemberResponse[]
   refinedQuestion?: string // Store the refined question that was fired
   altOpinion?: AltOpinion // Alternate AI's opinion
   mode?: ResponseMode // Which mode was used for this response
+  // Routing metadata from model router - "OSQR knows when to think"
+  routing?: {
+    questionType: string
+    modelUsed: { provider: string; model: string }
+    confidence: number
+    shouldSuggestAltOpinion: boolean
+  }
 }
 
 interface RefineResult {
@@ -62,7 +98,188 @@ interface RefineFireChatProps {
 }
 
 type ResponseMode = 'quick' | 'thoughtful' | 'contemplate'
-type ChatStage = 'input' | 'refining' | 'refined' | 'firing' | 'complete'
+type ChatStage = 'input' | 'gating' | 'gatekeeper-prompt' | 'refining' | 'refined' | 'firing' | 'complete'
+
+// Gatekeeper classification result
+interface GatekeeperResult {
+  question: string
+  selectedMode: ResponseMode
+  scores: {
+    clarity: number
+    intentDepth: number
+    knowledgeRequirement: number
+    consequenceWeight: number
+  }
+  totalScore: number
+  recommendation: 'quick' | 'refine' | 'fire' | 'suggest_thoughtful'
+  reasoning: string
+  refinedVersions?: {
+    precision: string
+    bigPicture: string
+  } | null
+}
+
+// Question complexity detection
+interface ComplexityAnalysis {
+  level: 'simple' | 'moderate' | 'complex'
+  suggestedMode: ResponseMode
+  reason: string
+}
+
+// Question refinement suggestions
+interface RefinementSuggestion {
+  type: 'add_context' | 'be_specific' | 'add_goal' | 'clarify_scope' | 'add_constraints' | 'good'
+  message: string
+  example?: string
+}
+
+function analyzeForRefinement(question: string): RefinementSuggestion | null {
+  const q = question.toLowerCase().trim()
+  const words = q.split(/\s+/)
+  const wordCount = words.length
+
+  // Too short - needs more context
+  if (wordCount < 4 && q.length > 0) {
+    return {
+      type: 'add_context',
+      message: 'Add more context for a better answer',
+      example: 'Try: "How do I [your question] for [your specific situation]?"',
+    }
+  }
+
+  // Vague questions that could use specificity
+  const vagueStarters = [
+    /^what do you think/,
+    /^what about/,
+    /^how about/,
+    /^tell me about/,
+    /^explain/,
+    /^help me with/,
+    /^i need help/,
+  ]
+  if (vagueStarters.some(p => p.test(q)) && wordCount < 10) {
+    return {
+      type: 'be_specific',
+      message: 'Be more specific about what you want to know',
+      example: 'Instead of "tell me about X", try "what are the key considerations for X when Y?"',
+    }
+  }
+
+  // Questions without clear goal
+  const hasGoalWords = /\b(to|for|so that|in order to|because|want to|need to|trying to)\b/.test(q)
+  if (wordCount > 5 && wordCount < 15 && !hasGoalWords && !q.includes('?')) {
+    return {
+      type: 'add_goal',
+      message: 'Consider adding your goal or intended outcome',
+      example: 'Add "so I can..." or "because I want to..." to get more targeted advice',
+    }
+  }
+
+  // Very broad questions that need scope
+  const broadPatterns = [
+    /^how (do|can|should) (i|we|you) (start|begin|get started)/,
+    /best (way|approach|practice)/,
+    /everything about/,
+    /all about/,
+  ]
+  if (broadPatterns.some(p => p.test(q)) && !q.includes('specific')) {
+    return {
+      type: 'clarify_scope',
+      message: 'This is broad - consider narrowing the scope',
+      example: 'Add constraints like timeline, budget, skill level, or specific aspect',
+    }
+  }
+
+  // Decision questions without constraints
+  const decisionPatterns = [
+    /should (i|we)/,
+    /which (one|should|is better)/,
+    /\bor\b.*\?$/,
+    /choose between/,
+  ]
+  if (decisionPatterns.some(p => p.test(q)) && wordCount < 20) {
+    const hasConstraints = /\b(budget|time|cost|deadline|experience|skill|goal|priority)\b/.test(q)
+    if (!hasConstraints) {
+      return {
+        type: 'add_constraints',
+        message: 'Decision questions work better with constraints',
+        example: 'Add your priorities, constraints, or what matters most to you',
+      }
+    }
+  }
+
+  // Good question - no suggestions needed
+  if (wordCount >= 10 || q.includes('?') && wordCount >= 6) {
+    return {
+      type: 'good',
+      message: 'Looking good!',
+    }
+  }
+
+  return null
+}
+
+function analyzeQuestionComplexity(question: string): ComplexityAnalysis {
+  const q = question.toLowerCase().trim()
+  const wordCount = q.split(/\s+/).length
+
+  // Complex indicators
+  const complexPatterns = [
+    /how (should|can|do) i (decide|choose|evaluate|analyze|compare)/,
+    /what('s| is| are) the (best|right|optimal) (way|approach|strategy)/,
+    /pros and cons/,
+    /trade.?offs?/,
+    /long.?term/,
+    /implications/,
+    /strategy|strategic/,
+    /architecture|design pattern/,
+    /should i (start|build|create|implement)/,
+    /how do (successful|great|top)/,
+    /what makes/,
+    /explain.+(in depth|thoroughly|comprehensively)/,
+  ]
+
+  // Simple indicators
+  const simplePatterns = [
+    /^what (is|are|was|were) /,
+    /^who (is|are|was|were) /,
+    /^when (is|are|was|were|did|does) /,
+    /^where (is|are|was|were) /,
+    /^define /,
+    /^list /,
+    /^name /,
+    /syntax/,
+    /example of/,
+    /how to (install|setup|configure|run|start)/,
+  ]
+
+  // Check for complex patterns
+  const hasComplexPattern = complexPatterns.some(p => p.test(q))
+  const hasSimplePattern = simplePatterns.some(p => p.test(q))
+
+  // Determine complexity
+  if (hasComplexPattern || wordCount > 25) {
+    return {
+      level: 'complex',
+      suggestedMode: 'contemplate',
+      reason: 'This question involves strategic thinking or multiple considerations',
+    }
+  }
+
+  if (hasSimplePattern || wordCount < 8) {
+    return {
+      level: 'simple',
+      suggestedMode: 'quick',
+      reason: 'This is a straightforward factual question',
+    }
+  }
+
+  return {
+    level: 'moderate',
+    suggestedMode: 'thoughtful',
+    reason: 'This question could benefit from some analysis',
+  }
+}
 
 export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
@@ -72,7 +289,7 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
   const [useKnowledge, setUseKnowledge] = useState(true)
   const [showDebug, setShowDebug] = useState(false)
   const [expandedDebug, setExpandedDebug] = useState<number | null>(null)
-  const [responseMode, setResponseMode] = useState<ResponseMode>('thoughtful')
+  const [responseMode, setResponseMode] = useState<ResponseMode>('quick')
 
   // Refine state
   const [refineResult, setRefineResult] = useState<RefineResult | null>(null)
@@ -88,6 +305,28 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
   const [showArtifacts, setShowArtifacts] = useState(false)
   const [currentArtifacts, setCurrentArtifacts] = useState<ArtifactBlock[]>([])
 
+  // Alt opinion state
+  const [selectedAltModel, setSelectedAltModel] = useState<AltModelId>('random')
+  const [showAltModelDropdown, setShowAltModelDropdown] = useState<number | null>(null)
+  const [comparisonViewIdx, setComparisonViewIdx] = useState<number | null>(null)
+
+  // Mode suggestion state
+  const [modeSuggestion, setModeSuggestion] = useState<ComplexityAnalysis | null>(null)
+  const [showModeSuggestion, setShowModeSuggestion] = useState(false)
+
+  // Refinement suggestion state
+  const [refinementSuggestion, setRefinementSuggestion] = useState<RefinementSuggestion | null>(null)
+
+  // Gatekeeper state
+  const [gatekeeperResult, setGatekeeperResult] = useState<GatekeeperResult | null>(null)
+  const [autoDowngradedQuestion, setAutoDowngradedQuestion] = useState<string | null>(null)
+
+  // OSCAR bubble onboarding state
+  const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => {
+    // TODO: Load from localStorage or API for persistence
+    return getInitialOnboardingState()
+  })
+
   // Ref for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const refineCardRef = useRef<HTMLDivElement>(null)
@@ -96,6 +335,33 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Analyze question complexity and refinement when input changes (debounced)
+  useEffect(() => {
+    if (input.trim().length < 3) {
+      setModeSuggestion(null)
+      setShowModeSuggestion(false)
+      setRefinementSuggestion(null)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      // Analyze for mode suggestion
+      const analysis = analyzeQuestionComplexity(input)
+      if (analysis.suggestedMode !== responseMode) {
+        setModeSuggestion(analysis)
+        setShowModeSuggestion(true)
+      } else {
+        setShowModeSuggestion(false)
+      }
+
+      // Analyze for refinement suggestions
+      const refinement = analyzeForRefinement(input)
+      setRefinementSuggestion(refinement)
+    }, 300) // 300ms debounce for snappier feedback
+
+    return () => clearTimeout(timer)
+  }, [input, responseMode])
 
   // Scroll to refine card when it appears
   useEffect(() => {
@@ -120,6 +386,96 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
     }
     loadAnsweredQuestions()
   }, [workspaceId])
+
+  // STEP 0: Gatekeeper - classify question before allowing expensive modes
+  const handleGatekeeper = async () => {
+    if (!input.trim() || isLoading) return
+
+    const userQuestion = input.trim()
+
+    // Quick mode always bypasses gatekeeper
+    if (responseMode === 'quick') {
+      handleDirectFire(userQuestion)
+      return
+    }
+
+    setChatStage('gating')
+    setIsLoading(true)
+
+    try {
+      const response = await fetch('/api/oscar/classify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: userQuestion,
+          selectedMode: responseMode,
+        }),
+      })
+
+      if (!response.ok) {
+        // If gatekeeper fails, fall through to normal refine flow
+        console.warn('Gatekeeper failed, proceeding with refine')
+        handleRefine()
+        return
+      }
+
+      const data: GatekeeperResult = await response.json()
+      setGatekeeperResult(data)
+
+      // Handle the recommendation
+      if (data.recommendation === 'fire') {
+        // Question is deep enough, proceed to refine or fire
+        handleRefine()
+      } else if (data.recommendation === 'quick') {
+        // Question is too shallow - auto-answer in Quick mode silently
+        // Track that we auto-downgraded so we can offer "go deeper" after
+        setAutoDowngradedQuestion(userQuestion)
+        setResponseMode('quick')
+        handleDirectFire(userQuestion)
+      } else if (data.recommendation === 'refine') {
+        // Question needs refinement - show refinement options
+        setChatStage('gatekeeper-prompt')
+        setIsLoading(false)
+      } else if (data.recommendation === 'suggest_thoughtful') {
+        // Contemplate overkill, suggest Thoughtful
+        setChatStage('gatekeeper-prompt')
+        setIsLoading(false)
+      }
+    } catch (error) {
+      console.error('Gatekeeper error:', error)
+      // Fallback: proceed with normal refine flow
+      handleRefine()
+    }
+  }
+
+  // Handle gatekeeper actions
+  const handleGatekeeperAction = (action: 'refine' | 'quick' | 'fire' | 'use-precision' | 'use-bigpicture' | 'switch-thoughtful') => {
+    if (!gatekeeperResult) return
+
+    if (action === 'quick') {
+      setResponseMode('quick')
+      handleDirectFire(gatekeeperResult.question)
+    } else if (action === 'fire') {
+      // User insists, proceed with their chosen mode
+      handleRefine()
+    } else if (action === 'refine') {
+      // User wants to refine themselves
+      setChatStage('input')
+      setGatekeeperResult(null)
+      setIsLoading(false)
+    } else if (action === 'use-precision' && gatekeeperResult.refinedVersions?.precision) {
+      setInput(gatekeeperResult.refinedVersions.precision)
+      setChatStage('input')
+      setGatekeeperResult(null)
+    } else if (action === 'use-bigpicture' && gatekeeperResult.refinedVersions?.bigPicture) {
+      setInput(gatekeeperResult.refinedVersions.bigPicture)
+      setChatStage('input')
+      setGatekeeperResult(null)
+    } else if (action === 'switch-thoughtful') {
+      setResponseMode('thoughtful')
+      handleRefine()
+    }
+  }
 
   // STEP 1: Refine the question
   const handleRefine = async () => {
@@ -183,9 +539,9 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
     // Add "thinking" placeholder with mode
     setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true, mode: responseMode }])
 
-    // Show profile question during wait time
+    // Show profile question during wait time (even in quick mode - bubble will be there when they need it)
     const nextQuestion = getNextQuestion(answeredQuestionIds)
-    if (nextQuestion && responseMode !== 'quick') {
+    if (nextQuestion) {
       setCurrentQuestion(nextQuestion)
       setShowProfileQuestion(true)
     }
@@ -210,6 +566,24 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
       const data = await response.json()
 
       // Replace thinking placeholder with actual response
+      // J-4: Transform panel discussion into structured council responses
+      const councilResponses: PanelMemberResponse[] = (data.panelDiscussion || []).map((p: any, i: number) => ({
+        agentId: p.agentId || `agent-${i}`,
+        agentName: `Expert ${i + 1}`,
+        modelId: p.modelId || 'unknown',
+        provider: p.provider || 'unknown',
+        content: p.content || '',
+        error: p.error,
+      }))
+      const councilRoundtable: PanelMemberResponse[] = (data.roundtableDiscussion || []).map((p: any, i: number) => ({
+        agentId: p.agentId || `agent-${i}`,
+        agentName: `Expert ${i + 1}`,
+        modelId: p.modelId || 'unknown',
+        provider: p.provider || 'unknown',
+        content: p.content || '',
+        error: p.error,
+      }))
+
       setMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = {
@@ -218,6 +592,10 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
           thinking: false,
           artifacts: data.artifacts,
           mode: responseMode, // Preserve the mode used for this response
+          routing: data.routing, // Include routing metadata for Alt-Opinion suggestions
+          // J-4: Include structured council data for visible reasoning
+          councilResponses: showDebug && councilResponses.length > 0 ? councilResponses : undefined,
+          councilRoundtable: showDebug && councilRoundtable.length > 0 ? councilRoundtable : undefined,
           debug: showDebug
             ? {
                 panelDiscussion: data.panelDiscussion,
@@ -233,6 +611,9 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
         setCurrentArtifacts(data.artifacts)
         setShowArtifacts(true)
       }
+
+      // Trigger onboarding progress for first question asked (will show post_first_answer stage)
+      setOnboardingState(prev => progressOnboarding(prev, { type: 'asked_question' }))
     } catch (error) {
       console.error('Error asking OSQR:', error)
       setMessages((prev) => {
@@ -266,11 +647,8 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       if (chatStage === 'input' || chatStage === 'complete') {
-        if (responseMode === 'quick') {
-          handleDirectFire(input.trim())
-        } else {
-          handleRefine()
-        }
+        // Route through gatekeeper for Thoughtful/Contemplate
+        handleGatekeeper()
       }
     }
   }
@@ -279,8 +657,19 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
   const handleStartOver = () => {
     setChatStage('input')
     setRefineResult(null)
+    setGatekeeperResult(null)
+    setAutoDowngradedQuestion(null)
     setRefinedQuestion('')
     setClarifyingAnswers([])
+  }
+
+  // Handle "go deeper" on auto-downgraded questions
+  const handleGoDeeper = (question: string) => {
+    setInput(question)
+    setResponseMode('thoughtful')
+    setAutoDowngradedQuestion(null)
+    // Don't auto-submit - let user review and hit Ask
+    setChatStage('input')
   }
 
   // Profile question handlers
@@ -331,7 +720,13 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
   }
 
   // Get alternate AI opinion
-  const handleGetAltOpinion = async (messageIdx: number, question: string) => {
+  const handleGetAltOpinion = async (messageIdx: number, question: string, modelId?: AltModelId) => {
+    const useModel = modelId || selectedAltModel
+    const originalAnswer = messages[messageIdx]?.content || ''
+
+    // Close dropdown
+    setShowAltModelDropdown(null)
+
     // Set loading state on the message
     setMessages((prev) => {
       const updated = [...prev]
@@ -349,6 +744,8 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
         body: JSON.stringify({
           message: question,
           workspaceId,
+          preferredModel: useModel,
+          originalAnswer, // Send original for comparison
         }),
       })
 
@@ -367,6 +764,7 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
             model: data.model,
             provider: data.provider,
             loading: false,
+            comparison: data.comparison,
           },
         }
         return updated
@@ -397,39 +795,196 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
       {/* Main chat area */}
       <div className={`flex flex-col flex-1 transition-all duration-300 ${showArtifacts ? 'mr-0' : ''}`}>
         {/* Messages area */}
-        <div className="flex-1 space-y-6 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="relative flex-1 space-y-6 overflow-y-auto rounded-xl border border-slate-700/50 bg-slate-800/50 p-6">
+          {/* Subtle background gradient */}
+          <div className="absolute inset-0 bg-radial-gradient pointer-events-none" />
+
           {messages.length === 0 && chatStage === 'input' && (
-            <div className="flex h-full flex-col items-center justify-center text-center">
-              <div className="relative mb-4">
-                <Brain className="h-16 w-16 text-neutral-400" />
-                <Sparkles className="absolute -right-2 -top-2 h-6 w-6 text-amber-500" />
+            <div className="relative flex h-full flex-col items-center justify-center text-center">
+              {/* Animated background blobs */}
+              <div className="absolute -top-20 -right-20 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl animate-pulse" />
+              <div className="absolute -bottom-20 -left-20 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+
+              <div className="relative mb-6">
+                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-500/10 ring-1 ring-blue-500/20 animate-pulse-glow">
+                  <Brain className="h-10 w-10 text-blue-400" />
+                </div>
+                <Sparkles className="absolute -right-2 -top-2 h-6 w-6 text-blue-400" />
               </div>
-              <h3 className="mb-2 text-xl font-semibold text-neutral-900 dark:text-neutral-100">
-                Hello, I'm OSQR
+              <h3 className="mb-3 text-3xl font-bold text-white">
+                Hello, I'm <span className="shimmer-text">OSQR</span>
               </h3>
-              <p className="max-w-md text-neutral-600 dark:text-neutral-400 mb-4">
+              <p className="max-w-lg text-base text-slate-300 mb-6 leading-relaxed">
                 Your personal AI operating system. I'll help you sharpen your question first, then consult a panel of AI experts for the best possible answer.
               </p>
-              <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+              <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
                 <Target className="h-4 w-4" />
                 <span>Refine → Fire: Better questions, better answers</span>
               </div>
             </div>
           )}
 
+          {/* Gating indicator */}
+          {chatStage === 'gating' && (
+            <div className="relative flex h-full flex-col items-center justify-center text-center animate-fade-in">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/10 ring-1 ring-blue-500/20 mb-4">
+                <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
+              </div>
+              <p className="text-slate-400">Evaluating question depth...</p>
+            </div>
+          )}
+
+          {/* Gatekeeper Prompt */}
+          {chatStage === 'gatekeeper-prompt' && gatekeeperResult && (
+            <div className="relative flex h-full flex-col items-center justify-center animate-fade-in">
+              <Card className="max-w-xl w-full bg-slate-800/80 border-slate-700/50 p-6">
+                {/* Header with score visualization */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
+                      <Target className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <span className="font-semibold text-slate-200">Question Analysis</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-slate-500">Depth Score:</span>
+                    <span className={`text-sm font-bold ${
+                      gatekeeperResult.totalScore >= 9 ? 'text-purple-400' :
+                      gatekeeperResult.totalScore >= 6 ? 'text-blue-400' :
+                      'text-amber-400'
+                    }`}>
+                      {gatekeeperResult.totalScore}/12
+                    </span>
+                  </div>
+                </div>
+
+                {/* User's question */}
+                <div className="mb-4 p-3 rounded-lg bg-slate-700/50 border border-slate-600/50">
+                  <p className="text-sm text-slate-300">"{gatekeeperResult.question}"</p>
+                </div>
+
+                {/* Reasoning */}
+                <p className="text-sm text-slate-400 mb-5">{gatekeeperResult.reasoning}</p>
+
+                {/* Actions based on recommendation */}
+                {gatekeeperResult.recommendation === 'quick' && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-300 mb-3">
+                      I can answer this instantly in <span className="text-amber-400 font-medium">Quick</span> mode, or we can explore deeper. What's your goal?
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => handleGatekeeperAction('quick')}
+                        className="bg-amber-500 hover:bg-amber-600 text-white"
+                      >
+                        <Zap className="h-4 w-4 mr-1.5" />
+                        Answer in Quick Mode
+                      </Button>
+                      <Button
+                        onClick={() => handleGatekeeperAction('refine')}
+                        variant="outline"
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                      >
+                        Let me refine my question
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {gatekeeperResult.recommendation === 'refine' && gatekeeperResult.refinedVersions && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-300 mb-3">
+                      Here are two stronger versions of your question:
+                    </p>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleGatekeeperAction('use-precision')}
+                        className="w-full text-left p-3 rounded-lg bg-slate-700/50 border border-slate-600/50 hover:border-blue-500/50 hover:bg-slate-700 transition-all group"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Target className="h-3.5 w-3.5 text-blue-400" />
+                          <span className="text-xs font-medium text-blue-400">Precision</span>
+                        </div>
+                        <p className="text-sm text-slate-300 group-hover:text-slate-100">
+                          {gatekeeperResult.refinedVersions.precision}
+                        </p>
+                      </button>
+                      <button
+                        onClick={() => handleGatekeeperAction('use-bigpicture')}
+                        className="w-full text-left p-3 rounded-lg bg-slate-700/50 border border-slate-600/50 hover:border-purple-500/50 hover:bg-slate-700 transition-all group"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Sparkles className="h-3.5 w-3.5 text-purple-400" />
+                          <span className="text-xs font-medium text-purple-400">Big Picture</span>
+                        </div>
+                        <p className="text-sm text-slate-300 group-hover:text-slate-100">
+                          {gatekeeperResult.refinedVersions.bigPicture}
+                        </p>
+                      </button>
+                    </div>
+                    <div className="flex gap-2 mt-4 pt-3 border-t border-slate-700/50">
+                      <Button
+                        onClick={() => handleGatekeeperAction('fire')}
+                        variant="ghost"
+                        size="sm"
+                        className="text-slate-400 hover:text-slate-200"
+                      >
+                        Use my original question anyway
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {gatekeeperResult.recommendation === 'suggest_thoughtful' && (
+                  <div className="space-y-3">
+                    <p className="text-sm text-slate-300 mb-3">
+                      This question would get a great answer in <span className="text-blue-400 font-medium">Thoughtful</span> mode.
+                      <span className="text-purple-400 font-medium"> Contemplate</span> mode is best for high-stakes decisions.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        onClick={() => handleGatekeeperAction('switch-thoughtful')}
+                        className="bg-blue-500 hover:bg-blue-600 text-white"
+                      >
+                        <Lightbulb className="h-4 w-4 mr-1.5" />
+                        Use Thoughtful Mode
+                      </Button>
+                      <Button
+                        onClick={() => handleGatekeeperAction('fire')}
+                        variant="outline"
+                        className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
+                      >
+                        <GraduationCap className="h-4 w-4 mr-1.5" />
+                        Proceed with Contemplate
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Cancel option */}
+                <button
+                  onClick={handleStartOver}
+                  className="mt-4 text-xs text-slate-500 hover:text-slate-400 transition-colors"
+                >
+                  ← Start over
+                </button>
+              </Card>
+            </div>
+          )}
+
           {/* Messages */}
           {messages.map((message, idx) => (
-            <div key={idx} className="space-y-2">
+            <div key={idx} className="relative space-y-2 animate-fade-in">
               {message.role === 'user' ? (
                 <div className="flex justify-end">
                   <div className="max-w-[80%]">
                     {message.refinedQuestion && (
-                      <div className="mb-1 text-xs text-neutral-500 text-right">
+                      <div className="mb-1 text-xs text-slate-500 text-right">
                         Original: "{message.refinedQuestion}"
                       </div>
                     )}
-                    <Card className="bg-blue-50 p-4 dark:bg-blue-950/20">
-                      <p className="whitespace-pre-wrap text-sm text-neutral-900 dark:text-neutral-100">
+                    <Card className="bg-blue-500/10 border-blue-500/20 p-4">
+                      <p className="whitespace-pre-wrap text-sm text-slate-100">
                         {message.content}
                       </p>
                     </Card>
@@ -439,18 +994,20 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                 <div className="flex justify-start">
                   <div className="max-w-[80%] space-y-2">
                     <div className="flex items-center space-x-2">
-                      <Brain className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                      <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-500/10 ring-1 ring-blue-500/20">
+                        <Brain className="h-3.5 w-3.5 text-blue-400" />
+                      </div>
+                      <span className="text-sm font-semibold text-slate-200">
                         OSQR
                       </span>
                       {/* Mode badge */}
                       {message.mode && !message.thinking && (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ring-1 ${
                           message.mode === 'quick'
-                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                            ? 'bg-amber-500/10 text-amber-400 ring-amber-500/20'
                             : message.mode === 'thoughtful'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-                            : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                            ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
+                            : 'bg-purple-500/10 text-purple-400 ring-purple-500/20'
                         }`}>
                           {message.mode === 'quick' && 'Quick'}
                           {message.mode === 'thoughtful' && 'Thoughtful'}
@@ -458,10 +1015,10 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                         </span>
                       )}
                     </div>
-                    <Card className="p-4">
+                    <Card className="bg-slate-700/50 border-slate-600/50 p-4">
                       {message.thinking ? (
-                        <div className="flex items-center space-x-2 text-sm text-neutral-500">
-                          <Loader2 className="h-4 w-4 animate-spin" />
+                        <div className="flex items-center space-x-2 text-sm text-slate-400">
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
                           <span>
                             {responseMode === 'quick' && 'Quick response - consulting expert...'}
                             {responseMode === 'thoughtful' && 'Consulting panel and synthesizing...'}
@@ -469,8 +1026,8 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                           </span>
                         </div>
                       ) : (
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <p className="whitespace-pre-wrap text-sm text-neutral-900 dark:text-neutral-100">
+                        <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-headings:text-slate-100">
+                          <p className="whitespace-pre-wrap text-sm text-slate-300">
                             {message.content}
                           </p>
                         </div>
@@ -491,6 +1048,30 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                       />
                     )}
 
+                    {/* "Go Deeper" prompt for auto-downgraded questions */}
+                    {!message.thinking && message.content && message.mode === 'quick' && autoDowngradedQuestion && idx === messages.length - 1 && (
+                      <div className="mt-3 flex items-center gap-3 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg animate-fade-in">
+                        <Zap className="h-4 w-4 text-amber-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <span className="text-sm text-slate-300">
+                            Answered with one model.{' '}
+                          </span>
+                          <button
+                            onClick={() => handleGoDeeper(autoDowngradedQuestion)}
+                            className="text-sm font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                          >
+                            Want to explore this deeper?
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => setAutoDowngradedQuestion(null)}
+                          className="text-slate-500 hover:text-slate-300"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+
                     {/* Artifacts button */}
                     {message.artifacts && message.artifacts.length > 0 && (
                       <div className="mt-2">
@@ -506,8 +1087,36 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                       </div>
                     )}
 
-                    {/* Debug panel */}
-                    {message.debug && (
+                    {/* J-4: Council Panel - Visible Multi-Model Reasoning */}
+                    {message.councilResponses && message.councilResponses.length > 0 && (
+                      <div className="mt-4">
+                        <button
+                          onClick={() => setExpandedDebug(expandedDebug === idx ? null : idx)}
+                          className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 mb-2"
+                        >
+                          <CouncilBadge
+                            modelCount={message.councilResponses.length}
+                            onClick={() => setExpandedDebug(expandedDebug === idx ? null : idx)}
+                          />
+                          {expandedDebug === idx ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                          <span>
+                            {expandedDebug === idx ? 'Hide council discussion' : 'View council discussion'}
+                          </span>
+                        </button>
+
+                        {expandedDebug === idx && (
+                          <CouncilPanel
+                            isVisible={true}
+                            responses={message.councilResponses}
+                            roundtableResponses={message.councilRoundtable}
+                            mode={message.mode === 'contemplate' ? 'contemplate' : 'thoughtful'}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Legacy debug panel fallback (if no structured council data) */}
+                    {message.debug && !message.councilResponses && (
                       <div className="mt-2">
                         <button
                           onClick={() => setExpandedDebug(expandedDebug === idx ? null : idx)}
@@ -537,42 +1146,206 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                       </div>
                     )}
 
-                    {/* "See what another AI thinks" button - Quick Mode only */}
+                    {/* "See what another AI thinks" button with model selector - Quick Mode only */}
                     {!message.thinking && message.content && !message.altOpinion && message.mode === 'quick' && (
-                      <div className="mt-3">
-                        <button
-                          onClick={() => handleGetAltOpinion(idx, getQuestionForResponse(idx))}
-                          className="flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors"
-                        >
-                          <Users className="h-3.5 w-3.5" />
-                          <span>See what another AI thinks</span>
-                        </button>
+                      <div className="mt-3 relative">
+                        {/* Proactive Alt-Opinion suggestion when confidence is low or stakes are high */}
+                        {message.routing?.shouldSuggestAltOpinion && (
+                          <div className="mb-2 flex items-center gap-2 px-3 py-2 bg-purple-500/10 border border-purple-500/20 rounded-lg animate-fade-in">
+                            <Sparkles className="h-4 w-4 text-purple-400 flex-shrink-0" />
+                            <span className="text-sm text-purple-300">
+                              {message.routing.questionType === 'high_stakes'
+                                ? 'High-stakes question - '
+                                : message.routing.questionType === 'analytical'
+                                ? 'Analytical question - '
+                                : message.routing.confidence < 0.7
+                                ? 'This topic has nuance - '
+                                : ''}
+                              <button
+                                onClick={() => handleGetAltOpinion(idx, getQuestionForResponse(idx))}
+                                className="font-medium text-purple-400 hover:text-purple-300 hover:underline"
+                              >
+                                get a second opinion?
+                              </button>
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleGetAltOpinion(idx, getQuestionForResponse(idx))}
+                            className="flex items-center space-x-2 px-3 py-1.5 rounded-md text-xs bg-purple-50 text-purple-700 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/30 transition-colors"
+                          >
+                            <Users className="h-3.5 w-3.5" />
+                            <span>
+                              {selectedAltModel === 'random' ? 'See another AI' : `Ask ${AVAILABLE_ALT_MODELS.find(m => m.id === selectedAltModel)?.name}`}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => setShowAltModelDropdown(showAltModelDropdown === idx ? null : idx)}
+                            className="flex items-center space-x-1 px-2 py-1.5 rounded-md text-xs bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 transition-colors"
+                            title="Choose AI model"
+                          >
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Model Selector Dropdown */}
+                        {showAltModelDropdown === idx && (
+                          <div className="absolute top-full left-0 mt-1 z-10 w-48 bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-lg shadow-lg py-1">
+                            {AVAILABLE_ALT_MODELS.map((model) => (
+                              <button
+                                key={model.id}
+                                onClick={() => {
+                                  setSelectedAltModel(model.id)
+                                  handleGetAltOpinion(idx, getQuestionForResponse(idx), model.id)
+                                }}
+                                className={`w-full px-3 py-2 text-left text-sm flex items-center gap-2 hover:bg-neutral-100 dark:hover:bg-neutral-700 ${
+                                  selectedAltModel === model.id ? 'text-purple-600 dark:text-purple-400 font-medium' : 'text-neutral-700 dark:text-neutral-300'
+                                }`}
+                              >
+                                {model.id === 'random' ? (
+                                  <Shuffle className="h-3.5 w-3.5" />
+                                ) : (
+                                  <Brain className="h-3.5 w-3.5" />
+                                )}
+                                <span>{model.name}</span>
+                                {selectedAltModel === model.id && <Check className="h-3.5 w-3.5 ml-auto" />}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 
                     {/* Alternate AI Opinion Display */}
                     {message.altOpinion && (
-                      <div className="mt-4">
-                        <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
-                          <CardContent className="p-4">
-                            <div className="flex items-center gap-2 mb-2">
-                              <MessageSquare className="h-4 w-4 text-purple-600" />
-                              <span className="text-sm font-semibold text-purple-800 dark:text-purple-300">
-                                {message.altOpinion.loading ? 'Getting another perspective...' : `${message.altOpinion.model} says:`}
-                              </span>
-                            </div>
-                            {message.altOpinion.loading ? (
-                              <div className="flex items-center space-x-2 text-sm text-neutral-500">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                <span>Consulting alternate AI...</span>
+                      <div className="mt-4 space-y-3">
+                        {/* View Toggle */}
+                        {!message.altOpinion.loading && (
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setComparisonViewIdx(comparisonViewIdx === idx ? null : idx)}
+                              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs transition-colors ${
+                                comparisonViewIdx === idx
+                                  ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300'
+                                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700'
+                              }`}
+                            >
+                              <Columns className="h-3.5 w-3.5" />
+                              <span>{comparisonViewIdx === idx ? 'Hide comparison' : 'Compare side-by-side'}</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Side-by-side Comparison View */}
+                        {comparisonViewIdx === idx && !message.altOpinion.loading && (
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* OSQR Panel Response */}
+                            <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Brain className="h-4 w-4 text-blue-600" />
+                                  <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">
+                                    OSQR Panel
+                                  </span>
+                                </div>
+                                <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
+                                  {message.content}
+                                </p>
+                              </CardContent>
+                            </Card>
+
+                            {/* Alternate AI Response */}
+                            <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
+                              <CardContent className="p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <MessageSquare className="h-4 w-4 text-purple-600" />
+                                  <span className="text-sm font-semibold text-purple-800 dark:text-purple-300">
+                                    {message.altOpinion.model}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
+                                  {message.altOpinion.answer}
+                                </p>
+                              </CardContent>
+                            </Card>
+                          </div>
+                        )}
+
+                        {/* Agreement/Disagreement Synthesis */}
+                        {message.altOpinion.comparison && comparisonViewIdx === idx && (
+                          <Card className="border-neutral-200 dark:border-neutral-700">
+                            <CardContent className="p-4">
+                              <h4 className="text-sm font-semibold text-neutral-800 dark:text-neutral-200 mb-3">
+                                Synthesis Analysis
+                              </h4>
+                              <div className="grid grid-cols-2 gap-4">
+                                {/* Agreements */}
+                                <div>
+                                  <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400 mb-2">
+                                    <Check className="h-4 w-4" />
+                                    <span className="text-xs font-medium uppercase tracking-wide">Agreements</span>
+                                  </div>
+                                  <ul className="space-y-1.5">
+                                    {message.altOpinion.comparison.agreements.map((point, i) => (
+                                      <li key={i} className="text-xs text-neutral-600 dark:text-neutral-400 flex items-start gap-1.5">
+                                        <span className="text-green-500 mt-0.5">•</span>
+                                        <span>{point}</span>
+                                      </li>
+                                    ))}
+                                    {message.altOpinion.comparison.agreements.length === 0 && (
+                                      <li className="text-xs text-neutral-500 italic">No major agreements identified</li>
+                                    )}
+                                  </ul>
+                                </div>
+
+                                {/* Disagreements */}
+                                <div>
+                                  <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 mb-2">
+                                    <X className="h-4 w-4" />
+                                    <span className="text-xs font-medium uppercase tracking-wide">Different Views</span>
+                                  </div>
+                                  <ul className="space-y-1.5">
+                                    {message.altOpinion.comparison.disagreements.map((point, i) => (
+                                      <li key={i} className="text-xs text-neutral-600 dark:text-neutral-400 flex items-start gap-1.5">
+                                        <span className="text-amber-500 mt-0.5">•</span>
+                                        <span>{point}</span>
+                                      </li>
+                                    ))}
+                                    {message.altOpinion.comparison.disagreements.length === 0 && (
+                                      <li className="text-xs text-neutral-500 italic">No major differences identified</li>
+                                    )}
+                                  </ul>
+                                </div>
                               </div>
-                            ) : (
-                              <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
-                                {message.altOpinion.answer}
-                              </p>
-                            )}
-                          </CardContent>
-                        </Card>
+                            </CardContent>
+                          </Card>
+                        )}
+
+                        {/* Default Single View (when not in comparison mode) */}
+                        {comparisonViewIdx !== idx && (
+                          <Card className="border-purple-200 bg-purple-50/50 dark:border-purple-900 dark:bg-purple-950/20">
+                            <CardContent className="p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <MessageSquare className="h-4 w-4 text-purple-600" />
+                                <span className="text-sm font-semibold text-purple-800 dark:text-purple-300">
+                                  {message.altOpinion.loading ? 'Getting another perspective...' : `${message.altOpinion.model} says:`}
+                                </span>
+                              </div>
+                              {message.altOpinion.loading ? (
+                                <div className="flex items-center space-x-2 text-sm text-neutral-500">
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                  <span>Consulting alternate AI...</span>
+                                </div>
+                              ) : (
+                                <p className="text-sm text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">
+                                  {message.altOpinion.answer}
+                                </p>
+                              )}
+                            </CardContent>
+                          </Card>
+                        )}
                       </div>
                     )}
                   </div>
@@ -670,71 +1443,171 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
 
         {/* Input area */}
         <div className="mt-4 space-y-3">
-          {/* Response Mode Buttons */}
-          <div className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-neutral-700 dark:text-neutral-300">Mode:</span>
-            <div className="flex space-x-1">
-              <Button
-                variant={responseMode === 'quick' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setResponseMode('quick')}
+          {/* Response Mode Buttons with visual state indicators */}
+          <div className="flex items-center space-x-3">
+            <span className="text-sm font-medium text-slate-400">Mode:</span>
+            <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
+              <button
+                onClick={() => {
+                  setResponseMode('quick')
+                  setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'quick' }))
+                }}
                 disabled={isLoading}
-                className="space-x-1"
+                className={`group relative flex items-center space-x-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  responseMode === 'quick'
+                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <Zap className="h-3 w-3" />
+                <Zap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'quick' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
                 <span>Quick</span>
-              </Button>
-              <Button
-                variant={responseMode === 'thoughtful' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setResponseMode('thoughtful')}
+                {responseMode === 'quick' && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-300"></span>
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setResponseMode('thoughtful')
+                  setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'thoughtful' }))
+                }}
                 disabled={isLoading}
-                className="space-x-1"
+                className={`group relative flex items-center space-x-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  responseMode === 'thoughtful'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <Lightbulb className="h-3 w-3" />
+                <Lightbulb className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'thoughtful' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
                 <span>Thoughtful</span>
-              </Button>
-              <Button
-                variant={responseMode === 'contemplate' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setResponseMode('contemplate')}
+                {responseMode === 'thoughtful' && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-300"></span>
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => {
+                  setResponseMode('contemplate')
+                  setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'contemplate' }))
+                }}
                 disabled={isLoading}
-                className="space-x-1"
+                className={`group relative flex items-center space-x-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                  responseMode === 'contemplate'
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <GraduationCap className="h-3 w-3" />
+                <GraduationCap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'contemplate' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
                 <span>Contemplate</span>
-              </Button>
+                {responseMode === 'contemplate' && (
+                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-300"></span>
+                  </span>
+                )}
+              </button>
             </div>
-            <span className="text-xs text-neutral-500 dark:text-neutral-400">
-              {responseMode === 'quick' && '(~5-10s, skips refinement)'}
-              {responseMode === 'thoughtful' && '(~30-60s, with refinement)'}
-              {responseMode === 'contemplate' && '(~60-90s, deep analysis)'}
-            </span>
+
+            {/* Mode description with visual indicator */}
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+              responseMode === 'quick' ? 'bg-amber-500/10 text-amber-400' :
+              responseMode === 'thoughtful' ? 'bg-blue-500/10 text-blue-400' :
+              'bg-purple-500/10 text-purple-400'
+            }`}>
+              <div className={`w-1.5 h-1.5 rounded-full ${
+                responseMode === 'quick' ? 'bg-amber-400' :
+                responseMode === 'thoughtful' ? 'bg-blue-400' :
+                'bg-purple-400'
+              }`} />
+              <span className="text-xs font-medium">
+                {responseMode === 'quick' && '~5-10s • Direct answer'}
+                {responseMode === 'thoughtful' && '~30-60s • Refine → Fire'}
+                {responseMode === 'contemplate' && '~60-90s • Deep analysis'}
+              </span>
+            </div>
           </div>
+
+          {/* Mode Suggestion Banner */}
+          {showModeSuggestion && modeSuggestion && (
+            <div className="flex items-center gap-3 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+              <Sparkles className="h-4 w-4 text-blue-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-blue-300">
+                  {modeSuggestion.reason}.{' '}
+                </span>
+                <button
+                  onClick={() => {
+                    setResponseMode(modeSuggestion.suggestedMode)
+                    setShowModeSuggestion(false)
+                    // Trigger onboarding discovery for mode change
+                    setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: modeSuggestion.suggestedMode }))
+                  }}
+                  className="text-sm font-medium text-blue-400 hover:text-blue-300 hover:underline"
+                >
+                  Try {modeSuggestion.suggestedMode} mode?
+                </button>
+              </div>
+              <button
+                onClick={() => setShowModeSuggestion(false)}
+                className="text-slate-500 hover:text-slate-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Refinement Suggestion - Real-time question improvement hints */}
+          {refinementSuggestion && refinementSuggestion.type !== 'good' && input.trim().length > 0 && (
+            <div className="flex items-start gap-3 px-3 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-fade-in">
+              <HelpCircle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-amber-300 font-medium">
+                  {refinementSuggestion.message}
+                </p>
+                {refinementSuggestion.example && (
+                  <p className="text-xs text-amber-400/70 mt-1">
+                    {refinementSuggestion.example}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Good question indicator */}
+          {refinementSuggestion?.type === 'good' && input.trim().length > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-green-400 animate-fade-in">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              <span>Good question - ready to fire!</span>
+            </div>
+          )}
 
           {/* Options */}
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2">
+              <label className="flex items-center space-x-2 cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={useKnowledge}
                   onChange={(e) => setUseKnowledge(e.target.checked)}
-                  className="h-4 w-4 rounded border-neutral-300"
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-slate-900"
                   disabled={isLoading}
                 />
-                <span className="text-neutral-700 dark:text-neutral-300">Use Knowledge Base</span>
+                <span className="text-slate-400 group-hover:text-slate-300">Use Knowledge Base</span>
               </label>
 
-              <label className="flex items-center space-x-2">
+              <label className="flex items-center space-x-2 cursor-pointer group">
                 <input
                   type="checkbox"
                   checked={showDebug}
                   onChange={(e) => setShowDebug(e.target.checked)}
-                  className="h-4 w-4 rounded border-neutral-300"
+                  className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-slate-900"
                   disabled={isLoading}
                 />
-                <span className="text-neutral-700 dark:text-neutral-300">Show Panel</span>
+                <span className="text-slate-400 group-hover:text-slate-300">Show Panel</span>
               </label>
             </div>
           </div>
@@ -758,7 +1631,7 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
               {responseMode === 'quick' ? (
                 // Quick mode: Direct fire
                 <Button
-                  onClick={() => handleDirectFire(input.trim())}
+                  onClick={() => handleGatekeeper()}
                   disabled={isLoading || !input.trim()}
                   size="lg"
                   className="px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
@@ -773,19 +1646,19 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
                   )}
                 </Button>
               ) : (
-                // Thoughtful/Contemplate mode: Refine first
+                // Thoughtful/Contemplate mode: Goes through gatekeeper first
                 <Button
-                  onClick={handleRefine}
-                  disabled={isLoading || !input.trim() || chatStage === 'refined'}
+                  onClick={handleGatekeeper}
+                  disabled={isLoading || !input.trim() || chatStage === 'refined' || chatStage === 'gatekeeper-prompt'}
                   size="lg"
                   className="px-6"
                 >
-                  {isLoading && chatStage === 'refining' ? (
+                  {isLoading && (chatStage === 'refining' || chatStage === 'gating') ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
                     <>
-                      <Target className="mr-2 h-4 w-4" />
-                      Refine
+                      <Send className="mr-2 h-4 w-4" />
+                      Ask
                     </>
                   )}
                 </Button>
@@ -800,15 +1673,28 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
         <ArtifactPanel artifacts={currentArtifacts} onClose={() => setShowArtifacts(false)} />
       )}
 
-      {/* Profile Question Modal */}
-      <ProfileQuestionModal
-        isOpen={showProfileQuestion}
-        question={currentQuestion}
+      {/* OSCAR Bubble - Handles onboarding + profile questions */}
+      <OSCARBubble
+        onboardingState={onboardingState}
+        onOnboardingProgress={setOnboardingState}
+        profileQuestion={currentQuestion}
         answeredCount={answeredQuestionIds.length}
         totalQuestions={getTotalQuestions()}
-        onAnswer={handleProfileAnswer}
-        onSkip={handleProfileSkip}
-        onClose={handleProfileClose}
+        onProfileAnswer={handleProfileAnswer}
+        onProfileSkip={handleProfileSkip}
+        onModeChanged={(mode) => {
+          // Trigger onboarding discovery when user tries new modes
+          setOnboardingState(prev =>
+            progressOnboarding(prev, { type: 'mode_changed', mode })
+          )
+        }}
+        onQuestionAsked={() => {
+          // Trigger onboarding progress when user asks first question
+          setOnboardingState(prev =>
+            progressOnboarding(prev, { type: 'asked_question' })
+          )
+        }}
+        alwaysVisible={true}
       />
     </div>
   )

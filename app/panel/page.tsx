@@ -1,11 +1,17 @@
 import { MainLayout } from '@/components/layout/MainLayout'
 import { RefineFireChat } from '@/components/oscar/RefineFireChat'
-import { OnboardingWrapper } from '@/components/onboarding/OnboardingWrapper'
 import { prisma } from '@/lib/db/prisma'
 
 // Prevent static generation at build time - this page needs database access
 export const dynamic = 'force-dynamic'
 
+/**
+ * Panel Page - Main chat interface with OSQR
+ *
+ * The OSQR bubble handles onboarding directly within this page.
+ * New users will see the bubble introduce OSQR, explain how he works,
+ * and guide them through their first interaction - all conversationally.
+ */
 export default async function PanelPage() {
   // Get the first workspace (for single-user MVP)
   const workspace = await prisma.workspace.findFirst({
@@ -37,24 +43,19 @@ export default async function PanelPage() {
   }
 
   return (
-    <OnboardingWrapper
-      workspaceId={workspace.id}
-      initialOnboardingCompleted={workspace.onboardingCompleted}
-    >
-      <MainLayout user={user} workspaceName={workspace.name} workspaceId={workspace.id} showMSC={true}>
-        <div className="space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-              Chat with OSQR
-            </h1>
-            <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-              Refine your question, then fire it to a panel of AI experts for the best possible answer.
-            </p>
-          </div>
-
-          <RefineFireChat workspaceId={workspace.id} />
+    <MainLayout user={user} workspaceName={workspace.name} workspaceId={workspace.id} showMSC={true} capabilityLevel={workspace.capabilityLevel}>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
+            Chat with OSQR
+          </h1>
+          <p className="mt-2 text-neutral-600 dark:text-neutral-400">
+            Refine your question, then fire it to a panel of AI experts for the best possible answer.
+          </p>
         </div>
-      </MainLayout>
-    </OnboardingWrapper>
+
+        <RefineFireChat workspaceId={workspace.id} />
+      </div>
+    </MainLayout>
   )
 }

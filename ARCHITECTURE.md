@@ -157,6 +157,30 @@ The "brain" of Oscar's runtime behavior.
 - **Retrieval** – Vector search scoped to user's tenant, ranked results
 - **Profile Service** – Master Summary, user goals, preferences
 
+### 3.4.1 Two-Brain Knowledge Architecture
+
+> **Full Spec:** [docs/KNOWLEDGE_ARCHITECTURE.md](docs/KNOWLEDGE_ARCHITECTURE.md)
+
+OSQR has two knowledge sources:
+
+| Brain | Scope | Contents |
+|-------|-------|----------|
+| **Global Knowledge Index (GKVI)** | Shared by all users | Frameworks, modes, coaching philosophy |
+| **Private Knowledge Vault (PKV)** | Per-user, isolated | User files, conversations, MSC |
+
+**The Golden Rule:**
+> "If it teaches OSQR how to BE OSQR, it's global."
+> "If it teaches OSQR about YOU, it's private."
+
+**Query Flow:**
+1. User asks question
+2. OSQR searches GKVI (shared frameworks)
+3. OSQR searches user's PKV (their data)
+4. Never mixes data between users
+5. Response uses both sources
+
+**Technical Note:** Documents with `workspaceId: null` and `isGlobal: true` belong to GKVI.
+
 ### 3.5 User Services
 
 - **Auth & Accounts** – Registration, login, sessions
@@ -324,44 +348,186 @@ Current monolith can be split as load grows:
 
 ---
 
-## 10. Pricing Tiers
+## 9.5 Safety System
 
-### Oscar Lite - $19/mo ($168/yr)
-*"A taste of the second brain — without the full power."*
+> **Full Spec:** [docs/SAFETY_SYSTEM.md](docs/SAFETY_SYSTEM.md)
 
-- 2 AI models (Llama + GPT-3.5)
-- 1 AI-to-AI Discussion per day (6 back-and-forths max)
-- 50MB Knowledge Vault (first 2 files indexed)
-- Remembers last 3 interactions
-- 1 Daily Calibration question
-- Basic Tasks checklist (no Master Summary)
+The Safety System protects users while preserving OSQR's core philosophy of privacy, agency, and trust.
 
-### Oscar Pro - $49/mo ($399/yr) ⭐ CORE TIER
-*"Your fully indexed second brain. The 90-Day Transformation Tier."*
+### Design Principles
 
-- Everything in Lite
-- Full Personal Knowledge Vault (unlimited indexing)
-- Multi-model panel (Claude, GPT-4, etc.)
-- Oscar's Daily Calibration Questions (full sequence)
+1. **Rely on model-level safety** — Claude/GPT already decline harmful requests
+2. **Wrap refusals in OSQR's voice** — Maintain personality even when declining
+3. **Crisis requires empathy, not refusal** — Self-harm needs different handling
+4. **Don't over-filter** — OSQR should be useful, not paranoid
+5. **Respect privacy** — Crisis content is never stored
+
+### Core Components
+
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| CrisisDetector | Detect self-harm/suicide signals | `lib/safety/CrisisDetector.ts` |
+| ResponsePlaybooks | Templates for safety responses | `lib/safety/ResponsePlaybooks.ts` |
+| SafetyWrapper | Wrap model refusals in OSQR voice | `lib/safety/SafetyWrapper.ts` |
+
+### Safety Response Levels
+
+| Level | Trigger | Response |
+|-------|---------|----------|
+| **0** | Normal | Standard OSQR response |
+| **1** | Sensitive topic | Response + soft disclaimer |
+| **2** | Medical/legal/financial | Response + strong disclaimer |
+| **3** | Crisis (self-harm) | Empathy + resources (988) |
+| **4** | Harmful intent | OSQR-voiced decline + redirect |
+
+### Crisis Response Flow
+
+```
+User Message
+  → Crisis Detection (pattern-based)
+  → If crisis detected:
+      → Return empathetic response + resources
+      → Skip storage (never store crisis content)
+  → If normal:
+      → Continue to Model Router
+      → If model refuses, wrap in OSQR voice
+```
+
+### What's Never Stored
+
+- Crisis message content
+- Self-harm detection events (beyond anonymous count)
+- Refusal interaction details
+
+---
+
+## 9.6 Behavioral Intelligence Layer
+
+> **Full Spec:** [docs/BEHAVIORAL_INTELLIGENCE_LAYER.md](docs/BEHAVIORAL_INTELLIGENCE_LAYER.md)
+
+The Behavioral Intelligence Layer enables OSQR to learn from user interactions and improve over time — **without ever accessing user content**.
+
+### Core Components
+
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| TelemetryCollector | Captures behavioral events | `lib/telemetry/TelemetryCollector.ts` |
+| PatternAggregator | Transforms events into patterns | `lib/telemetry/PatternAggregator.ts` |
+| UserBehaviorModel | Per-user behavioral profile | `lib/telemetry/UserBehaviorModel.ts` |
+| PrivacyTierManager | Enforces consent boundaries | `lib/telemetry/PrivacyTierManager.ts` |
+
+### Privacy Tiers (Telemetry)
+
+| Tier | Description | Data Collected |
+|------|-------------|----------------|
+| **A** (Default) | Local only | Basic metrics, errors |
+| **B** (Opt-in) | Personal learning | Mode preferences, feedback, usage patterns |
+| **C** (Opt-in+) | Global learning | Anonymized patterns to improve OSQR for everyone |
+
+### What OSQR Learns (Behavioral Only)
+- Mode preferences per question type
+- Feature usage patterns
+- Response satisfaction signals
+- Session timing patterns
+- Onboarding completion rates
+
+### What OSQR NEVER Accesses
+- Document contents
+- Chat message text
+- PKV data
+- Personal information
+
+### Related Documentation
+- [TELEMETRY_SPEC.md](docs/TELEMETRY_SPEC.md) - Event schemas and flow
+- [PRIVACY_TIERS.md](docs/PRIVACY_TIERS.md) - Privacy tier implementation
+
+---
+
+## 9.7 Meta-OSQR Mode (Phase 6)
+
+> **Full Spec:** [docs/META_OSQR_MODE.md](docs/META_OSQR_MODE.md)
+
+Meta-OSQR is a self-refinement capability where OSQR audits its own system — applying the principle *"The best part is no part"* to itself.
+
+### Core Capabilities
+
+| Capability | Description |
+|------------|-------------|
+| **System Complexity Audit** | Maps OSQR components, identifies cruft, proposes simplifications |
+| **Question Quality Scoring** | Rates questions on clarity/specificity/tractability |
+| **PowerQuestion Generation** | Generates high-leverage questions from user context |
+| **Complexity Tracking** | Trends complexity score over time |
+
+### Components
+
+| Component | Purpose | Location |
+|-----------|---------|----------|
+| SelfAuditor | Core audit orchestration | `lib/meta/SelfAuditor.ts` |
+| ComplexityAnalyzer | Code/feature complexity scoring | `lib/meta/ComplexityAnalyzer.ts` |
+| QuestionIntelligence | Question quality & generation | `lib/meta/QuestionIntelligence.ts` |
+
+### Trigger Commands
+
+- "Oscar, audit yourself" → Full complexity report
+- "Oscar, what could be simpler?" → Simplification proposals
+- "Oscar, rate this question" → Question quality analysis
+- "Oscar, give me a PowerQuestion" → High-leverage question
+
+### Dependencies
+
+- Behavioral Intelligence Layer (Phase 3.0) must be operational
+- TelemetryCollector active for usage data
+- PatternAggregator working for pattern detection
+
+### The Meta-Irony
+
+> Building a feature that identifies unnecessary features is itself a risk of unnecessary complexity.
+> Implementation must be minimal, or Meta-OSQR will be the first thing Meta-OSQR recommends removing.
+
+---
+
+## 10. Pricing Tiers (Premium Launch Strategy)
+
+> **Note:** OSQR launches with Pro and Master only. Lite tier introduced later after 1,000+ users.
+> See [ROADMAP.md](./ROADMAP.md) for full monetization strategy.
+
+### OSQR Pro - $49/mo (Founder Price, future $79/mo) ⭐ CORE TIER
+*"For high-performers who want elite clarity and multi-model thinking."*
+
+- Multi-model panel (Claude + GPT-4o)
+- Quick, Thoughtful & Contemplate modes
+- Full Personal Knowledge Vault
+- Unlimited Refine → Fire
+- 25 documents in vault
+- 100 panel queries/day
+- OSQR's Daily Calibration Questions (full sequence)
 - Master Summary Checklist
-- Unlimited long-context threads
+- Advanced memory
 - Full chat memory
-- 2-3 concurrent model calls
 - **90-Day Transformation Guarantee (annual only)**
 
-### Oscar Master - $149/mo ($1,299/yr)
-*"Your personal team of AI agents."*
+### OSQR Master - $149/mo (Founder Price, future $249/mo)
+*"For founders, operators, and elite thinkers who want OS-level intelligence."*
 
 - Everything in Pro
-- Personal AI Agents (automations)
-- Meeting summarizer, Task generator, Content engine
-- Unlimited document ingestion
-- Priority processing (faster calls)
-- Higher context limits
-- Custom agent builder
-- Team workflows (up to 3 teammates)
-- Exclusive templates
-- Early access to new features
+- Advanced memory & personalized intelligence
+- Priority fast-lane processing
+- 100 documents in vault
+- Weekly automated reviews
+- Custom Agent Builder (coming)
+- Council Mode (coming)
+- VS Code Extension (coming)
+- Early access to new models & features
+- Priority support
+
+### OSQR Lite - $19/mo (FUTURE - Not at Launch)
+*Will be introduced after premium brand is established (1,000+ users)*
+
+- Quick mode only
+- Limited Thoughtful mode
+- 5 documents in vault
+- 10 panel queries/day
+- Basic memory
 
 ---
 
@@ -386,15 +552,10 @@ Current monolith can be split as load grows:
 ## 12. Referral System
 
 ### Core Structure: "Give X / Get X"
-**Give:** Friend gets 14 days of Oscar Pro for free (no credit card)
+**Give:** Friend gets 14 days of OSQR Pro trial
 **Get:** Referrer chooses reward based on tier
 
 ### Rewards by Tier:
-
-**Lite Users:**
-- +25MB vault storage (stackable to +500MB)
-- OR +1 AI panel discussion/day (stackable to +5)
-- OR $5 credit toward Pro upgrade
 
 **Pro Users:**
 - +7 days added to subscription
@@ -407,7 +568,7 @@ Current monolith can be split as load grows:
 - OR double AI processing speed for 30 days
 
 ### Milestone Bonus:
-🎯 **Refer 5 friends → Unlock 30 days of Oscar Master for free**
+🎯 **Refer 5 friends → Unlock 30 days of OSQR Master for free**
 
 ### Badge System (Status Flywheel):
 - 🟦 **Connector** (1 referral): Badge + 7 days Pro

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { OnboardingFlow } from './OnboardingFlow'
+// DEPRECATED: The old modal-based onboarding is now replaced by the OSCAR bubble onboarding
+// The OnboardingFlow modal is disabled - onboarding now flows through OSCARBubble component
+// See: lib/onboarding/oscar-onboarding.ts and components/oscar/OSCARBubble.tsx
 
 interface OnboardingWrapperProps {
   workspaceId: string
@@ -9,62 +10,12 @@ interface OnboardingWrapperProps {
   children: React.ReactNode
 }
 
-interface OnboardingData {
-  name: string
-  workingOn: string
-  frustration: string
-  uploadedFile?: {
-    name: string
-    summary: string
-    suggestedQuestions: string[]
-  }
-  firstQuestion?: string
-  firstAnswer?: string
-  panelDebate?: {
-    gptResponse: string
-    claudeResponse: string
-    synthesis: string
-  }
-}
-
 export function OnboardingWrapper({
   workspaceId,
   initialOnboardingCompleted,
   children,
 }: OnboardingWrapperProps) {
-  const [showOnboarding, setShowOnboarding] = useState(!initialOnboardingCompleted)
-  const [isCompleted, setIsCompleted] = useState(initialOnboardingCompleted)
-
-  const handleOnboardingComplete = async (onboardingData: OnboardingData) => {
-    try {
-      const response = await fetch('/api/onboarding/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId,
-          onboardingData,
-        }),
-      })
-
-      if (response.ok) {
-        setIsCompleted(true)
-        setShowOnboarding(false)
-      } else {
-        console.error('Failed to save onboarding data')
-      }
-    } catch (error) {
-      console.error('Onboarding error:', error)
-    }
-  }
-
-  return (
-    <>
-      {children}
-      <OnboardingFlow
-        isOpen={showOnboarding && !isCompleted}
-        workspaceId={workspaceId}
-        onComplete={handleOnboardingComplete}
-      />
-    </>
-  )
+  // The new onboarding flows through the OSCAR bubble in RefineFireChat
+  // This wrapper now just passes through children without showing the old modal
+  return <>{children}</>
 }

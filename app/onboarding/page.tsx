@@ -1,15 +1,19 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { OnboardingFlow } from '@/components/onboarding/OnboardingFlow'
 
+/**
+ * Onboarding Page - Now redirects to /panel
+ *
+ * The onboarding experience is now handled by the OSQR bubble within the panel.
+ * This page simply redirects users to /panel where the bubble will guide them
+ * through the onboarding conversation.
+ */
 export default function OnboardingPage() {
   const router = useRouter()
-  const { data: session, status } = useSession()
-  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
+  const { status } = useSession()
 
   useEffect(() => {
     // Redirect to login if not authenticated
@@ -18,61 +22,20 @@ export default function OnboardingPage() {
       return
     }
 
-    if (status === 'authenticated' && session?.user?.id) {
-      // Fetch the user's workspace
-      fetchWorkspace()
+    // For authenticated users (or in dev mode), redirect to panel
+    // The OSQR bubble will handle onboarding there
+    if (status === 'authenticated') {
+      router.push('/panel')
     }
-  }, [status, session])
+  }, [status, router])
 
-  const fetchWorkspace = async () => {
-    try {
-      const res = await fetch('/api/workspace')
-      if (res.ok) {
-        const data = await res.json()
-        if (data.workspace) {
-          // Check if onboarding is already completed
-          if (data.workspace.onboardingCompleted) {
-            router.push('/panel')
-            return
-          }
-          setWorkspaceId(data.workspace.id)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to fetch workspace:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleOnboardingComplete = async () => {
-    // Mark onboarding as complete and redirect to panel
-    router.push('/panel')
-  }
-
-  if (status === 'loading' || loading) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-lg">Loading...</div>
-      </div>
-    )
-  }
-
-  if (!workspaceId) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-lg">Setting up your workspace...</div>
-      </div>
-    )
-  }
-
+  // Show loading state while redirecting
   return (
-    <div className="min-h-screen bg-slate-900">
-      <OnboardingFlow
-        isOpen={true}
-        workspaceId={workspaceId}
-        onComplete={handleOnboardingComplete}
-      />
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+      <div className="text-center">
+        <div className="text-white text-lg mb-2">Setting things up...</div>
+        <div className="text-slate-400 text-sm">You'll meet OSQR in just a moment</div>
+      </div>
     </div>
   )
 }

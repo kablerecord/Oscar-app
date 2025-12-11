@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     }
 
     const userId = (session.user as { id?: string }).id || session.user.email
-    const tier = 'free' // TODO: Get from user profile/subscription
+    const tier = 'pro' // TODO: Get from user profile/subscription
 
     // Get usage stats
     const usage = await getUserUsageStats(userId)

@@ -23,4 +23,4 @@ export interface AIProvider {
   generateStream?(options: AIGenerateOptions): AsyncIterable<string>
 }
 
-export type ProviderType = 'openai' | 'anthropic'
+export type ProviderType = 'openai' | 'anthropic' | 'google' | 'xai'

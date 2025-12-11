@@ -1,6 +1,7 @@
 import { MainLayout } from '@/components/layout/MainLayout'
 import { VaultStats } from '@/components/vault/VaultStats'
 import { DocumentList } from '@/components/vault/DocumentList'
+import { VaultPageClient } from '@/components/vault/VaultPageClient'
 import { prisma } from '@/lib/db/prisma'
 
 // Prevent static generation at build time - this page needs database access
@@ -68,16 +69,7 @@ export default async function VaultPage() {
 
   return (
     <MainLayout user={user} workspaceName={workspace.name}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            Memory Vault
-          </h1>
-          <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-            Browse and manage your indexed documents. OSQR uses this knowledge to give you personalized answers.
-          </p>
-        </div>
-
+      <VaultPageClient workspaceId={workspace.id}>
         {/* Stats overview */}
         <VaultStats
           totalDocuments={totalDocuments}
@@ -119,7 +111,7 @@ export default async function VaultPage() {
             workspaceId={workspace.id}
           />
         </div>
-      </div>
+      </VaultPageClient>
     </MainLayout>
   )
 }

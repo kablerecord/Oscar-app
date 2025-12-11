@@ -15,7 +15,7 @@ import { checkRateLimit, recordRequest } from './rate-limit'
 export interface SecureRouteOptions {
   requireAuth?: boolean // Default: true
   endpoint: string // For rate limiting tracking
-  tier?: string // User tier (free/pro/unlimited)
+  tier?: string // User tier (pro/master/unlimited)
 }
 
 export interface AuthenticatedRequest extends NextRequest {
@@ -64,7 +64,7 @@ function getClientIP(req: NextRequest): string {
  */
 export function withSecurity(options: SecureRouteOptions, handler: RouteHandler) {
   return async (req: NextRequest, context?: { params: Record<string, string> }) => {
-    const { requireAuth = true, endpoint, tier = 'free' } = options
+    const { requireAuth = true, endpoint, tier = 'pro' } = options
     const ip = getClientIP(req)
 
     try {
@@ -171,7 +171,7 @@ export async function checkPublicRateLimit(
     userId: 'anonymous',
     ip,
     endpoint,
-    tier: 'free',
+    tier: 'pro',
   })
 
   if (!result.allowed) {

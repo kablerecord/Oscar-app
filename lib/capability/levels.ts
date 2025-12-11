@@ -168,3 +168,81 @@ export function getRecommendedBooks(level: number): string[] {
   const levelInfo = getLevelInfo(level)
   return levelInfo?.recommendedBooks || []
 }
+
+/**
+ * Alias for getLevelInfo (used throughout the app)
+ */
+export function getLevelDetails(level: number): (CapabilityLevel & { keyBehaviors: string[] }) | undefined {
+  const levelInfo = getLevelInfo(level)
+  if (!levelInfo) return undefined
+
+  // Add keyBehaviors based on the level's characteristics
+  const keyBehaviors = getKeyBehaviorsForLevel(level)
+  return { ...levelInfo, keyBehaviors }
+}
+
+/**
+ * Get key behaviors for a level
+ */
+function getKeyBehaviorsForLevel(level: number): string[] {
+  const behaviors: Record<number, string[]> = {
+    0: ['Reacting to circumstances', 'No consistent routines', 'Waiting for motivation'],
+    1: ['Starting to take ownership', 'Trying new habits', 'Seeking guidance'],
+    2: ['Recognizing patterns', 'Building awareness', 'Exploring options'],
+    3: ['Following routines (sometimes)', 'Setting goals', 'Learning from mistakes'],
+    4: ['Executing consistently in good conditions', 'Building momentum', 'Tracking progress'],
+    5: ['Keeping commitments to self', 'Managing time effectively', 'Building reliable habits'],
+    6: ['Creating systems', 'Building things that last', 'Thinking in identity statements'],
+    7: ['Solving problems for others', 'Creating value', 'Comfortable with uncertainty'],
+    8: ['Designing processes', 'Thinking in systems', 'Automating outcomes'],
+    9: ['Building platforms', 'Enabling others', 'Multi-project management'],
+    10: ['Creating ecosystems', 'Shaping culture', 'Long-term thinking'],
+    11: ['Integrating domains', 'Synthesizing ideas', 'Multi-decade planning'],
+    12: ['Building for generations', 'Institutionalizing wisdom', 'Legacy thinking'],
+  }
+  return behaviors[level] || []
+}
+
+/**
+ * Get stage info
+ */
+export interface StageInfo {
+  name: string
+  description: string
+  levelRange: [number, number]
+}
+
+const STAGE_INFO: Record<CapabilityStage, StageInfo> = {
+  foundation: {
+    name: 'Foundation',
+    description: 'Building basic habits and self-awareness',
+    levelRange: [0, 3],
+  },
+  operator: {
+    name: 'Operator',
+    description: 'Reliable execution and self-management',
+    levelRange: [4, 6],
+  },
+  creator: {
+    name: 'Creator',
+    description: 'Building systems and creating value',
+    levelRange: [7, 9],
+  },
+  architect: {
+    name: 'Architect',
+    description: 'Designing platforms and institutions',
+    levelRange: [10, 12],
+  },
+}
+
+export function getStageInfo(stage: CapabilityStage): StageInfo {
+  return STAGE_INFO[stage]
+}
+
+/**
+ * Get next level info for progression
+ */
+export function getNextLevelInfo(currentLevel: number): CapabilityLevel | undefined {
+  if (currentLevel >= 12) return undefined
+  return getLevelInfo(currentLevel + 1)
+}

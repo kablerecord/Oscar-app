@@ -14,31 +14,34 @@ interface MainLayoutProps {
   workspaceName?: string
   workspaceId?: string
   showMSC?: boolean
+  capabilityLevel?: number | null
+  onAskOSQR?: (prompt: string) => void
 }
 
-export function MainLayout({ children, user, workspaceName, workspaceId, showMSC = false }: MainLayoutProps) {
+export function MainLayout({ children, user, workspaceName, workspaceId, showMSC = false, capabilityLevel, onAskOSQR }: MainLayoutProps) {
   const [mscExpanded, setMscExpanded] = useState(true)
 
   return (
-    <div className="min-h-screen bg-neutral-50 dark:bg-neutral-900">
-      <Sidebar />
-      <TopBar user={user} workspaceName={workspaceName} />
+    <div className="min-h-screen bg-slate-950">
+      <Sidebar workspaceId={workspaceId} />
+      <TopBar user={user} workspaceName={workspaceName} capabilityLevel={capabilityLevel} />
 
       {/* Main content area with optional MSC panel */}
       <div className="ml-64 mt-16 flex min-h-[calc(100vh-4rem)]">
-        <main className={`flex-1 p-6 transition-all duration-300 ${showMSC && workspaceId ? (mscExpanded ? 'mr-72' : 'mr-12') : ''}`}>
+        <main className={`flex-1 p-6 transition-all duration-300 ${showMSC && workspaceId ? (mscExpanded ? 'mr-80' : 'mr-14') : ''}`}>
           <div className="mx-auto max-w-7xl">
             {children}
           </div>
         </main>
 
-        {/* MSC Panel - Fixed on right side */}
+        {/* Command Center Panel - Fixed on right side */}
         {showMSC && workspaceId && (
           <div className="fixed right-0 top-16 bottom-0 z-40">
             <MSCPanel
               workspaceId={workspaceId}
               isExpanded={mscExpanded}
               onToggle={() => setMscExpanded(!mscExpanded)}
+              onAskOSQR={onAskOSQR}
             />
           </div>
         )}

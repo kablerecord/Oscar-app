@@ -1,0 +1,197 @@
+{
+  "calibration_date": "2024-12-09",
+  "session_metrics": {
+    "phases_completed": ["phase1", "phase2"],
+    "total_lines_created": 3080,
+    "total_files_created": 11,
+    "total_tool_calls": 47,
+    "context_switches": 0,
+    "blockers_hit": 1,
+    "blocker_resolution_time_minutes": 2
+  },
+  "actual_deliverables": {
+    "J-2_auto_context": {
+      "category": "module_creation",
+      "lines": 309,
+      "files": 1,
+      "integrations": 1,
+      "tool_calls": 4,
+      "complexity": "medium"
+    },
+    "J-3_background_jobs": {
+      "category": "new_subsystem",
+      "lines": 783,
+      "files": 4,
+      "integrations": 2,
+      "tool_calls": 8,
+      "complexity": "high",
+      "sub_tasks": {
+        "queue_module": { "lines": 219, "category": "module_creation" },
+        "executor_module": { "lines": 298, "category": "module_creation" },
+        "api_routes": { "lines": 265, "category": "api_creation" },
+        "schema_addition": { "lines": 1, "category": "schema" }
+      }
+    },
+    "J-4_council_ui": {
+      "category": "ui_component",
+      "lines": 289,
+      "files": 1,
+      "integrations": 1,
+      "tool_calls": 3,
+      "complexity": "medium"
+    },
+    "J-5_autonomy_rails": {
+      "category": "new_subsystem",
+      "lines": 940,
+      "files": 3,
+      "integrations": 0,
+      "tool_calls": 6,
+      "complexity": "high",
+      "sub_tasks": {
+        "core_module": { "lines": 584, "category": "module_creation" },
+        "permissions_api": { "lines": 185, "category": "api_creation" },
+        "actions_api": { "lines": 171, "category": "api_creation" }
+      }
+    },
+    "J-7_identity_engine": {
+      "category": "module_creation",
+      "lines": 508,
+      "files": 1,
+      "integrations": 2,
+      "tool_calls": 5,
+      "complexity": "high"
+    },
+    "J-8_msc_auto_update": {
+      "category": "module_creation",
+      "lines": 252,
+      "files": 1,
+      "integrations": 1,
+      "tool_calls": 3,
+      "complexity": "medium"
+    }
+  },
+  "velocity_by_category": {
+    "module_creation": {
+      "avg_lines_per_task": 340,
+      "avg_tool_calls": 4,
+      "multiplier": 1.0,
+      "notes": "Core lib modules with business logic"
+    },
+    "api_creation": {
+      "avg_lines_per_task": 155,
+      "avg_tool_calls": 2,
+      "multiplier": 0.5,
+      "notes": "Next.js API routes, mostly boilerplate"
+    },
+    "ui_component": {
+      "avg_lines_per_task": 289,
+      "avg_tool_calls": 3,
+      "multiplier": 0.8,
+      "notes": "React components with tailwind"
+    },
+    "new_subsystem": {
+      "avg_lines_per_task": 860,
+      "avg_tool_calls": 7,
+      "multiplier": 2.5,
+      "notes": "Multi-file features requiring coordination"
+    },
+    "schema": {
+      "avg_lines_per_task": 25,
+      "avg_tool_calls": 2,
+      "multiplier": 0.2,
+      "notes": "Prisma schema changes + migration"
+    },
+    "integration": {
+      "avg_lines_per_task": 15,
+      "avg_tool_calls": 2,
+      "multiplier": 0.15,
+      "notes": "Wiring existing modules together"
+    },
+    "refactor": {
+      "avg_lines_per_task": 50,
+      "avg_tool_calls": 3,
+      "multiplier": 0.4,
+      "notes": "Modifying existing code"
+    }
+  },
+  "base_velocity": {
+    "lines_per_tool_call": 65,
+    "tool_calls_per_minute": 2.5,
+    "effective_lines_per_minute": 162,
+    "autonomous_efficiency": 0.92,
+    "notes": "Measured from this session - no user interruptions"
+  },
+  "blocker_patterns": {
+    "database_drift": {
+      "frequency": "rare",
+      "resolution": "db_push",
+      "time_cost_minutes": 2
+    },
+    "missing_imports": {
+      "frequency": "occasional",
+      "resolution": "auto_fix",
+      "time_cost_minutes": 0.5
+    },
+    "type_errors": {
+      "frequency": "rare_in_new_code",
+      "resolution": "inline_fix",
+      "time_cost_minutes": 1
+    }
+  },
+  "remaining_roadmap": {
+    "J-1_background_awareness": {
+      "category": "new_subsystem",
+      "estimated_lines": 800,
+      "estimated_files": 4,
+      "complexity": "high",
+      "dependencies": ["J-3_complete"],
+      "sub_tasks": [
+        { "name": "awareness_engine", "category": "module_creation", "lines": 350 },
+        { "name": "trigger_system", "category": "module_creation", "lines": 250 },
+        { "name": "pattern_detector", "category": "module_creation", "lines": 200 }
+      ]
+    },
+    "J-6_integrations": {
+      "category": "new_subsystem",
+      "estimated_lines": 1500,
+      "estimated_files": 8,
+      "complexity": "very_high",
+      "dependencies": ["J-5_complete"],
+      "external_dependencies": ["oauth_setup", "api_keys"],
+      "sub_tasks": [
+        { "name": "mcp_server", "category": "new_subsystem", "lines": 500 },
+        { "name": "oauth_flow", "category": "module_creation", "lines": 300 },
+        { "name": "calendar_adapter", "category": "module_creation", "lines": 250 },
+        { "name": "email_adapter", "category": "module_creation", "lines": 250 },
+        { "name": "file_adapter", "category": "module_creation", "lines": 200 }
+      ],
+      "requires_user_input": ["google_oauth_credentials", "email_api_choice"]
+    },
+    "J-9_voice": {
+      "category": "new_subsystem",
+      "estimated_lines": 600,
+      "estimated_files": 4,
+      "complexity": "medium",
+      "external_dependencies": ["elevenlabs_key_or_alternative"],
+      "sub_tasks": [
+        { "name": "speech_input", "category": "ui_component", "lines": 200 },
+        { "name": "tts_output", "category": "module_creation", "lines": 200 },
+        { "name": "voice_integration", "category": "integration", "lines": 200 }
+      ]
+    }
+  },
+  "estimated_completion": {
+    "J-1_autonomous_time_minutes": 20,
+    "J-6_autonomous_time_minutes": 45,
+    "J-6_blocked_waiting_user": true,
+    "J-9_autonomous_time_minutes": 15,
+    "total_autonomous_minutes": 80,
+    "total_with_user_blocks_minutes": "80 + user_input_time"
+  },
+  "confidence_notes": {
+    "high_confidence": ["J-1", "J-9"],
+    "medium_confidence": ["J-6_code_portions"],
+    "low_confidence": ["J-6_oauth_setup"],
+    "reason": "OAuth requires external service configuration that may have issues"
+  }
+}

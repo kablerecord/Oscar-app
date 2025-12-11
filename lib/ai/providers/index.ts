@@ -1,5 +1,7 @@
 import { OpenAIProvider } from './openai'
 import { AnthropicProvider } from './anthropic'
+import { GoogleProvider } from './google'
+import { XAIProvider } from './xai'
 import type { AIProvider, ProviderType, AIProviderConfig } from '../types'
 
 /**
@@ -32,6 +34,10 @@ export class ProviderRegistry {
         return new OpenAIProvider(config)
       case 'anthropic':
         return new AnthropicProvider(config)
+      case 'google':
+        return new GoogleProvider(config)
+      case 'xai':
+        return new XAIProvider(config)
       default:
         throw new Error(`Unknown provider type: ${type}`)
     }
@@ -45,4 +51,4 @@ export class ProviderRegistry {
   }
 }
 
-export { OpenAIProvider, AnthropicProvider }
+export { OpenAIProvider, AnthropicProvider, GoogleProvider, XAIProvider }

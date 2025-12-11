@@ -22,11 +22,16 @@ This roadmap extracts actionable implementation items from the OSQR Master Plan 
 - [x] Privacy tiers concept (A/B/C)
 - [x] Automatic conversation indexing
 
+### Specified (Ready to Build)
+- [ ] Safety System (crisis detection, response playbooks) — [docs/SAFETY_SYSTEM.md](docs/SAFETY_SYSTEM.md)
+- [ ] Global Knowledge Index (GKVI) — [docs/KNOWLEDGE_ARCHITECTURE.md](docs/KNOWLEDGE_ARCHITECTURE.md)
+
 ### Phase 1: Foundation (Current → Month 2)
 ### Phase 2: Core Experience (Months 2-4)
 ### Phase 3: Intelligence Layer (Months 4-6)
 ### Phase 4: Advanced Features (Months 6-9)
 ### Phase 5: OS-Level Features (Months 9-12+)
+### Phase 6: Meta-OSQR Mode (Post Intelligence Layer)
 ### Phase X: VS Code Dev Companion Extension (Future)
 
 ---
@@ -41,14 +46,15 @@ This roadmap extracts actionable implementation items from the OSQR Master Plan 
   - *Master Plan: Part 1A - Naming*
   - *Note: Internal routes kept as `/api/oscar/` per AUTONOMOUS-GUIDELINES.md*
 
-### 1.2 Refine → Fire System (Master Plan: Part 2A.3)
-Current: Basic panel mode
-Needed:
-- [ ] **Two-stage thinking process UI**
+### 1.2 Refine → Fire System (Master Plan: Part 2A.3) ✅ COMPLETE
+Implemented:
+- [x] **Two-stage thinking process UI**
   - "Refine" stage: Help user clarify question
   - "Fire" button: Triggers multi-model panel
-- [ ] **Visual state changes** between modes
-- [ ] **Question refinement suggestions** before firing
+- [x] **Visual state changes** between modes (amber for refining, green for ready)
+- [x] **Question refinement suggestions** before firing
+- [x] **Clarifying questions** - OSQR asks follow-ups before firing
+- [x] **Editable refined question** - user can tweak before firing
 
 ### 1.3 Three Response Modes (Master Plan: Part 2A.4) ✅ COMPLETE
 Implemented:
@@ -57,28 +63,26 @@ Implemented:
 - [x] **Contemplate Mode** - Extended multi-round + deep synthesis (~60-90s)
 - [x] **Mode selector UI** in chat interface (Quick/Thoughtful/Contemplate buttons)
 - [x] **Mode badge** on responses showing which mode was used
-Remaining:
-- [ ] **Auto-suggest mode** based on question complexity
+- [x] **Auto-suggest mode** based on question complexity (analyzes patterns, word count)
 
-### 1.3.1 "See What Another AI Thinks" Button ⭐ NEW
+### 1.3.1 "See What Another AI Thinks" Button ✅ COMPLETE
 *A brilliant Quick Mode enhancement that adds panel-like feel without full Contemplate compute*
 
 **How it works:**
 - In Quick Mode, display: 🔘 "See what another AI thinks"
 - When pressed, OSQR sends the same refined question to another model
 - Shows alternate answer side-by-side
-- Labels clearly (Claude, Grok, Gemini, Mistral, etc.)
-- Optionally synthesizes: "Here's where they agree / disagree"
+- Labels clearly (Claude, GPT-4, GPT-4o)
+- Synthesizes: "Here's where they agree / disagree"
 
 **Implementation:**
 - [x] **Add "See another perspective" button** to Quick Mode responses only
 - [x] **Auto-select model** - randomly picks GPT-4, GPT-4o, or Claude
 - [x] **Inline view** - shows alternate response below original
 - [x] **Model attribution badges** - clear labeling of which AI said what
-Remaining:
-- [ ] **Model selector** - let user pick which AI to compare
-- [ ] **Side-by-side view** - show original + alternate response
-- [ ] **Agreement/disagreement synthesis** - optional quick comparison
+- [x] **Model selector dropdown** - let user pick which AI to compare
+- [x] **Side-by-side comparison view** - toggle to show original + alternate response
+- [x] **Agreement/disagreement synthesis** - automatic comparison with bullet points
 
 **Why this is genius:**
 - Low compute cost (single additional API call)
@@ -89,28 +93,125 @@ Remaining:
 - Perfect viral feature (users will screenshot differences)
 - Gives incremental panel diversity without full Contemplate Mode
 
-### 1.4 File Upload Enhancement (Master Plan: Part 2B.3)
-Current: PDF, TXT, JSON, DOCX
-Needed:
-- [ ] **Add .docx support to web upload API** (mammoth extraction)
+### 1.4 File Upload Enhancement (Master Plan: Part 2B.3) ✅ MOSTLY COMPLETE
+Implemented:
+- [x] **PDF, TXT, JSON, DOCX support** - All working in web upload API
+- [x] **Mammoth extraction** for DOCX files
+- [x] **Summary generation** after upload (AI-generated summary + suggested questions)
+Remaining (nice-to-have):
 - [ ] **Progress indicators** for large file indexing
 - [ ] **Chunking feedback** - show user how many chunks created
-- [ ] **Summary generation** after upload
 
-### 1.5 Onboarding Polish (Master Plan: Part 2F.2)
-Current: Basic upload + profile
-Needed:
-- [ ] **Zero-overwhelm onboarding** - one step at a time
-- [ ] **"Magic moment" engineering** - immediate value in first 10 min
-- [ ] **Skip options** for each step
-- [ ] **Progress indicator** - where user is in setup
+### 1.5 Onboarding Polish (Master Plan: Part 2F.2) ✅ COMPLETE
+Implemented:
+- [x] **Zero-overwhelm onboarding** - Step-by-step modal flow
+- [x] **"Magic moment" engineering** - 5 magic moments (Upload, Ask, Debate, Remember, Organize)
+- [x] **Skip options** - "Skip for now" button on all steps after welcome
+- [x] **Progress indicator** - Gradient progress bar showing current step
+- [x] **Privacy info modal** - Explains data privacy during upload step
+- [x] **AI-powered features** - Generates summaries, suggested questions, panel debate synthesis
 
-### 1.6 Capability Ladder Assessment (NEW - from Capability Ladder doc)
+### 1.6 Capability Ladder Assessment ✅ COMPLETE
 *Foundation for OSQR's identity engine - determines how OSQR sees and serves each user*
-- [ ] **Capability Level field** - Add to Workspace model (0-12 scale)
-- [ ] **Level Assessment Questions** - 10-15 onboarding questions for initial placement
-- [ ] **Display current level** in profile/settings
-- [ ] **Level-appropriate welcome message** after assessment
+- [x] **Capability Level field** - Added to Workspace model (0-12 scale)
+- [x] **Level Assessment Questions** - 6 quick onboarding questions for initial placement
+- [x] **Display current level** - CapabilityBadge in TopBar
+- [x] **Level-appropriate welcome message** after assessment (Foundation/Operator/Creator/Architect stages)
+
+### 1.7 Safety System ⭐ NEW
+*Protecting users while preserving privacy, agency, and trust*
+
+> **Full Spec:** [docs/SAFETY_SYSTEM.md](docs/SAFETY_SYSTEM.md)
+
+**Design Principles:**
+- Rely on model-level safety (Claude/GPT already decline harmful requests)
+- Wrap refusals in OSQR's voice (maintain personality)
+- Crisis requires empathy, not refusal (different response for self-harm)
+- Don't over-filter (OSQR should be useful, not paranoid)
+- Respect privacy (crisis content never stored)
+
+**Phase 1.7a: Alpha (Must Have)**
+- [ ] **Crisis Detection** — Pattern-based detection for self-harm signals
+- [ ] **Crisis Response Template** — Empathetic response + resources (988, findahelpline.com)
+- [ ] **Refusal Wrapper** — Wrap model refusals in OSQR voice
+- [ ] **Storage Filter** — Skip storage for flagged crisis content
+- [ ] **Integration** — Wire into `/api/oscar/ask` endpoint
+
+**Phase 1.7b: Beta (Should Have)**
+- [ ] **Graduated Disclaimers** — Soft/strong caveats for medical/legal/financial topics
+- [ ] **Context-Aware Classification** — Use PKV to inform intent
+- [ ] **User Feedback Loop** — "Was this too cautious?" to tune false positives
+
+**Phase 1.7c: Future (Nice to Have)**
+- [ ] **Session Memory** — Don't repeatedly flag same user
+- [ ] **Professional Context** — Recognize nurses, therapists, researchers
+- [ ] **Fiction Detection** — "My character wants to..." context
+
+**Technical Implementation:**
+```
+lib/safety/
+├── index.ts              # Main exports + SafetyMiddleware
+├── CrisisDetector.ts     # Crisis pattern detection
+├── ResponsePlaybooks.ts  # Crisis response, refusal wrapper, disclaimers
+├── SafetyWrapper.ts      # Wrap model refusals in OSQR voice
+└── types.ts              # Type definitions
+```
+
+**Why This Matters:**
+- Protects vulnerable users without being authoritarian
+- Legal protection for OSQR
+- Builds trust ("OSQR cares about me")
+- Aligns with privacy philosophy (crisis content never stored)
+
+### 1.8 Global Knowledge Index (GKVI)
+*OSQR's "global brain" — shared frameworks that make OSQR behave consistently*
+
+> **Full Spec:** [docs/KNOWLEDGE_ARCHITECTURE.md](docs/KNOWLEDGE_ARCHITECTURE.md)
+
+**The Two-Brain Model:**
+- **Global Knowledge Index (GKVI)** — Shared by all users (frameworks, modes, coaching)
+- **Private Knowledge Vault (PKV)** — Per-user, isolated, never shared
+
+**The Golden Rule:**
+> "If it teaches OSQR how to BE OSQR, it's global."
+> "If it teaches OSQR about YOU, it's private."
+
+**Phase 1.8a: Alpha (Must Have)**
+- [ ] **Capability Ladder** - All 13 levels indexed
+- [ ] **Mode definitions** - Quick, Thoughtful, Contemplate
+- [ ] **Refine → Fire process** - How OSQR handles questions
+- [ ] **Basic coaching tone** - Guidelines for OSQR's voice
+
+**Phase 1.8b: Beta (Should Have)**
+- [ ] **Fourth Generation Formula** - Identity → Capability → Action → Persistence
+- [ ] **Core Commitments** - Universal habit framework
+- [ ] **MSC structure** - Goals, Projects, Habits categories
+- [ ] **Level-appropriate communication** - Tone by capability level
+
+**Phase 1.8c: Founding Users (Nice to Have)**
+- [ ] **Foundational Truths** - Mindset principles
+- [ ] **Advanced coaching guidelines** - Deep coaching patterns
+- [ ] **Identity script templates** - Example identity statements
+- [ ] **Book recommendations per level** - Reading by capability
+
+**Technical Implementation:**
+```typescript
+// Location: lib/knowledge/global-index.ts
+interface GlobalKnowledgeIndex {
+  frameworks: { capabilityLadder, fourthGenFormula, coreCommitments }
+  system: { modes, refineFire, panelLogic, mscStructure }
+  coaching: { toneGuidelines, levelAppropriateComms }
+}
+
+// Documents with workspaceId: null are global
+// Query routing pulls from GKVI + user's PKV, never mixing users
+```
+
+**Why This Matters:**
+- Makes OSQR behavior consistent across all users
+- Enables "OSQR-style" coaching using your frameworks
+- Differentiates OSQR from generic ChatGPT/Claude
+- Users get your system delivered by superintelligence
 
 ---
 
@@ -152,7 +253,7 @@ Needed:
 - [ ] **User can pin/unpin items**
 - [ ] **Shareable summary card**
 
-### 2.4 Oscar Personality Engine (Master Plan: Part 2C.5)
+### 2.4 OSQR Personality Engine (Master Plan: Part 2C.5)
 Current: Basic system prompts
 Needed:
 - [ ] **Adjustable personality traits**
@@ -162,6 +263,38 @@ Needed:
 - [ ] **Learn from user feedback** (thumbs up/down)
 - [ ] **Domain-specific voice** (business vs personal)
 
+### 2.4.1 User Settings & Model Preferences ✅ IN PROGRESS
+*Let users customize their OSQR experience*
+
+**Implemented:**
+- [x] **Claude as default synthesizer** - Claude is now the "voice" of OSQR (Dec 2024)
+- [x] **UserSetting model** - Database schema ready for key/value settings
+
+**Planned:**
+- [ ] **Synthesizer model selection** - Let users choose Claude, GPT-4, or others as OSQR's voice
+- [ ] **Settings API endpoints** - GET/PUT /api/settings for user preferences
+- [ ] **Settings UI page** - /settings route with preference controls
+- [ ] **Panel composition preferences** - Let power users customize which models are on their panel
+
+**Technical Notes:**
+```typescript
+// Available settings keys
+type SettingKey =
+  | 'synthesizer_model'    // 'claude-sonnet-4-20250514' | 'gpt-4-turbo' | etc.
+  | 'panel_composition'    // { strategic: 'claude', technical: 'gpt-4', ... }
+  | 'response_style'       // 'concise' | 'detailed' | 'balanced'
+  | 'default_mode'         // 'quick' | 'thoughtful' | 'contemplate'
+
+// Default synthesizer is Claude (changed Dec 2024)
+const DEFAULT_SYNTHESIZER = 'claude-sonnet-4-20250514'
+```
+
+**Why this matters:**
+- Power users want control over their AI experience
+- Some users may prefer GPT-4's style for certain work
+- Future-proofs for new models (Claude 4, GPT-5, etc.)
+- Natural upsell feature for Pro/Master tiers
+
 ### 2.5 Capability Ladder - Level-Based Personalization (NEW)
 *Extend Capability Ladder into core experience*
 - [ ] **Level-appropriate prompts** - Tone matches user's developmental level
@@ -170,10 +303,92 @@ Needed:
 - [ ] **Dynamic difficulty** - Challenge advanced users, support beginners
 - [ ] **Level scoring signals** - Detect level from conversation patterns
 
+### 2.6 Wellness Check Memory Layer (NEW)
+*Track physical/mental state over time for pattern recognition*
+
+**Concept:** OSQR occasionally asks "How are you feeling?" and tracks energy, mood, focus, and symptoms over time. After sufficient data, surfaces correlations and insights.
+
+**Implementation:**
+- [ ] **WellnessEntry model** - Store daily/periodic check-ins
+  - Energy level (1-5 or descriptive)
+  - Mood state
+  - Focus quality
+  - Symptoms/notes (freeform)
+  - Context (what's happening)
+- [ ] **Conversational check-in** - Natural prompt in main chat (optional, can be disabled)
+- [ ] **Pattern detection** - After 14+ entries, identify:
+  - Day-of-week patterns ("You're tired on Mondays")
+  - Correlation with work patterns
+  - Symptom clusters
+- [ ] **Weekly wellness summary** - Optional digest of trends
+- [ ] **Integration with Capability Ladder** - Physical state impacts performance
+- [ ] **Fourth Gen tie-in** - "Your energy dips when you skip morning routine"
+
+**Why this matters:**
+- Builds deep trust ("OSQR actually knows me")
+- Unique differentiator vs other AI assistants
+- Pattern data is gold for personalization
+- Natural upsell to Pro tier (detailed analytics)
+
+**Technical Schema:**
+```
+WellnessEntry {
+  id String
+  workspaceId String
+  date DateTime
+  energy Int? // 1-5
+  mood String? // good, stressed, anxious, calm, etc.
+  focus String? // sharp, scattered, tired
+  symptoms String? // freeform notes
+  context String? // what's happening
+  createdAt DateTime
+}
+```
+
 ---
 
 ## Phase 3: Intelligence Layer
-*Focus: Proactive features, pattern recognition, cross-referencing*
+*Focus: Proactive features, pattern recognition, cross-referencing, behavioral learning*
+
+### 3.0 Behavioral Intelligence Layer ⭐ NEW
+
+> **Full Spec:** [docs/BEHAVIORAL_INTELLIGENCE_LAYER.md](docs/BEHAVIORAL_INTELLIGENCE_LAYER.md)
+
+**Purpose:** Enable OSQR to learn from user behavior (not content) and improve over time.
+
+**Components:**
+- [ ] **TelemetryCollector** - Captures behavioral events (mode selections, feature usage, feedback)
+- [ ] **PatternAggregator** - Transforms events into meaningful patterns
+- [ ] **UserBehaviorModel** - Per-user behavioral profile for personalization
+- [ ] **PrivacyTierManager** - Enforces A/B/C privacy tier consent
+
+**Privacy Tiers:**
+- **Tier A (Default):** Local only, minimal telemetry
+- **Tier B (Opt-in):** Personal learning, OSQR adapts to user
+- **Tier C (Opt-in+):** Global learning, helps improve OSQR for everyone
+
+**What OSQR Learns:**
+- Mode preferences per question type
+- Feature usage patterns
+- Response satisfaction signals
+- Optimal UI personalization
+
+**What OSQR NEVER Sees:**
+- Document contents
+- Chat message text
+- PKV data
+- Personal information
+
+**Implementation Status:**
+- [x] Architecture documented
+- [x] Telemetry spec defined (see [docs/TELEMETRY_SPEC.md](docs/TELEMETRY_SPEC.md))
+- [x] Privacy tiers defined (see [docs/PRIVACY_TIERS.md](docs/PRIVACY_TIERS.md))
+- [ ] Stub files created
+- [ ] Database schema
+- [ ] Event collection
+- [ ] Pattern aggregation
+- [ ] User behavior models
+- [ ] Privacy settings UI
 
 ### 3.1 Cross-Referencing Engine (Master Plan: Part 2B.5)
 Current: Basic semantic search
@@ -191,15 +406,75 @@ Needed:
 - [ ] **Memory-Based Pattern Recognition**
   - Surface recurring themes/concerns
 
-### 3.3 Model Personality Tagging (Master Plan: Part 2A.6)
-Current: Generic model labels
-Needed:
-- [ ] **Named identities** for each model in panel
-  - Claude = "The Reasoner"
-  - GPT-4 = "The Creative"
-  - etc.
-- [ ] **Visual differentiation** in panel view
-- [ ] **User-customizable names**
+### 3.3 Model Personality Tagging & Registry (Master Plan: Part 2A.6) ✅ FOUNDATION COMPLETE
+
+> **Full Spec:** [docs/features/MULTI-MODEL-ARCHITECTURE.md](docs/features/MULTI-MODEL-ARCHITECTURE.md)
+
+**Status:** Model Registry with personalities implemented in `lib/ai/model-router.ts`
+
+**What's Built:**
+- [x] **MODEL_REGISTRY** - Single source of truth for all models
+- [x] **Capability scoring** (0-10 scale): reasoning, creativity, coding, speed, accuracy, nuance
+- [x] **Cost profiles**: cheap, medium, expensive
+- [x] **Model personalities** with codenames, descriptions, strengths, communication styles
+- [x] **Council Mode flags** - which models can appear in visible multi-chat
+
+**Model Personality Atlas (Council Mode):**
+
+| Model | Codename | Personality |
+|-------|----------|-------------|
+| Claude Opus 4 | The Philosopher | Calm, cautious, deeply logical, extremely reliable |
+| Claude Sonnet 4 | The Balanced Thinker | Excellent all-rounder with strong creative and analytical abilities |
+| Claude 3.5 Sonnet | The Empath | Strong emotional intelligence with excellent creative abilities |
+| GPT-4o | The Creator | Great at everything: writing, coding, brainstorming, structure |
+| Gemini 2.0 Pro | The Engineer | Excellent multimodality, STEM reasoning + code analysis |
+| Grok 2 | The Maverick | Fast, witty, contrarian, great for real-time stuff |
+| Mistral Large | The Prodigy | High-quality reasoning with European safety standards |
+| Llama 3.1 | The Workhorse | Close to GPT-4 performance with fully open-source access |
+
+**Remaining Work:**
+- [ ] **Visual differentiation** in panel view (model badges, colors)
+- [ ] **User-customizable names** - let users rename models
+- [ ] **Personality display** in Council Mode UI
+- [ ] **Provider expansion** - integrate Gemini, Grok, Mistral (see 3.3.1)
+
+### 3.3.1 Provider Expansion (Multi-Model Integration)
+
+**Current Providers (Integrated):**
+- [x] Anthropic (Claude) - Full integration
+- [x] OpenAI (GPT) - Full integration
+
+**Future Providers (Registry Ready, Adapters Needed):**
+- [ ] **Google (Gemini)** - Build `GoogleClient` adapter
+  - Models: Gemini 2.0 Pro, Gemini 2.0 Flash
+  - Priority: HIGH - long context, multimodal, strong STEM
+- [ ] **xAI (Grok)** - Build `XAIClient` adapter
+  - Models: Grok 2, Grok 2.5
+  - Priority: MEDIUM - real-time knowledge, contrarian perspective
+- [ ] **Mistral** - Build `MistralClient` adapter
+  - Models: Mistral Large, Mixtral
+  - Priority: MEDIUM - efficient, good coding, multilingual
+- [ ] **Meta (Llama)** - Build `LlamaClient` adapter (self-hosted or via API)
+  - Models: Llama 3.1 70B/405B
+  - Priority: LOW - requires infrastructure for self-hosting
+
+**Implementation Pattern:**
+```typescript
+// Each provider adapter implements the same interface:
+interface ProviderClient {
+  chat(params: {
+    model: string
+    messages: Message[]
+    maxTokens?: number
+    temperature?: number
+  }): Promise<{ content: string; tokensUsed: number }>
+}
+```
+
+**When to Enable:**
+- Flip `enabled: true` in MODEL_REGISTRY
+- Add API key to environment
+- Provider adapter handles the rest
 
 ### 3.4 Oscar Synthesis Engine Enhancement (Master Plan: Part 2A.7)
 Current: Basic synthesis prompt
@@ -208,6 +483,44 @@ Needed:
 - [ ] **Highlight disagreements** between models
 - [ ] **Confidence indicators** on final answer
 - [ ] **Source attribution** - which model contributed what
+
+### 3.5 Council Mode (Multi-Chat Mode) ⭐ v2.0 FLAGSHIP FEATURE
+*"A room of minds. One final voice."*
+
+> **Full Spec:** [docs/features/COUNCIL-MODE.md](docs/features/COUNCIL-MODE.md)
+
+**What it is:**
+A live, real-time, multi-agent thinking room where 2-6 AI models think in parallel, display their answers in real time, and OSQR synthesizes a final unified response as the "consensus voice."
+
+**Why it matters:**
+- OpenAI/Anthropic cannot show competing models in their apps — OSQR can
+- Users trust consensus more than single-model answers
+- Visualizes the "invisible panel" that already powers Thoughtful/Contemplate modes
+- Screenshots go viral ("Claude vs GPT vs Gemini — moderated by OSQR")
+
+**Dependencies (must be complete first):**
+- [ ] 3.1 Cross-Referencing Engine (stable)
+- [ ] 3.3 Model Personality Tagging (models have identities)
+- [ ] 3.4 Synthesis Engine Enhancement (weighted synthesis working)
+- [ ] Dynamic model routing (✅ implemented in model-router.ts)
+- [ ] Hardened backend + rate limiting for compute-intensive queries
+
+**Target:** v2.0 release (Phase 3 completion)
+**Tier:** OSQR Master exclusive ($149/mo)
+
+**High-level implementation:**
+```
+┌────────────┬────────────┬────────────┬────────────┐
+│   Claude   │   GPT-4o   │   Gemini   │    Grok    │
+│  (stream)  │  (stream)  │  (stream)  │  (stream)  │
+└────────────┴────────────┴────────────┴────────────┘
+
+┌────────────────────────────────────────────────────┐
+│    OSQR Moderator Synthesis (final answer)         │
+└────────────────────────────────────────────────────┘
+```
+
+**See full spec for:** UI layout, backend architecture, model routing logic, cost controls, system prompts, and future expansions.
 
 ---
 
@@ -245,16 +558,69 @@ Needed:
 - [ ] **Algorithm for level detection** - Automated scoring from behavior patterns
 
 ### 4.6 Multi-Model Debate Mode (Master Plan: Part 2A.8)
+> **Note:** This evolves into **Council Mode** (3.5) as the v2.0 flagship feature.
+> Basic debate features may ship earlier; full Council Mode UI in Phase 3.
+
 - [ ] **Structured debate format** between AI models
 - [ ] **Pro/Con generation** on complex topics
 - [ ] **Devil's advocate mode**
 - [ ] **Consensus building** visualization
+- [ ] **Council Mode integration** → See [docs/features/COUNCIL-MODE.md](docs/features/COUNCIL-MODE.md)
 
 ### 4.7 Panel Credits System (Master Plan: Part 2A.10)
 - [ ] **Gamified credit system** for panel discussions
 - [ ] **Credit-based pricing tier**
 - [ ] **Bonus credits for referrals**
 - [ ] **Credit usage visualization**
+
+### 4.8 Media Vault (Image & Video Foundations) ⭐ FUTURE FLAGSHIP
+*"A lifelong, AI-enhanced, meaning-driven memory vault."*
+
+> **Full Spec:** [docs/features/MEDIA-VAULT.md](docs/features/MEDIA-VAULT.md)
+
+**What it is:**
+Turn OSQR into a lifelong memory OS by letting users store photos and videos in the same Personal Knowledge Vault as their documents. Not a social feed — a private, searchable, AI-enhanced archive of your life.
+
+**Why it matters:**
+- **Future-proof bet:** Store media now, analyze with better AI later
+- **Unique moat:** No one else has PKV + MSC + Memory + Identity Model to *use* memories, not just store them
+- **Category creation:** "The OS of someone's entire life"
+- **Differentiator vs Facebook/Google Photos:** They store memories; OSQR *uses* memories
+
+**The strategic insight:**
+> "If you store people's memories now, future AI will make them exponentially more valuable."
+
+AI capabilities improve quarterly. Photos stored today can be retroactively analyzed when vision models mature. OSQR becomes the only platform positioned to cross-reference visual memories with:
+- Goals and projects (PKV)
+- Identity and values (MSC)
+- Life patterns (Memory Layer)
+- Capability progression (Ladder)
+
+**Phased implementation:**
+
+| Phase | Scope | AI Involvement |
+|-------|-------|----------------|
+| **4.8a** | Storage only | None — just archive |
+| **4.8b** | Basic vision extraction | Auto-caption, tags, objects |
+| **4.8c** | Timeline + cross-linking | Link to goals, people, projects |
+| **4.8d** | Advanced video + life intelligence | Video summarization, life recaps |
+
+**Dependencies:**
+- [ ] PKV stable and proven at scale
+- [ ] Privacy tiers fully implemented (especially Tier A for media)
+- [ ] Object storage infrastructure (Supabase/S3/R2)
+- [ ] Users trust OSQR with text before trusting it with family photos
+
+**Target:** v3.0 or later (after Council Mode and core intelligence features)
+**Tier:** Pro ($49/mo) for storage, Master ($149/mo) for advanced analysis
+
+**Why Phase 4.8 (not earlier):**
+1. Core OSQR value must be proven first (intelligence, memory, routing)
+2. Storage costs scale differently than text — need sustainable pricing model
+3. Privacy stakes are higher with photos of family/kids
+4. Users need to trust OSQR with text before trusting it with visual memories
+
+**See full spec for:** Data model, backend architecture, privacy tiers, UI/UX, and phased rollout.
 
 ---
 
@@ -324,25 +690,75 @@ Needed:
 
 ---
 
-## Monetization Strategy (Master Plan Part 3A)
+## Monetization Strategy (Premium Launch — Tesla Model)
 
-### Tier Structure
-| Tier | Price | Core Value |
-|------|-------|------------|
-| **OSQR Lite** | $19/mo | Taste of second brain |
-| **OSQR Pro** | $49/mo | Full PKV + panel mode |
-| **OSQR Master** | $149/mo | Automation + team features |
+### Launch Strategy: Premium First
 
-### Panel Credits
-- Fire Mode costs credits
-- Free tier gets limited credits
-- Paid tiers get more/unlimited
-- Referrals earn bonus credits
+OSQR launches with **Pro and Master tiers only**. No Lite/Free tier at launch.
 
-### Key Differentiator
-- **Local-Only Vault** option ($5-10 add-on)
-- **90-Day Transformation Guarantee** (annual Pro)
-- **Family Plan** available
+**Rationale (Tesla Roadster Model):**
+- Build premium brand positioning first
+- Attract high-value early adopters (founders, operators, builders)
+- Higher LTV per user = more runway for development
+- Better user feedback quality
+- Lite tier introduced later (after 1,000+ paying users)
+
+### Tier Structure (Launch)
+
+| Tier | Launch Price | Future Price | Core Value |
+|------|-------------|--------------|------------|
+| **OSQR Pro** | $49/mo | $79/mo | Elite clarity + multi-model thinking |
+| **OSQR Master** | $149/mo | $249/mo | OS-level intelligence + all features |
+
+**No Lite tier at launch.** Lite will be introduced after premium brand is established.
+
+### Founder Pricing
+
+Early adopters get **lifetime rate lock**:
+- First 1,000 users keep launch pricing forever
+- Creates urgency without discounting
+- Makes early users feel like insiders/founders
+
+### Pro Tier Features
+- Multi-model panel (Claude + GPT-4o)
+- Quick, Thoughtful & Contemplate modes
+- Full Personal Knowledge Vault
+- Unlimited Refine → Fire
+- 25 documents in vault
+- 100 panel queries/day
+- Advanced memory
+- 90-day transformation guarantee
+
+### Master Tier Features
+- Everything in Pro
+- Advanced memory & personalized intelligence
+- Priority fast-lane processing
+- 100 documents in vault
+- Weekly automated reviews
+- Custom Agent Builder (coming)
+- Council Mode (coming)
+- VS Code Extension (coming)
+- Early access to new models & features
+
+### Key Differentiators
+- **90-Day Capability Transformation Guarantee** — Full refund if OSQR doesn't improve thinking
+- **Multi-model synthesis** — No other tool shows competing AI perspectives
+- **Founder Pricing Lock** — Early adopters rewarded permanently
+
+### Price Increase Timeline
+
+| Phase | Timing | Action |
+|-------|--------|--------|
+| Phase 1 | Launch | Pro $49, Master $149 |
+| Phase 2 | After 1,000 users | Pro $79, Master $199-249 |
+| Phase 3 | Council Mode ships | Master $249+ |
+| Phase 4 | Mass market | Introduce Lite $19/mo |
+
+### Messaging
+
+**Headline:** "Don't Just Ask AI. Start Thinking With One."
+**Subhead:** "One Question. Many Minds. One Clear Answer."
+**Target:** "Built for founders, operators, and high-performers who want elite decision-making and world-class clarity."
 
 ---
 
@@ -607,159 +1023,184 @@ PsychAssessment {
 
 ---
 
-## Phase X: VS Code Dev Companion Extension (Future)
-*Focus: Native VS Code extension connecting to OSQR backend for developer workflows*
+## Phase 6: Meta-OSQR Mode ("Oscar, Audit Yourself")
 
-### Overview
+> **Status:** Specification complete. Build after Intelligence Layer (Phase 3) is stable.
+> **Tier:** OSQR Master exclusive
+> **Full Spec:** [docs/META_OSQR_MODE.md](docs/META_OSQR_MODE.md)
 
-A VS Code extension that connects to OSQR's backend and leverages PKV, MSC, and multi-model routing specifically for software development workflows. The extension enables developers to use OSQR's "Refine → Fire" methodology directly inside their development environment.
+### Vision
 
-### X.1 Core Goals for v1
+Meta-OSQR is a self-refinement capability where OSQR audits its own system — applying the principle *"The best part is no part"* to itself.
 
-- [ ] **VS Code Sidebar** - OSQR panel accessible while coding
-- [ ] **Refine → Fire on Selected Code** - Highlight code, ask OSQR, get multi-model insight
-- [ ] **PKV Integration** - Context from user's personal knowledge vault available in extension
-- [ ] **MSC Integration** - Morning Strategy Call patterns applied to dev tasks
-- [ ] **Multi-model routing** - Same panel/debate mode as web app
+**The Insight:**
+> "If Oscar helps users identify unnecessary complexity in their lives, why can't Oscar turn that same thinking inward?"
 
-### X.2 Extension UX: OSQR Dev Panel
+### Core Capabilities
 
-Three collapsible sections in the sidebar:
+#### 6.1 System Complexity Audit
+- [ ] **Analyze current state** - Map all OSQR components, features, data flows
+- [ ] **Identify cruft** - Find features with low usage, redundant code paths, over-engineered systems
+- [ ] **Generate simplification proposals** - "This feature could be removed. Here's the impact."
+- [ ] **Track complexity over time** - Complexity score trending dashboard
 
-#### Context Panel
-- [ ] **Project binding** - Associate VS Code workspace with OSQR project
-- [ ] **Active context display** - Show what PKV + MSC context is loaded
-- [ ] **Quick context toggle** - Enable/disable specific knowledge sources
-- [ ] **Context indicators** - Visual badges for active PKV, MSC, project docs
+#### 6.2 Question Quality Scoring
+- [ ] **Rate incoming questions** - Score questions on clarity, specificity, tractability
+- [ ] **Suggest question improvements** - "This question would yield better results if..."
+- [ ] **Learn question patterns** - Identify what makes questions effective for each user
 
-#### Tasks & Questions Panel
-- [ ] **Question input field** - Type or voice-to-text questions
-- [ ] **Suggested questions** - Based on current file/selection
-- [ ] **Active task list** - Synced with OSQR web app
-- [ ] **Task completion** - Mark tasks done from VS Code
-- [ ] **Code-aware suggestions** - "Explain this function", "Find bugs", etc.
+#### 6.3 PowerQuestion Generation
+- [ ] **Analyze user's goals/projects** - Pull from PKV, MSC, profile
+- [ ] **Generate high-leverage questions** - "Have you considered asking yourself: [question]?"
+- [ ] **Weekly reflection prompts** - Automated thought-provoking questions
 
-#### Insights Panel
-- [ ] **Recent answers** - Last 5 OSQR responses (clickable to expand)
-- [ ] **Pinned insights** - User-pinned important responses
-- [ ] **Code snippets** - Generated code ready to insert
-- [ ] **Apply to editor** - One-click insert of generated code
+#### 6.4 Self-Improvement Proposals
+- [ ] **Feature usage analytics** - Which features are actually used?
+- [ ] **Code complexity metrics** - Lines of code, cyclomatic complexity, dependencies
+- [ ] **UX friction detection** - Where do users abandon flows?
+- [ ] **Architecture review** - "This component could be simplified because..."
 
-### X.3 Commands & Behaviors
+### Trigger Methods
 
-#### Refine & Fire on Selection
-- [ ] **Keyboard shortcut** - `Cmd+Shift+O` (Mac) / `Ctrl+Shift+O` (Windows)
-- [ ] **Context menu item** - "Ask OSQR about this"
-- [ ] **Auto-detect question type** - Code explanation, bug finding, refactoring
-- [ ] **Language detection** - Adjust prompts based on file type
-- [ ] **Multi-file context** - Include related files automatically
+**User-Initiated:**
+- "Oscar, audit yourself"
+- "Oscar, what could be simpler?"
+- "Oscar, show me your complexity report"
 
-#### Generate Project TODO
-- [ ] **Scan current workspace** - Extract TODO/FIXME comments
-- [ ] **OSQR synthesis** - Generate prioritized task list
-- [ ] **Task assignment** - Suggest which tasks to tackle first
-- [ ] **Sync to web app** - Push generated tasks to OSQR web
+**Automated (scheduled):**
+- Weekly self-audit report
+- Post-release complexity check
+- Monthly feature usage review
 
-#### Summarize Recent Work
-- [ ] **Git integration** - Analyze recent commits
-- [ ] **Change detection** - Summarize what files changed
-- [ ] **Progress report** - Generate summary of work done
-- [ ] **Share to MSC** - Export to Morning Strategy Call context
+### Sample Outputs
 
-### X.4 PKV Integration
-
-#### Project Binding
-- [ ] **Workspace ↔ Project mapping** - Link VS Code workspace to OSQR project
-- [ ] **Auto-suggest binding** - Detect project from git remote or package.json
-- [ ] **Multi-project support** - Handle monorepos with multiple bindings
-- [ ] **Binding indicators** - Show which PKV context is active
-
-#### Read Path (PKV → Extension)
-- [ ] **Semantic search** - Query PKV from VS Code
-- [ ] **Context injection** - Include relevant PKV docs in AI prompts
-- [ ] **Reference display** - Show which PKV documents informed the answer
-- [ ] **Quick preview** - Hover to see PKV document excerpts
-
-#### Write Path (Extension → PKV)
-- [ ] **Index code snippets** - Save important code to PKV
-- [ ] **Index decisions** - Document architectural decisions
-- [ ] **Index learnings** - Capture "aha moments" during coding
-- [ ] **Auto-index option** - Automatically save starred responses
-
-### X.5 MSC Integration
-
-#### Daily Dev Standup
-- [ ] **Morning prompt** - "What are you building today?"
-- [ ] **Context-aware suggestions** - Based on recent git activity
-- [ ] **Goal setting** - Set 1-3 daily coding goals
-- [ ] **End-of-day review** - Summary of what was accomplished
-
-#### Pattern Detection
-- [ ] **Coding patterns** - Detect user's coding habits
-- [ ] **Time tracking** - Optional tracking of coding sessions
-- [ ] **Productivity insights** - "You're most productive at X time"
-- [ ] **Break reminders** - Based on user preferences
-
-### X.6 "One-Prompt Build" (Advanced Feature)
-
-A future capability for scaffolding entire features:
-
-- [ ] **Feature description input** - "Build a user authentication system"
-- [ ] **Multi-step generation** - Files, tests, documentation
-- [ ] **Preview mode** - Review before applying changes
-- [ ] **Rollback support** - Undo generated changes
-- [ ] **Iterative refinement** - "Make this more secure"
-
-### X.7 Technical Implementation Notes
-
-#### Extension Architecture
+**Complexity Report:**
 ```
-osqr-vscode/
-├── src/
-│   ├── extension.ts      # Entry point
-│   ├── panels/           # Webview panels
-│   ├── commands/         # VS Code commands
-│   ├── api/              # OSQR backend client
-│   └── context/          # Context management
-├── webview/              # React-based sidebar UI
-└── package.json          # Extension manifest
+OSQR Self-Audit Report
+======================
+Overall Complexity Score: 7.2/10 (up 0.3 from last month)
+
+High-complexity areas:
+1. Memory system (5 tiers when 3 would suffice)
+2. Mode routing logic (nested conditionals)
+3. Panel composition (over-parameterized)
+
+Simplification opportunities:
+- Memory tiers: Merge Working + Dialogue → "Session Memory"
+- Mode routing: Replace conditionals with lookup table
+- Panel: Remove unused 'debater' personality type
+
+Features with <5% usage this month:
+- Knowledge graph visualization
+- Custom agent builder (0.2% of users)
+- Voice input mode
 ```
 
-#### Authentication Flow
-- [ ] **OAuth redirect** - Login via browser, return to VS Code
-- [ ] **Token storage** - Secure storage in VS Code secrets
-- [ ] **Session management** - Auto-refresh tokens
-- [ ] **Multi-account** - Support multiple OSQR accounts
+**PowerQuestion Generation:**
+```
+Based on your current projects and goals, consider:
 
-#### API Endpoints Required
-- [ ] `POST /api/vscode/refine` - Refine question with code context
-- [ ] `POST /api/vscode/fire` - Multi-model query with code context
-- [ ] `GET /api/vscode/pkv/search` - Search PKV from extension
-- [ ] `POST /api/vscode/pkv/index` - Index code/decisions to PKV
-- [ ] `GET /api/vscode/context` - Get current project context
-- [ ] `POST /api/vscode/tasks` - Sync tasks with web app
+1. "What would this look like if it were easy?"
+   → Related to: VoiceQuote scaling challenges
 
-### X.8 Success Criteria for v1
+2. "If I could only keep 3 features, which would they be?"
+   → Related to: Product roadmap decisions
 
-1. **User can ask questions** about selected code and get multi-model responses
-2. **PKV context** improves answer quality compared to vanilla AI
-3. **Seamless sync** between VS Code and OSQR web app
-4. **Sub-3-second** response time for Quick Mode
-5. **Zero-config setup** for existing OSQR users (just login)
-6. **Works offline** for basic features (cached context)
+3. "What am I avoiding that I know I should do?"
+   → Related to: Recurring patterns in your reflections
+```
 
-### X.9 Implementation Priority
+### Technical Implementation
 
-| Priority | Feature | Complexity |
-|----------|---------|------------|
-| P0 | Authentication + basic sidebar | Medium |
-| P0 | Refine → Fire on selection | Medium |
-| P1 | PKV read integration | High |
-| P1 | Context panel | Medium |
-| P2 | PKV write integration | Medium |
-| P2 | Task sync | Medium |
-| P3 | MSC integration | High |
-| P3 | One-Prompt Build | Very High |
+**Dependencies:**
+- [ ] Behavioral Intelligence Layer (Phase 3.0) operational
+- [ ] Usage telemetry flowing (TelemetryCollector active)
+- [ ] Pattern detection working (PatternAggregator)
+
+**New Components:**
+- [ ] `lib/meta/SelfAuditor.ts` - Core audit logic
+- [ ] `lib/meta/ComplexityAnalyzer.ts` - Code/feature complexity scoring
+- [ ] `lib/meta/QuestionIntelligence.ts` - Question quality & generation
+- [ ] `lib/meta/index.ts` - Clean exports
+
+**Database Additions:**
+```
+ComplexityReport {
+  id String
+  generatedAt DateTime
+  overallScore Float
+  componentScores Json
+  simplificationProposals Json
+  lowUsageFeatures String[]
+}
+
+QuestionScore {
+  id String
+  workspaceId String
+  questionText String (hashed)
+  clarityScore Float
+  specificityScore Float
+  tractabilityScore Float
+  improvedVersion String?
+  createdAt DateTime
+}
+```
+
+### Why Phase 6 (Not Earlier)
+
+1. **Requires telemetry data** - Can't audit without usage patterns
+2. **Requires pattern detection** - PatternAggregator must be operational
+3. **Recursive complexity** - Adding meta-features adds complexity; must be mature enough to handle it
+4. **Brand positioning** - "AI that audits itself" is powerful marketing after core value proven
+
+### The Meta-Irony
+
+> Building a feature that identifies unnecessary features is itself a risk of unnecessary complexity.
+> The implementation must be minimal, or Meta-OSQR will be the first thing Meta-OSQR recommends removing.
+
+---
+
+## Phase X: OSQR VS Code Dev Companion (Future)
+
+> **Status:** Vision documented. Do not begin until Phase 3 Intelligence Layer is stable.
+
+### Vision
+
+Make OSQR a real dev companion inside VS Code—not another prompt hack, but a tool that:
+- Uses OSQR's multi-model routing (Quick/Thoughtful/Contemplate)
+- Reads and writes to PKV (project context) and MSC (principles)
+- Can eventually operate autonomously on well-defined tasks
+- Builds toward "describe your app, OSQR builds it"
+
+### Milestone Sequence
+
+1. **Dev Companion v1** – Sidebar panel, Refine→Fire on code, PKV/MSC integration
+2. **Autonomous Developer Mode** – Safe branch-based autonomous development (Jarvis-style)
+3. **Autonomous App Builder** – Generate full app scaffolds from natural language
+
+These are stacked. Each depends on the previous.
+
+### Prerequisites
+
+- [ ] OSQR core app launched and stable
+- [ ] Intelligence Layer (Phase 3) complete
+- [ ] PKV/MSC have real usage data from multiple projects
+- [ ] Clear pricing model for extension features
+
+### Key Differentiators vs Copilot/Cursor
+
+- **Memory that persists** – PKV/MSC means OSQR remembers projects, decisions, and principles across sessions
+- **Multi-model routing** – Not locked to one AI; uses the right model for the task
+- **Integrated with life OS** – Dev work connects to broader goals via MSC
+- **Learns from you** – Gets better at YOUR codebase over time
+
+### Detailed Specs
+
+Full specifications preserved in vision documents:
+- **[docs/vision/VSCODE-DEV-COMPANION.md](docs/vision/VSCODE-DEV-COMPANION.md)** – Dev Companion v1 & Autonomous Mode specs
+- **[docs/vision/AUTONOMOUS-APP-BUILDER.md](docs/vision/AUTONOMOUS-APP-BUILDER.md)** – App Builder blueprint
+
+*Detailed implementation planning begins when prerequisites are met.*
 
 ---
 
@@ -841,6 +1282,196 @@ Items Claude can complete without user input:
 - Content/copy decisions for user-facing text
 - Major UX flow changes
 - Database schema changes affecting production data
+
+---
+
+## Appendix E: Multi-Model Architecture Summary
+
+> **Full Spec:** [docs/features/MULTI-MODEL-ARCHITECTURE.md](docs/features/MULTI-MODEL-ARCHITECTURE.md)
+
+### Architecture Overview
+
+OSQR's multi-model system is built on 5 core components:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     1. MODEL_REGISTRY                           │
+│  Single source of truth for all models & capabilities           │
+│  → lib/ai/model-router.ts                                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   2. PROVIDER ADAPTERS                          │
+│  OpenAI, Anthropic (+ future: Google, xAI, Mistral)            │
+│  → lib/ai/providers/                                            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    3. MODE ROUTING                              │
+│  Quick → 1 model (routed by type)                              │
+│  Thoughtful → Panel (2+ models) + synthesis                     │
+│  Contemplate → Extended panel + multi-round + deep synthesis    │
+│  Council → Visible panel + OSQR moderation                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    4. OSQR SYNTHESIS                            │
+│  Combines model outputs into unified OSQR voice                 │
+│  → lib/ai/oscar.ts                                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               5. INSTRUMENTATION (Future)                       │
+│  Latency, cost, agreement, user feedback                        │
+│  → Enables adaptive model scoring over time                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Model Registry Structure
+
+Each model in the registry has:
+
+```typescript
+interface ModelDefinition {
+  id: string                    // "anthropic-claude-sonnet-4"
+  provider: ModelProvider       // 'anthropic' | 'openai' | 'google' | etc.
+  model: string                 // API model name
+  displayName: string           // Human-readable
+  capabilities: {
+    reasoning: number   // 0-10
+    creativity: number  // 0-10
+    coding: number      // 0-10
+    speed: number       // 0-10
+    accuracy: number    // 0-10
+    nuance: number      // 0-10
+  }
+  costProfile: 'cheap' | 'medium' | 'expensive'
+  maxContextTokens: number
+  enabled: boolean              // Can toggle on/off
+  enabledForCouncil: boolean    // Available in Council Mode
+  personality: {
+    codename: string            // "The Philosopher"
+    description: string         // One-sentence personality
+    strengths: string[]         // What it excels at
+    style: string               // Communication style
+  }
+}
+```
+
+### Question Type → Model Routing
+
+| Question Type | Primary Model | Alternative | Reason |
+|---------------|---------------|-------------|--------|
+| factual | Claude Haiku | GPT-4o Mini | Speed + accuracy |
+| creative | Claude Sonnet | Claude 3.5 Sonnet | Nuance + creativity |
+| coding | GPT-4o | Claude Sonnet | Code generation |
+| analytical | Claude Sonnet | GPT-4o | Balanced analysis |
+| reasoning | Claude Opus | GPT-4o | Deep logic |
+| high_stakes | Claude Opus | Multiple panel | Thoroughness |
+
+### Implementation Status
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Model Registry | ✅ Complete | `lib/ai/model-router.ts` |
+| Question Detection | ✅ Complete | `detectQuestionType()` |
+| Complexity Scoring | ✅ Complete | `estimateComplexity()` |
+| Route to Model | ✅ Complete | `routeQuestion()` |
+| Anthropic Adapter | ✅ Complete | `lib/ai/providers/anthropic.ts` |
+| OpenAI Adapter | ✅ Complete | `lib/ai/providers/openai.ts` |
+| Google Adapter | ✅ Complete | `lib/ai/providers/google.ts` |
+| xAI Adapter | ✅ Complete | `lib/ai/providers/xai.ts` |
+| Mistral Adapter | ❌ Not started | - |
+| Council Mode | 📋 Spec complete | `docs/features/COUNCIL-MODE.md` |
+| Instrumentation | ❌ Not started | - |
+
+### Adding a New Provider
+
+1. Add models to `MODEL_REGISTRY` in `lib/ai/model-router.ts`
+2. Create adapter in `lib/ai/providers/{provider}.ts`
+3. Register in `ProviderRegistry`
+4. Add API key to environment
+5. Flip `enabled: true` in registry
+
+---
+
+## Appendix F: Collaboration Layer (Future Feature)
+
+> **Status:** End-of-list idea. Do not build until core Personal OS is fully established.
+> **Timeframe:** 1-2 years out, revisit when demand naturally emerges.
+
+OSQR may eventually support multi-user collaboration inside shared workspaces, allowing teams or partners to build, think, and plan together with OSQR acting as the shared intelligence layer. This is **not social media** — it is project-centered collaboration with AI mediation.
+
+### Prerequisites (Must Complete First)
+
+- Phase 4.8 Media Vault complete
+- Multi-Model Architecture stable (Council Mode shipped)
+- Memory Engine operational
+- Tier system with billing stable
+- Significant single-user adoption established
+
+### Collaboration Phase 1 — Shared Workspaces (Async)
+
+- Multiple users can join a single workspace (e.g., "VoiceQuote", "Playa Bowls Expansion")
+- All workspace members share:
+  - PKV subset scoped to that workspace
+  - OSQR's summaries, insights, and project structure
+  - Chat threads scoped to the workspace
+- No presence indicators. No live features. Purely asynchronous.
+
+### Collaboration Phase 2 — Live OSQR Co-Sessions (Real-time)
+
+- Users can start a "Live Session" inside a workspace
+- OSQR mediates the session:
+  - Recognizes multiple humans present
+  - References each person's past notes, goals, conversations, and PKV contributions
+  - Facilitates shared problem-solving
+- Both users see:
+  - The same chat feed
+  - The same document references
+  - The same reasoning context
+- Supports commands like:
+  - `@osqr refine this idea`
+  - `@teammate review this part`
+
+### Collaboration Phase 3 — Light Presence + Minimal Messaging (Optional, Scoped)
+
+- Only shows presence **inside shared workspaces** ("Israel is active in VoiceQuote workspace")
+- OSQR may prompt:
+  - "Both of you are active — start a session together?"
+- Minimal messaging sidebar:
+  - Not a social network
+  - Not a global DM system
+  - Only for workspace collaborators
+- No discovery, no feed, no friends list
+
+### NOT Planned
+
+- ❌ No global chat system
+- ❌ No friend graph
+- ❌ No public posting
+- ❌ No social timelines
+- ❌ No open messaging between strangers
+
+### PKV Sharing Complexity (To Be Defined)
+
+When implementing, we'll need to solve:
+
+- What happens when a user leaves a workspace? (Data ownership, export rights)
+- Who owns synthesized insights from collaborative sessions?
+- Privacy boundaries between personal PKV and shared workspace PKV
+- How do we handle conflicting privacy tiers between collaborators?
+- Can users "un-share" previously shared knowledge?
+
+*Note: These questions may be clearer by the time we're ready to build this. Document decisions as they emerge.*
+
+### Monetization Note
+
+Collaboration features naturally unlock a **Team tier** ($XX/month/seat). Pricing TBD based on market conditions at time of development.
 
 ---
 

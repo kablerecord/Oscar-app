@@ -6,13 +6,14 @@
     "node": ">=20.9.0"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "npx prisma migrate dev && npm run db:seed",
     "index-knowledge": "tsx scripts/index-knowledge.ts",
+    "index-osqr-self": "tsx scripts/index-osqr-self.ts",
     "seed-msc": "tsx scripts/seed-msc.ts"
   },
   "prisma": {
@@ -21,6 +22,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.0",
     "@auth/prisma-adapter": "^2.11.1",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "6.19.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { Send, Brain, Loader2, ChevronDown, ChevronUp, Zap, Lightbulb, GraduationCap, PanelRight, X } from 'lucide-react'
-import { ProfileQuestionModal } from '@/components/profile/ProfileQuestionModal'
+import { CompanionBubble } from '@/components/oscar/CompanionBubble'
 import { ShareActions } from '@/components/share/ShareActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
@@ -459,8 +459,8 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
         />
       )}
 
-      {/* Profile Question Modal */}
-      <ProfileQuestionModal
+      {/* OSQR Companion Bubble */}
+      <CompanionBubble
         isOpen={showProfileQuestion}
         question={currentQuestion}
         answeredCount={answeredQuestionIds.length}

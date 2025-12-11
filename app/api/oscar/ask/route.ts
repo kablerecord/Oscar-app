@@ -7,6 +7,13 @@ import { checkRateLimit, recordRequest } from '@/lib/security'
 import { getServerSession } from 'next-auth'
 import { parseArtifacts } from '@/lib/artifacts'
 import { indexConversation, indexArtifact, indexInBackground } from '@/lib/knowledge/auto-index'
+import { assembleContext, parseSystemMode } from '@/lib/context/auto-context'
+import { extractMSCUpdates, mightContainMSCContent, formatSuggestionsForChat } from '@/lib/msc/auto-updater'
+import { updateIdentityFromConversation } from '@/lib/identity/dimensions'
+import { trackConversation, getTILContext } from '@/lib/til'
+import { isPlanningRequest, extractPlanParams, generatePlan90, formatPlanForChat } from '@/lib/til/planner'
+import { isAuditRequest, extractAuditParams, runSelfAudit, formatAuditForChat } from '@/lib/til/self-audit'
+import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
 
 const RequestSchema = z.object({
   message: z.string().min(1),
@@ -14,6 +21,7 @@ const RequestSchema = z.object({
   useKnowledge: z.boolean().default(true),
   includeDebate: z.boolean().default(false), // Debug mode to see panel discussion
   mode: z.enum(['quick', 'thoughtful', 'contemplate']).default('thoughtful'), // Response complexity mode
+  systemMode: z.boolean().optional(), // Explicit system mode (restrict to OSQR docs only)
 })
 
 // Helper to get client IP
@@ -52,7 +60,7 @@ export async function POST(req: NextRequest) {
       userId,
       ip,
       endpoint: 'oscar/ask',
-      tier: 'free', // TODO: Get user's actual tier from database
+      tier: 'pro', // TODO: Get user's actual tier from database
     })
 
     if (!rateLimitResult.allowed) {
@@ -80,7 +88,188 @@ export async function POST(req: NextRequest) {
     await recordRequest({ userId, ip, endpoint: 'oscar/ask' })
 
     const body = await req.json()
-    const { message, workspaceId, useKnowledge, includeDebate, mode } = RequestSchema.parse(body)
+    const { message: rawMessage, workspaceId, useKnowledge, includeDebate, mode, systemMode: explicitSystemMode } = RequestSchema.parse(body)
+
+    // SYSTEM MODE: Check for /system prefix or explicit toggle
+    // This restricts context to OSQR system docs only (architecture, roadmap, etc.)
+    const { systemMode: detectedSystemMode, cleanMessage } = parseSystemMode(rawMessage)
+    const systemMode = explicitSystemMode ?? detectedSystemMode
+    const message = cleanMessage
+
+    if (systemMode) {
+      console.log('[OSQR] System Mode active - restricting to OSQR system docs')
+    }
+
+    // ==========================================================================
+    // SAFETY CHECK: Detect crisis signals BEFORE any processing
+    // ==========================================================================
+    const safetyResult = performSafetyCheck(message)
+
+    if (!safetyResult.proceedWithNormalFlow) {
+      // Crisis detected - return empathetic response immediately
+      // DO NOT store this message (privacy protection)
+      console.log('[OSQR] Safety intervention triggered - crisis level:', safetyResult.crisis.level)
+
+      // Log safety event (metadata only, never content)
+      logSafetyEvent('crisis_detected', {
+        level: safetyResult.crisis.level,
+        confidence: safetyResult.crisis.confidence,
+      })
+
+      // Create a thread but mark it specially (for continuity if user responds)
+      const thread = await prisma.chatThread.create({
+        data: {
+          workspaceId,
+          title: 'Support Conversation',
+          mode: 'panel',
+        },
+      })
+
+      // DO NOT save the user's message content (crisis content never stored)
+      // Only save OSQR's supportive response
+      await prisma.chatMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'assistant',
+          provider: 'osqr-safety',
+          content: safetyResult.interventionResponse || '',
+          metadata: {
+            safetyIntervention: true,
+            // Never store: crisis level, signals, or any identifying info
+          },
+        },
+      })
+
+      return NextResponse.json({
+        answer: safetyResult.interventionResponse,
+        threadId: thread.id,
+        // Don't include routing info for safety responses
+        stored: false, // Signal to client that user message was not stored
+      })
+    }
+
+    // TIL-PLANNER: Check if this is a 90-day planning request
+    if (isPlanningRequest(message)) {
+      console.log('[OSQR] Detected planning request, routing to TIL Planner')
+
+      const planParams = extractPlanParams(message)
+      const plan = await generatePlan90({
+        workspaceId,
+        mode: planParams.mode || 'realistic',
+        targetRevenue: planParams.targetRevenue,
+        targetLaunchDate: planParams.targetLaunchDate,
+      })
+
+      const formattedPlan = formatPlanForChat(plan)
+
+      // Save as a thread
+      const thread = await prisma.chatThread.create({
+        data: {
+          workspaceId,
+          title: `90-Day Plan (${plan.metadata.mode})`,
+          mode: 'panel',
+        },
+      })
+
+      await prisma.chatMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'user',
+          content: message,
+        },
+      })
+
+      await prisma.chatMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'assistant',
+          provider: 'mixed',
+          content: formattedPlan,
+          metadata: {
+            isPlan90: true,
+            planMode: plan.metadata.mode,
+            confidence: plan.metadata.confidenceScore,
+            dataPoints: plan.metadata.dataPoints,
+          },
+        },
+      })
+
+      return NextResponse.json({
+        answer: formattedPlan,
+        threadId: thread.id,
+        routing: {
+          type: 'plan90',
+          mode: plan.metadata.mode,
+          confidence: plan.metadata.confidenceScore,
+        },
+        plan, // Include raw plan for UI rendering
+      })
+    }
+
+    // SELF-AUDIT: Check if this is a self-audit request (/audit, "audit yourself", etc.)
+    if (isAuditRequest(message)) {
+      console.log('[OSQR] Detected self-audit request, routing to Self-Audit System')
+
+      const auditParams = extractAuditParams(message)
+      const report = await runSelfAudit({
+        workspaceId,
+        auditType: auditParams.auditType || 'comprehensive',
+        focusArea: auditParams.focusArea,
+      })
+
+      const formattedReport = formatAuditForChat(report)
+
+      // Save as a thread
+      const thread = await prisma.chatThread.create({
+        data: {
+          workspaceId,
+          title: `Self-Audit (${report.metadata.auditType})`,
+          mode: 'panel',
+        },
+      })
+
+      await prisma.chatMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'user',
+          content: message,
+        },
+      })
+
+      await prisma.chatMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'assistant',
+          provider: 'mixed',
+          content: formattedReport,
+          metadata: {
+            isAudit: true,
+            auditType: report.metadata.auditType,
+            score: report.score,
+            findingsCount: report.findings.length,
+            systemDocsUsed: report.metadata.systemDocsUsed,
+          },
+        },
+      })
+
+      return NextResponse.json({
+        answer: formattedReport,
+        threadId: thread.id,
+        routing: {
+          type: 'self-audit',
+          auditType: report.metadata.auditType,
+          score: report.score,
+        },
+        report, // Include raw report for UI rendering
+      })
+    }
+
+    // Fetch workspace to get capability level for GKVI context
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { capabilityLevel: true },
+    })
+    const userLevel = workspace?.capabilityLevel ?? 0
 
     // Fetch active agents from database
     const agents = await prisma.agent.findMany({
@@ -109,41 +298,60 @@ export async function POST(req: NextRequest) {
       systemPrompt: agent.systemPrompt,
     }))
 
-    // Get RAG context if requested
-    let context: string | undefined
-    if (useKnowledge) {
-      const { searchKnowledge } = await import('@/lib/knowledge/search')
-      context = await searchKnowledge({
-        workspaceId,
-        query: message,
-        topK: 5,
-      })
+    // AUTO-CONTEXT (J-2): Assemble all relevant context automatically
+    // Includes: profile, MSC (goals/projects), knowledge search, recent threads
+    // In system mode, restricts to OSQR system docs only (skips user-specific context)
+    const autoContext = await assembleContext(workspaceId, message, {
+      includeProfile: true,
+      includeMSC: true,
+      includeKnowledge: useKnowledge,
+      includeThreads: true,
+      maxKnowledgeChunks: 5,
+      maxThreads: 3,
+      systemMode, // Restrict to OSQR docs only when active
+    })
+
+    // J-1 TIL: Add temporal intelligence insights to context
+    const tilContext = await getTILContext(workspaceId, message)
+    const contextParts = [autoContext.context]
+    if (tilContext) {
+      contextParts.push(tilContext)
+    }
+    const context = contextParts.filter(Boolean).join('\n\n---\n\n') || undefined
+
+    // Log what context sources were used
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[OSQR] Auto-context sources:', autoContext.sources)
+      if (tilContext) console.log('[OSQR] TIL context included')
     }
 
-    // Get user profile context
-    const { getProfileContext } = await import('@/lib/profile/context')
-    const profileContext = await getProfileContext(workspaceId)
-
-    // Combine profile with knowledge base context
-    if (profileContext) {
-      context = context
-        ? `${context}\n\n--- User Profile ---\n${profileContext}`
-        : `--- User Profile ---\n${profileContext}`
-    }
-
-    // Ask OSQR
+    // Ask OSQR with user's capability level for GKVI context
     const osqrRequest: OSQRRequest = {
       userMessage: message,
       panelAgents,
       context,
       includeDebate,
       mode,
+      userLevel, // Pass capability level for level-aware GKVI context
     }
 
     const response = await OSQR.ask(osqrRequest)
 
+    // ==========================================================================
+    // SAFETY POST-PROCESSING: Wrap refusals and add disclaimers
+    // ==========================================================================
+    const safetyProcessed = processSafetyResponse(response.answer, message)
+    const processedAnswer = safetyProcessed.content
+
+    if (safetyProcessed.wasModified) {
+      logSafetyEvent(
+        safetyProcessed.content.includes("I can't help") ? 'refusal_wrapped' : 'disclaimer_added',
+        { timestamp: new Date() }
+      )
+    }
+
     // Parse artifacts from OSQR's response
-    const parsedResponse = parseArtifacts(response.answer)
+    const parsedResponse = parseArtifacts(processedAnswer)
     const { text: cleanAnswer, artifacts } = parsedResponse
 
     // Save conversation to database
@@ -176,6 +384,8 @@ export async function POST(req: NextRequest) {
           hadDebate: !!response.panelDiscussion,
           usedKnowledge: useKnowledge && !!context,
           hasArtifacts: artifacts.length > 0,
+          // J-2: Track auto-context sources
+          contextSources: autoContext.sources,
         },
       },
     })
@@ -222,6 +432,38 @@ export async function POST(req: NextRequest) {
           type: artifact.type,
           description: artifact.description,
         })
+      }
+
+      // J-8: MSC Auto-Update - Extract goals/projects/ideas from conversation
+      // Only run extraction if conversation might contain MSC-relevant content
+      if (mightContainMSCContent(message) || mightContainMSCContent(cleanAnswer)) {
+        try {
+          const mscResult = await extractMSCUpdates(workspaceId, message, cleanAnswer)
+          if (mscResult.extractions.length > 0) {
+            console.log('[MSC Auto-Update] Found extractions:', mscResult.extractions.length)
+            // For now, just log - we'll add UI for suggestions later
+            // In future: store suggestions for user review
+          }
+        } catch (error) {
+          console.error('[MSC Auto-Update] Extraction error:', error)
+        }
+      }
+
+      // J-7: Identity Learning - Update identity dimensions from conversation
+      try {
+        await updateIdentityFromConversation(workspaceId, {
+          userMessage: message,
+          osqrResponse: cleanAnswer,
+        })
+      } catch (error) {
+        console.error('[Identity Learning] Update error:', error)
+      }
+
+      // J-1: TIL Session Tracking - Track conversation for temporal intelligence
+      try {
+        await trackConversation(workspaceId, message, cleanAnswer)
+      } catch (error) {
+        console.error('[TIL] Session tracking error:', error)
       }
     })
 
@@ -273,6 +515,10 @@ export async function POST(req: NextRequest) {
         threadId: thread.id,
         panelDiscussion: response.panelDiscussion,
         roundtableDiscussion: response.roundtableDiscussion,
+        // New routing metadata - "OSQR knows when to think"
+        routing: response.routing,
+        // J-2: Auto-context sources used
+        contextSources: autoContext.sources,
       },
       {
         headers: {

@@ -1,11 +1,14 @@
 import { prisma } from '../db/prisma'
 import { vectorSearch, hybridSearch } from './vector-search'
 
+type KnowledgeScope = 'all' | 'system' | 'user'
+
 interface SearchOptions {
   workspaceId: string
   query: string
   topK?: number
   useVectorSearch?: boolean // Default true if embeddings available
+  scope?: KnowledgeScope // Filter by system (OSQR) vs user knowledge
 }
 
 interface SearchResult {
@@ -15,13 +18,50 @@ interface SearchResult {
 }
 
 /**
+ * Detect if a query is asking about OSQR itself
+ */
+function isOSQRSystemQuery(query: string): boolean {
+  const systemPatterns = [
+    /osqr/i,
+    /jarvis/i,
+    /roadmap/i,
+    /architecture/i,
+    /how does.*work/i,
+    /where is.*defined/i,
+    /what (file|module|function)/i,
+    /implementation/i,
+    /capability|capabilities/i,
+    /til|temporal intelligence/i,
+    /msc|mission/i,
+    /auto.?context/i,
+    /panel|agent/i,
+    /knowledge.?base/i,
+    /identity.?dimension/i,
+    /autonomy/i,
+  ]
+  return systemPatterns.some((pattern) => pattern.test(query))
+}
+
+/**
  * Search knowledge base for relevant content
  *
  * Uses vector search (semantic) when embeddings are available,
  * falls back to keyword search otherwise.
+ *
+ * Intelligently routes queries:
+ * - OSQR-related questions -> prefer system scope
+ * - User questions -> prefer user scope
+ * - Ambiguous -> search all
  */
 export async function searchKnowledge(options: SearchOptions): Promise<string | undefined> {
   const { workspaceId, query, topK = 5, useVectorSearch = true } = options
+
+  // Auto-detect scope if not specified
+  let scope = options.scope || 'all'
+  if (!options.scope && isOSQRSystemQuery(query)) {
+    scope = 'system'
+    console.log('[Search] Auto-detected OSQR system query, preferring system docs')
+  }
 
   // Check if we have any embeddings
   if (useVectorSearch) {
@@ -45,7 +85,34 @@ export async function searchKnowledge(options: SearchOptions): Promise<string | 
 
   // Fall back to keyword search
   console.log('[Search] Using keyword search')
-  return await keywordSearch({ workspaceId, query, topK })
+  return await keywordSearch({ workspaceId, query, topK, scope })
+}
+
+/**
+ * Build scope filter for Prisma queries
+ */
+function buildScopeFilter(scope: KnowledgeScope): object | undefined {
+  if (scope === 'system') {
+    // Only OSQR system docs (indexed by index-osqr-self)
+    return {
+      metadata: {
+        path: ['scope'],
+        equals: 'system',
+      },
+    }
+  }
+  if (scope === 'user') {
+    // Only user docs (not system)
+    return {
+      NOT: {
+        metadata: {
+          path: ['scope'],
+          equals: 'system',
+        },
+      },
+    }
+  }
+  return undefined // No filter for 'all'
 }
 
 /**
@@ -55,8 +122,9 @@ async function keywordSearch(options: {
   workspaceId: string
   query: string
   topK: number
+  scope: KnowledgeScope
 }): Promise<string | undefined> {
-  const { workspaceId, query, topK } = options
+  const { workspaceId, query, topK, scope } = options
 
   // Extract keywords from query
   const keywords = query
@@ -70,12 +138,17 @@ async function keywordSearch(options: {
     return undefined
   }
 
+  // Build document filter with scope
+  const scopeFilter = buildScopeFilter(scope)
+  const documentFilter: Record<string, unknown> = { workspaceId }
+  if (scopeFilter) {
+    Object.assign(documentFilter, scopeFilter)
+  }
+
   // Search for chunks containing keywords
   const chunks = await prisma.documentChunk.findMany({
     where: {
-      document: {
-        workspaceId,
-      },
+      document: documentFilter,
       OR: keywords.map(keyword => ({
         content: {
           contains: keyword,
@@ -88,6 +161,7 @@ async function keywordSearch(options: {
         select: {
           title: true,
           originalFilename: true,
+          metadata: true,
         },
       },
     },
@@ -106,19 +180,29 @@ async function keywordSearch(options: {
         contentLower.includes(keyword)
       ).length
 
+      // Get metadata for better source display
+      const metadata = chunk.document.metadata as Record<string, unknown> | null
+      const isSystem = metadata?.scope === 'system'
+      const sourcePath = metadata?.osqr_source_path as string | undefined
+
       return {
         content: chunk.content,
         documentTitle: chunk.document.originalFilename || chunk.document.title,
+        sourcePath,
+        isSystem,
         score: matchCount,
       }
     })
     .sort((a, b) => b.score - a.score)
     .slice(0, topK)
 
-  // Format context
+  // Format context with better source info
   const context = rankedChunks
     .map((result, idx) => {
-      return `[Source ${idx + 1}: ${result.documentTitle}]\n${result.content}`
+      const sourceLabel = result.isSystem
+        ? `[OSQR: ${result.sourcePath || result.documentTitle}]`
+        : `[Source ${idx + 1}: ${result.documentTitle}]`
+      return `${sourceLabel}\n${result.content}`
     })
     .join('\n\n---\n\n')
 
