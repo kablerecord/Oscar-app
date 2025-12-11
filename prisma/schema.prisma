@@ -323,13 +323,12 @@ model AccessCode {
   id          String    @id @default(cuid())
   code        String    @unique
   label       String?   // Who this code is for (e.g., "Jesse", "Mom")
-  isUsed      Boolean   @default(false)
-  usedBy      String?   // Email of user who used it
-  usedAt      DateTime?
+  maxUses     Int       @default(1)    // How many times this code can be used
+  useCount    Int       @default(0)    // How many times it's been used
+  usedBy      String[]  // Emails of users who used it (array for multi-use codes)
   createdAt   DateTime  @default(now())
 
   @@index([code])
-  @@index([isUsed])
 }
 
 // Background Tasks (J-3)

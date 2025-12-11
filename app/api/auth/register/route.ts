@@ -32,9 +32,9 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      if (validatedCode.isUsed) {
+      if (validatedCode.useCount >= validatedCode.maxUses) {
         return NextResponse.json(
-          { error: 'This access code has already been used' },
+          { error: 'This access code has reached its usage limit' },
           { status: 400 }
         )
       }
@@ -120,14 +120,13 @@ export async function POST(req: NextRequest) {
       })),
     })
 
-    // Mark access code as used if one was provided
+    // Increment access code usage if one was provided
     if (validatedCode) {
       await prisma.accessCode.update({
         where: { id: validatedCode.id },
         data: {
-          isUsed: true,
-          usedBy: email,
-          usedAt: new Date(),
+          useCount: { increment: 1 },
+          usedBy: { push: email },
         },
       })
     }

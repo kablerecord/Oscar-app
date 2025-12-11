@@ -29,17 +29,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (accessCode.isUsed) {
+    if (accessCode.useCount >= accessCode.maxUses) {
       return NextResponse.json(
-        { valid: false, error: 'This access code has already been used' },
+        { valid: false, error: 'This access code has reached its usage limit' },
         { status: 400 }
       )
     }
 
-    // Code is valid and unused
+    // Code is valid and has uses remaining
     return NextResponse.json({
       valid: true,
       code: accessCode.code,
+      usesRemaining: accessCode.maxUses - accessCode.useCount,
     })
   } catch (error) {
     console.error('Access code validation error:', error)
