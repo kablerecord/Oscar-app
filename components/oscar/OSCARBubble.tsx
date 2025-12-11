@@ -194,7 +194,7 @@ export function OSCARBubble({
     return (
       <button
         onClick={handlePillClick}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2.5 text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl animate-subtle-pulse"
+        className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 px-4 py-2.5 text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl animate-subtle-pulse"
       >
         <MessageCircle className="h-4 w-4" />
         <span className="text-sm font-medium">
@@ -398,8 +398,9 @@ export function OSCARBubble({
   }
 
   // Normal corner bubble mode (after onboarding)
+  // Positioned higher on mobile to avoid browser navigation bars
   return (
-    <div className="fixed bottom-6 right-6 z-50 w-[380px] animate-in slide-in-from-bottom-4 fade-in duration-300">
+    <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[380px] max-w-[380px] animate-in slide-in-from-bottom-4 fade-in duration-300">
       <div className="relative overflow-hidden rounded-[28px] bg-slate-900 shadow-xl shadow-blue-500/10 border border-slate-700/50">
         {/* Animated background blobs */}
         <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />

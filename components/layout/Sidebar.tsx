@@ -20,10 +20,12 @@ import {
   Calendar,
   ChevronRight,
   Clock,
+  X,
 } from 'lucide-react'
 
 interface SidebarProps {
   workspaceId?: string
+  onClose?: () => void
 }
 
 interface QuickStats {
@@ -79,7 +81,7 @@ const navigation = [
   },
 ]
 
-export function Sidebar({ workspaceId }: SidebarProps) {
+export function Sidebar({ workspaceId, onClose }: SidebarProps) {
   const pathname = usePathname()
   const [quickStats, setQuickStats] = useState<QuickStats | null>(null)
   const [recentThreads, setRecentThreads] = useState<RecentThread[]>([])
@@ -139,8 +141,8 @@ export function Sidebar({ workspaceId }: SidebarProps) {
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
       <div className="flex h-full flex-col">
         {/* Logo / App Name */}
-        <div className="flex h-16 items-center border-b border-slate-700/50 px-6">
-          <Link href="/panel" className="flex items-center space-x-3 group">
+        <div className="flex h-16 items-center justify-between border-b border-slate-700/50 px-6">
+          <Link href="/panel" className="flex items-center space-x-3 group" onClick={onClose}>
             <div className="relative">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 ring-1 ring-blue-500/30 group-hover:ring-blue-500/50 transition-all">
                 <Brain className="h-5 w-5 text-blue-400" />
@@ -151,6 +153,15 @@ export function Sidebar({ workspaceId }: SidebarProps) {
               OSQR
             </span>
           </Link>
+          {/* Close button - only visible on mobile */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="lg:hidden p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
 
         {/* Navigation */}

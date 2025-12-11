@@ -21,7 +21,7 @@ export function VaultStats({ totalDocuments, totalChunks, sourceBreakdown }: Vau
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
       <Card className="p-4">
         <div className="flex items-center space-x-3">
           <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900/20">
@@ -50,7 +50,7 @@ export function VaultStats({ totalDocuments, totalChunks, sourceBreakdown }: Vau
         </div>
       </Card>
 
-      <Card className="col-span-2 p-4">
+      <Card className="col-span-2 lg:col-span-2 p-4">
         <div className="flex items-center space-x-3 mb-3">
           <div className="rounded-lg bg-purple-100 p-2 dark:bg-purple-900/20">
             <Database className="h-5 w-5 text-purple-600 dark:text-purple-400" />

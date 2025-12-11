@@ -1467,8 +1467,8 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
         {/* Input area */}
         <div className="mt-4 space-y-3">
           {/* Response Mode Buttons with visual state indicators */}
-          <div className="flex items-center space-x-3">
-            <span className="text-sm font-medium text-slate-400">Mode:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <span className="hidden sm:block text-sm font-medium text-slate-400">Mode:</span>
             <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
               <button
                 onClick={() => {
@@ -1476,14 +1476,14 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
                   setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'quick' }))
                 }}
                 disabled={isLoading}
-                className={`group relative flex items-center space-x-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
                   responseMode === 'quick'
                     ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                 } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Zap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'quick' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                <span>Quick</span>
+                <span className="hidden sm:inline">Quick</span>
                 {responseMode === 'quick' && (
                   <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -1497,14 +1497,14 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
                   setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'thoughtful' }))
                 }}
                 disabled={isLoading}
-                className={`group relative flex items-center space-x-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
                   responseMode === 'thoughtful'
                     ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                 } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <Lightbulb className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'thoughtful' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                <span>Thoughtful</span>
+                <span className="hidden sm:inline">Thoughtful</span>
                 {responseMode === 'thoughtful' && (
                   <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -1518,14 +1518,14 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
                   setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'contemplate' }))
                 }}
                 disabled={isLoading}
-                className={`group relative flex items-center space-x-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
                   responseMode === 'contemplate'
                     ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                 } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 <GraduationCap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'contemplate' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                <span>Contemplate</span>
+                <span className="hidden sm:inline">Contemplate</span>
                 {responseMode === 'contemplate' && (
                   <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
@@ -1535,8 +1535,8 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
               </button>
             </div>
 
-            {/* Mode description with visual indicator */}
-            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+            {/* Mode description with visual indicator - hidden on smallest screens */}
+            <div className={`hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-all duration-300 ${
               responseMode === 'quick' ? 'bg-amber-500/10 text-amber-400' :
               responseMode === 'thoughtful' ? 'bg-blue-500/10 text-blue-400' :
               'bg-purple-500/10 text-purple-400'
@@ -1608,8 +1608,8 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
             </div>
           )}
 
-          {/* Options */}
-          <div className="flex items-center justify-between text-sm">
+          {/* Options - hidden on mobile to reduce clutter */}
+          <div className="hidden sm:flex items-center justify-between text-sm">
             <div className="flex items-center space-x-4">
               <label className="flex items-center space-x-2 cursor-pointer group">
                 <input
@@ -1636,7 +1636,7 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
           </div>
 
           {/* Input */}
-          <div className="flex space-x-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Textarea
               placeholder={
                 chatStage === 'refined'
@@ -1646,18 +1646,18 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              rows={3}
+              rows={2}
               disabled={isLoading || (chatStage === 'refined' && !refineResult?.readyToFire)}
-              className="flex-1"
+              className="flex-1 min-h-[60px] sm:min-h-[80px]"
             />
-            <div className="flex flex-col gap-2">
+            <div className="flex sm:flex-col gap-2">
               {responseMode === 'quick' ? (
                 // Quick mode: Direct fire
                 <Button
                   onClick={() => handleGatekeeper()}
                   disabled={isLoading || !input.trim()}
                   size="lg"
-                  className="px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                  className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
                 >
                   {isLoading ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
@@ -1674,7 +1674,7 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
                   onClick={handleGatekeeper}
                   disabled={isLoading || !input.trim() || chatStage === 'refined' || chatStage === 'gatekeeper-prompt'}
                   size="lg"
-                  className="px-6"
+                  className="flex-1 sm:flex-initial px-4 sm:px-6"
                 >
                   {isLoading && (chatStage === 'refining' || chatStage === 'gating') ? (
                     <Loader2 className="h-5 w-5 animate-spin" />
