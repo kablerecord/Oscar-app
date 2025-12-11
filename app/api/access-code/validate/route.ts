@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db/prisma'
+
+export async function POST(req: NextRequest) {
+  try {
+    const { code } = await req.json()
+
+    if (!code) {
+      return NextResponse.json(
+        { valid: false, error: 'Access code is required' },
+        { status: 400 }
+      )
+    }
+
+    // Look up the code (case-insensitive)
+    const accessCode = await prisma.accessCode.findFirst({
+      where: {
+        code: {
+          equals: code.toLowerCase().trim(),
+          mode: 'insensitive',
+        },
+      },
+    })
+
+    if (!accessCode) {
+      return NextResponse.json(
+        { valid: false, error: 'Invalid access code' },
+        { status: 404 }
+      )
+    }
+
+    if (accessCode.isUsed) {
+      return NextResponse.json(
+        { valid: false, error: 'This access code has already been used' },
+        { status: 400 }
+      )
+    }
+
+    // Code is valid and unused
+    return NextResponse.json({
+      valid: true,
+      code: accessCode.code,
+    })
+  } catch (error) {
+    console.error('Access code validation error:', error)
+    return NextResponse.json(
+      { valid: false, error: 'Failed to validate access code' },
+      { status: 500 }
+    )
+  }
+}

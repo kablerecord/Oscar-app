@@ -15,10 +15,16 @@ function SignupForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [isEarlyAccess, setIsEarlyAccess] = useState(false)
+  const [accessCode, setAccessCode] = useState<string | null>(null)
 
   useEffect(() => {
-    // Check if user came through early access
+    // Check if user came through early access with a code
     if (searchParams.get('early_access') === 'true') {
+      setIsEarlyAccess(true)
+    }
+    const code = searchParams.get('code')
+    if (code) {
+      setAccessCode(code)
       setIsEarlyAccess(true)
     }
   }, [searchParams])
@@ -44,7 +50,7 @@ function SignupForm() {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name, accessCode }),
       })
 
       const data = await res.json()

@@ -4,13 +4,40 @@ import bcrypt from 'bcryptjs'
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name } = await req.json()
+    const { email, password, name, accessCode } = await req.json()
 
     if (!email || !password) {
       return NextResponse.json(
         { error: 'Email and password are required' },
         { status: 400 }
       )
+    }
+
+    // If access code provided, validate it
+    let validatedCode = null
+    if (accessCode) {
+      validatedCode = await prisma.accessCode.findFirst({
+        where: {
+          code: {
+            equals: accessCode.toLowerCase().trim(),
+            mode: 'insensitive',
+          },
+        },
+      })
+
+      if (!validatedCode) {
+        return NextResponse.json(
+          { error: 'Invalid access code' },
+          { status: 400 }
+        )
+      }
+
+      if (validatedCode.isUsed) {
+        return NextResponse.json(
+          { error: 'This access code has already been used' },
+          { status: 400 }
+        )
+      }
     }
 
     // Check if user already exists
@@ -92,6 +119,18 @@ export async function POST(req: NextRequest) {
         workspaceId: workspace.id,
       })),
     })
+
+    // Mark access code as used if one was provided
+    if (validatedCode) {
+      await prisma.accessCode.update({
+        where: { id: validatedCode.id },
+        data: {
+          isUsed: true,
+          usedBy: email,
+          usedAt: new Date(),
+        },
+      })
+    }
 
     return NextResponse.json({
       success: true,

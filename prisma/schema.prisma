@@ -318,6 +318,20 @@ model MSCCategory {
   @@index([workspaceId])
 }
 
+// Access Codes for early access signup
+model AccessCode {
+  id          String    @id @default(cuid())
+  code        String    @unique
+  label       String?   // Who this code is for (e.g., "Jesse", "Mom")
+  isUsed      Boolean   @default(false)
+  usedBy      String?   // Email of user who used it
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([code])
+  @@index([isUsed])
+}
+
 // Background Tasks (J-3)
 model BackgroundTask {
   id           String    @id @default(cuid())
