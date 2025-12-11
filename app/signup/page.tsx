@@ -15,7 +15,7 @@ function SignupForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [isEarlyAccess, setIsEarlyAccess] = useState(false)
-  const [accessCode, setAccessCode] = useState<string | null>(null)
+  const [accessCode, setAccessCode] = useState('')
 
   useEffect(() => {
     // Check if user came through early access with a code
@@ -166,6 +166,24 @@ function SignupForm() {
                 className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="••••••••"
               />
+            </div>
+
+            <div>
+              <label htmlFor="accessCode" className="block text-sm font-medium text-slate-300 mb-2">
+                Access Code <span className="text-slate-500">(required during early access)</span>
+              </label>
+              <input
+                id="accessCode"
+                type="text"
+                value={accessCode}
+                onChange={(e) => setAccessCode(e.target.value)}
+                required
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Enter your access code"
+              />
+              {isEarlyAccess && accessCode && (
+                <p className="mt-1 text-xs text-emerald-400">Access code pre-filled from your invite link</p>
+              )}
             </div>
 
             <button

@@ -13,7 +13,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // If access code provided, validate it
+    // During early access, require an access code
+    if (!accessCode) {
+      return NextResponse.json(
+        { error: 'An access code is required during early access. Please request one or use an existing code.' },
+        { status: 400 }
+      )
+    }
+
+    // Validate the access code
     let validatedCode = null
     if (accessCode) {
       validatedCode = await prisma.accessCode.findFirst({

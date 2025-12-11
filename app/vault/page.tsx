@@ -3,13 +3,26 @@ import { VaultStats } from '@/components/vault/VaultStats'
 import { DocumentList } from '@/components/vault/DocumentList'
 import { VaultPageClient } from '@/components/vault/VaultPageClient'
 import { prisma } from '@/lib/db/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
+import { redirect } from 'next/navigation'
 
 // Prevent static generation at build time - this page needs database access
 export const dynamic = 'force-dynamic'
 
 export default async function VaultPage() {
-  // Get the first workspace (for single-user MVP)
+  // Get the logged-in user's session
+  const session = await getServerSession(authOptions)
+
+  if (!session?.user?.id) {
+    redirect('/login')
+  }
+
+  // Get the workspace owned by the logged-in user
   const workspace = await prisma.workspace.findFirst({
+    where: {
+      ownerId: session.user.id,
+    },
     include: {
       owner: true,
     },

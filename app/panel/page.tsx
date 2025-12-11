@@ -1,6 +1,9 @@
 import { MainLayout } from '@/components/layout/MainLayout'
 import { RefineFireChat } from '@/components/oscar/RefineFireChat'
 import { prisma } from '@/lib/db/prisma'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth/config'
+import { redirect } from 'next/navigation'
 
 // Prevent static generation at build time - this page needs database access
 export const dynamic = 'force-dynamic'
@@ -13,8 +16,18 @@ export const dynamic = 'force-dynamic'
  * and guide them through their first interaction - all conversationally.
  */
 export default async function PanelPage() {
-  // Get the first workspace (for single-user MVP)
+  // Get the logged-in user's session
+  const session = await getServerSession(authOptions)
+
+  if (!session?.user?.id) {
+    redirect('/login')
+  }
+
+  // Get the workspace owned by the logged-in user
   const workspace = await prisma.workspace.findFirst({
+    where: {
+      ownerId: session.user.id,
+    },
     include: {
       owner: true,
     },
@@ -54,7 +67,7 @@ export default async function PanelPage() {
           </p>
         </div>
 
-        <RefineFireChat workspaceId={workspace.id} />
+        <RefineFireChat workspaceId={workspace.id} onboardingCompleted={workspace.onboardingCompleted} />
       </div>
     </MainLayout>
   )

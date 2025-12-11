@@ -132,10 +132,12 @@ export const OSCAR_MESSAGES: Record<OnboardingStage, {
   },
 
   invite_first_question: {
-    message: "You're all set! Type your first question in the box above and hit 'Fire'.",
-    subMessage: "Try asking about something you're actually working on. I work best with real problems.",
-    inputType: 'none',
-    nextStage: 'first_question_asked',
+    greeting: "You're all set!",
+    message: "Let's try it out. I'll step aside so you can ask your first question.",
+    subMessage: "Type something you're actually working on in the chat — I work best with real problems.",
+    inputType: 'choice',
+    choices: ["Let's go!"],
+    nextStage: 'idle',
   },
 
   first_question_asked: {

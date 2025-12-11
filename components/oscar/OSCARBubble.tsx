@@ -181,8 +181,14 @@ export function OSCARBubble({
   const showInput = content.inputType !== 'none'
   const hasUnansweredQuestions = answeredCount < totalQuestions
 
-  // Show minimized pill when closed or minimized
-  if (!isOpen || isMinimized) {
+  // Check if this is a "hero" stage (welcome, explain_purpose, explain_how)
+  const isHeroStage = ['welcome', 'explain_purpose', 'explain_how'].includes(onboardingState.stage)
+
+  // Determine if we should show the full-screen onboarding takeover
+  const isOnboardingTakeover = isOnboarding && ['welcome', 'explain_purpose', 'explain_how', 'ask_ready', 'get_name', 'get_working_on', 'get_challenge', 'explain_modes', 'invite_first_question'].includes(onboardingState.stage)
+
+  // Show minimized pill when closed or minimized (but NEVER during onboarding takeover)
+  if ((!isOpen || isMinimized) && !isOnboardingTakeover) {
     if (!alwaysVisible && !isOnboarding) return null
 
     return (
@@ -201,9 +207,197 @@ export function OSCARBubble({
     )
   }
 
-  // Check if this is a "hero" stage (welcome, explain_purpose, explain_how)
-  const isHeroStage = ['welcome', 'explain_purpose', 'explain_how'].includes(onboardingState.stage)
+  // Full-screen onboarding takeover mode
+  if (isOnboardingTakeover) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/95 backdrop-blur-sm animate-in fade-in duration-500">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+          <div className="absolute top-1/2 right-1/3 w-64 h-64 bg-cyan-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        </div>
 
+        {/* Main content card */}
+        <div className="relative w-full max-w-md mx-4 animate-in slide-in-from-bottom-8 duration-700">
+          <div className="relative overflow-hidden rounded-3xl bg-slate-900/90 shadow-2xl shadow-blue-500/10 border border-slate-700/50 backdrop-blur-xl">
+            {/* Animated background blobs inside card */}
+            <div className="absolute -top-10 -right-10 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />
+            <div className="absolute -bottom-10 -left-10 w-28 h-28 bg-purple-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
+
+            {/* Chat content */}
+            <div className="relative px-8 py-10">
+              {/* Hero stages - centered with brain icon */}
+              {isHeroStage ? (
+                <div className="flex flex-col items-center text-center animate-in fade-in duration-500">
+                  {/* Brain icon with glow */}
+                  {content.showBrain && (
+                    <div className="relative mb-6">
+                      <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-500/10 ring-1 ring-blue-500/20 animate-pulse-glow">
+                        <Brain className="h-10 w-10 text-blue-400" />
+                      </div>
+                      <Sparkles className="absolute -right-1 -top-1 h-5 w-5 text-blue-400" />
+                    </div>
+                  )}
+
+                  {/* Greeting */}
+                  {content.greeting && (
+                    <p className="text-base text-slate-400 mb-2">{content.greeting}</p>
+                  )}
+
+                  {/* Main message */}
+                  <h3 className="mb-3 text-2xl font-bold text-white leading-tight">
+                    {onboardingState.stage === 'welcome' ? (
+                      <>I'm <span className="shimmer-text">OSQR</span> — your AI thinking partner.</>
+                    ) : (
+                      content.message
+                    )}
+                  </h3>
+
+                  {/* Sub message */}
+                  {content.subMessage && (
+                    <p className="text-base text-slate-400 leading-relaxed mb-6 max-w-sm">
+                      {content.subMessage}
+                    </p>
+                  )}
+
+                  {/* Choice buttons */}
+                  {content.choices && content.choices.length > 0 && (
+                    <div className="w-full space-y-3 max-w-xs">
+                      {content.choices.map((choice) => (
+                        <button
+                          key={choice}
+                          onClick={() => handleChoiceSelect(choice)}
+                          disabled={isSubmitting}
+                          className="w-full rounded-xl px-6 py-4 text-base font-medium bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02]"
+                        >
+                          {choice}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Regular onboarding stages - conversation style */
+                <>
+                  {/* OSQR's message */}
+                  <div className="mb-6 animate-in fade-in duration-500 text-center">
+                    {content.greeting && (
+                      <p className="text-lg font-medium text-white mb-2">
+                        {content.greeting}
+                      </p>
+                    )}
+                    <p className="text-base text-slate-300 leading-relaxed">
+                      {content.message}
+                    </p>
+                    {content.subMessage && (
+                      <p className="mt-3 text-sm text-slate-400 leading-relaxed whitespace-pre-line">
+                        {content.subMessage}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Input area */}
+                  {showInput && (
+                    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      {content.inputType === 'choice' && content.choices ? (
+                        // Choice buttons
+                        <div className="space-y-3 mb-4">
+                          {content.choices.map((choice) => (
+                            <button
+                              key={choice}
+                              onClick={() => handleChoiceSelect(choice)}
+                              disabled={isSubmitting}
+                              className={`w-full rounded-xl px-5 py-3.5 text-left text-base transition-all ${
+                                answer === choice
+                                  ? 'bg-blue-500 text-white'
+                                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-700'
+                              }`}
+                            >
+                              {choice}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        // Text input
+                        <div className="relative mb-4">
+                          <Textarea
+                            value={answer}
+                            onChange={(e) => setAnswer(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Type your answer..."
+                            rows={2}
+                            disabled={isSubmitting}
+                            className="pr-12 resize-none rounded-xl border-slate-700 bg-slate-800 text-base text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500"
+                            autoFocus
+                          />
+                          {answer.trim() && (
+                            <button
+                              onClick={handleSubmit}
+                              disabled={isSubmitting}
+                              className="absolute bottom-3 right-3 rounded-full bg-blue-500 p-2 text-white transition-all hover:bg-blue-600 disabled:opacity-50"
+                            >
+                              <Send className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Skip option (only for certain stages) */}
+                      {['get_name', 'get_working_on', 'get_challenge'].includes(onboardingState.stage) && (
+                        <div className="flex items-center justify-center">
+                          <button
+                            onClick={handleSkip}
+                            disabled={isSubmitting}
+                            className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                          >
+                            Skip for now
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Auto-advancing indicator */}
+                  {currentMessage?.autoAdvanceDelay && !showInput && (
+                    <div className="flex items-center justify-center pt-2">
+                      <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <div className="flex space-x-1">
+                          <span className="h-2 w-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="h-2 w-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="h-2 w-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Progress indicator */}
+          <div className="flex justify-center mt-6 gap-2">
+            {['welcome', 'explain_purpose', 'explain_how', 'ask_ready', 'get_name', 'explain_modes', 'invite_first_question'].map((stage, index) => {
+              const completedStages = onboardingState.completedStages || []
+              const isCompleted = completedStages.includes(stage as OnboardingStage)
+              const isCurrent = onboardingState.stage === stage ||
+                (stage === 'get_name' && ['get_name', 'get_working_on', 'get_challenge'].includes(onboardingState.stage))
+              return (
+                <div
+                  key={stage}
+                  className={`h-1.5 rounded-full transition-all duration-300 ${
+                    isCompleted ? 'w-6 bg-blue-500' : isCurrent ? 'w-6 bg-blue-400 animate-pulse' : 'w-1.5 bg-slate-700'
+                  }`}
+                />
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Normal corner bubble mode (after onboarding)
   return (
     <div className="fixed bottom-6 right-6 z-50 w-[380px] animate-in slide-in-from-bottom-4 fade-in duration-300">
       <div className="relative overflow-hidden rounded-[28px] bg-slate-900 shadow-xl shadow-blue-500/10 border border-slate-700/50">

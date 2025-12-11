@@ -95,6 +95,7 @@ interface RefineResult {
 
 interface RefineFireChatProps {
   workspaceId: string
+  onboardingCompleted?: boolean
 }
 
 type ResponseMode = 'quick' | 'thoughtful' | 'contemplate'
@@ -281,7 +282,7 @@ function analyzeQuestionComplexity(question: string): ComplexityAnalysis {
   }
 }
 
-export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
+export function RefineFireChat({ workspaceId, onboardingCompleted = false }: RefineFireChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [chatStage, setChatStage] = useState<ChatStage>('input')
@@ -323,9 +324,31 @@ export function RefineFireChat({ workspaceId }: RefineFireChatProps) {
 
   // OSCAR bubble onboarding state
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => {
-    // TODO: Load from localStorage or API for persistence
+    // If onboarding is already completed in the database, skip to idle
+    if (onboardingCompleted) {
+      return {
+        ...getInitialOnboardingState(),
+        stage: 'idle',
+        hasAskedFirstQuestion: true,
+        completedStages: ['welcome', 'explain_purpose', 'explain_how', 'ask_ready', 'explain_modes', 'invite_first_question', 'post_first_answer'],
+      }
+    }
     return getInitialOnboardingState()
   })
+
+  // Save onboarding completion to database when user finishes the intro
+  useEffect(() => {
+    // Check if we just transitioned to 'idle' from an onboarding stage
+    // This means the user completed the onboarding flow
+    if (onboardingState.stage === 'idle' && !onboardingCompleted && onboardingState.completedStages.includes('invite_first_question')) {
+      // Mark onboarding as completed in the database
+      fetch('/api/workspace/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspaceId, completed: true }),
+      }).catch(err => console.error('Failed to save onboarding status:', err))
+    }
+  }, [onboardingState.stage, workspaceId, onboardingCompleted, onboardingState.completedStages])
 
   // Ref for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null)
