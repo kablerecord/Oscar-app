@@ -91,24 +91,14 @@ Write a summary that shows you understand this person and are excited to help th
       temperature: 0.8,
     })
 
-    // Append OSQR's signature and Kable's personal note
-    const personalNote = `
+    // Append OSQR's signature
+    const signature = `
 
 ---
 
-*— OSQR*
+*— OSQR*`
 
----
-
-**A note from Kable, OSQR's creator:**
-
-I built OSQR because I believe everyone deserves an AI that truly knows them—not just another chatbot that forgets you exist the moment the conversation ends. Your ideas, your context, your journey... they matter.
-
-Welcome to something different.
-
-*— Kable*`
-
-    const fullSummary = summaryResponse + personalNote
+    const fullSummary = summaryResponse + signature
 
     // Generate specific action suggestions
     const suggestionsResponse = await gptProvider.generate({

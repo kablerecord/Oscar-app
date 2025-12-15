@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, User, CreditCard, Settings2, Flame, Download, Loader2, Check } from 'lucide-react'
+import { ArrowLeft, User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2 } from 'lucide-react'
 
 interface UserData {
   name: string
@@ -11,9 +11,22 @@ interface UserData {
   createdAt: string
 }
 
+interface InsightPreferences {
+  enabled: boolean
+  bubbleMode: 'on' | 'off' | 'quiet'
+  maxPerSession: number
+  maxPerHour: number
+  minIntervalMinutes: number
+  mutedCategories: string[]
+}
+
 export default function SettingsPage() {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Insight preferences state
+  const [insightPrefs, setInsightPrefs] = useState<InsightPreferences | null>(null)
+  const [savingInsights, setSavingInsights] = useState(false)
 
   // Burn It modal state
   const [showBurnModal, setShowBurnModal] = useState(false)
@@ -39,6 +52,67 @@ export default function SettingsPage() {
     }
     fetchUserData()
   }, [])
+
+  // Fetch insight preferences
+  useEffect(() => {
+    async function fetchInsightPrefs() {
+      try {
+        const res = await fetch('/api/insights/preferences')
+        if (res.ok) {
+          const data = await res.json()
+          setInsightPrefs(data.preferences)
+        }
+      } catch (error) {
+        console.error('Failed to fetch insight preferences:', error)
+      }
+    }
+    fetchInsightPrefs()
+  }, [])
+
+  // Update insight preferences
+  const updateInsightPrefs = async (updates: Partial<InsightPreferences>) => {
+    setSavingInsights(true)
+    try {
+      const res = await fetch('/api/insights/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setInsightPrefs(data.preferences)
+      }
+    } catch (error) {
+      console.error('Failed to update insight preferences:', error)
+    } finally {
+      setSavingInsights(false)
+    }
+  }
+
+  // Toggle category mute
+  const toggleCategory = async (category: string) => {
+    if (!insightPrefs) return
+    const isMuted = insightPrefs.mutedCategories.includes(category)
+    setSavingInsights(true)
+    try {
+      const res = await fetch('/api/insights/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: isMuted ? 'unmute' : 'mute',
+          category,
+        }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setInsightPrefs(data.preferences)
+      }
+    } catch (error) {
+      console.error('Failed to toggle category:', error)
+    } finally {
+      setSavingInsights(false)
+    }
+  }
 
   const handleExportData = async () => {
     setExporting(true)
@@ -221,6 +295,149 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+        </section>
+
+        {/* OSQR Bubble Settings Section */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <Lightbulb className="h-5 w-5 text-amber-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Proactive Insights</h2>
+              <p className="text-sm text-neutral-400">Control when and how OSQR shares thoughts with you</p>
+            </div>
+          </div>
+
+          {insightPrefs ? (
+            <div className="space-y-6">
+              {/* Bubble Mode */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-3">Bubble Mode</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => updateInsightPrefs({ bubbleMode: 'on' })}
+                    disabled={savingInsights}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                      insightPrefs.bubbleMode === 'on'
+                        ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/50'
+                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                    }`}
+                  >
+                    <Bell className="h-4 w-4" />
+                    On
+                  </button>
+                  <button
+                    onClick={() => updateInsightPrefs({ bubbleMode: 'quiet' })}
+                    disabled={savingInsights}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                      insightPrefs.bubbleMode === 'quiet'
+                        ? 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/50'
+                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                    }`}
+                  >
+                    <Volume2 className="h-4 w-4" />
+                    Quiet
+                  </button>
+                  <button
+                    onClick={() => updateInsightPrefs({ bubbleMode: 'off' })}
+                    disabled={savingInsights}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-all ${
+                      insightPrefs.bubbleMode === 'off'
+                        ? 'bg-neutral-600/20 text-neutral-300 ring-1 ring-neutral-500/50'
+                        : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                    }`}
+                  >
+                    <BellOff className="h-4 w-4" />
+                    Off
+                  </button>
+                </div>
+                <p className="mt-2 text-xs text-neutral-500">
+                  {insightPrefs.bubbleMode === 'on' && 'OSQR will proactively share insights when appropriate'}
+                  {insightPrefs.bubbleMode === 'quiet' && 'Only high-priority insights will be shown'}
+                  {insightPrefs.bubbleMode === 'off' && 'No proactive insights - OSQR only responds when asked'}
+                </p>
+              </div>
+
+              {/* Interrupt Budget */}
+              {insightPrefs.bubbleMode !== 'off' && (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-neutral-400">Max insights per hour</label>
+                    <span className="text-white font-semibold">{insightPrefs.maxPerHour}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="1"
+                    max="10"
+                    value={insightPrefs.maxPerHour}
+                    onChange={(e) => updateInsightPrefs({ maxPerHour: parseInt(e.target.value) })}
+                    disabled={savingInsights}
+                    className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                  />
+                  <div className="flex justify-between mt-1 text-xs text-neutral-500">
+                    <span>Less frequent</span>
+                    <span>More frequent</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Category Toggles */}
+              {insightPrefs.bubbleMode !== 'off' && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-3">Insight Categories</label>
+                  <div className="space-y-2">
+                    {[
+                      { id: 'contradiction', label: 'Pattern noticed', icon: '⚠️', desc: 'When OSQR notices inconsistencies' },
+                      { id: 'clarify', label: 'Quick thoughts', icon: '💡', desc: 'Helpful suggestions when you seem stuck' },
+                      { id: 'next_step', label: 'Next steps', icon: '→', desc: 'Natural momentum opportunities' },
+                      { id: 'recall', label: 'Remember', icon: '💭', desc: 'Relevant past context' },
+                    ].map((cat) => {
+                      const isMuted = insightPrefs.mutedCategories.includes(cat.id)
+                      return (
+                        <button
+                          key={cat.id}
+                          onClick={() => toggleCategory(cat.id)}
+                          disabled={savingInsights}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all ${
+                            isMuted
+                              ? 'bg-neutral-800/50 opacity-50'
+                              : 'bg-neutral-800 hover:bg-neutral-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">{cat.icon}</span>
+                            <div className="text-left">
+                              <p className="text-white text-sm font-medium">{cat.label}</p>
+                              <p className="text-neutral-500 text-xs">{cat.desc}</p>
+                            </div>
+                          </div>
+                          <div className={`w-10 h-6 rounded-full transition-colors ${
+                            isMuted ? 'bg-neutral-700' : 'bg-amber-500'
+                          } relative`}>
+                            <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                              isMuted ? 'left-1' : 'left-5'
+                            }`} />
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {savingInsights && (
+                <div className="flex items-center justify-center gap-2 text-sm text-neutral-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Saving...
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+            </div>
+          )}
         </section>
 
         {/* Data & Privacy Section */}

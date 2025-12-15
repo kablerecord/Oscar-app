@@ -328,7 +328,84 @@ Data export in machine-readable format (JSON).
 
 ---
 
+## Security Posture
+
+### The Core Principle
+
+> **There is no such thing as "OSQR user data." There is only "this user's vault."**
+
+This principle governs all security architecture decisions.
+
+### Why Mass Data Theft Is Structurally Useless
+
+Raw OSQR data has almost zero value outside of its owner because:
+
+- **No shared social graph** — No followers, no cross-user context, no shared timelines
+- **No aggregation of meaning** — Each user is a sealed cognitive universe
+- **No standardized schema** — Unlike "likes" or "politics," meaning only exists in relation to that one person's life
+- **Context-dependent** — Even stolen data is fragmented and uninterpretable without the user
+
+Bulk data theft yields millions of unsorted personal journals written in different languages. Hard to analyze, hard to monetize, hard to weaponize.
+
+### Per-User Isolation Requirements
+
+| Requirement | Description |
+|-------------|-------------|
+| **Per-user encryption** | Each vault encrypted with a unique key; keys never reused or derivable from each other |
+| **Hard tenant isolation** | Separate logical partitions; no shared memory tables; no cross-user queries possible |
+| **No lateral movement** | Compromising one vault gives zero leverage on another |
+
+### Internal Access Rules (Absolute)
+
+- **Founder cannot read user vaults** — No exceptions
+- **Admin tools operate on metadata only** — Usage counts, health metrics, never content
+- **No "break glass" content access** — If a feature requires human review of user content, it is not allowed
+
+### No Psychological Profiles
+
+OSQR will **never** store:
+- Personality summaries
+- Belief models
+- Emotional profiles
+- Predictive psychological data
+
+Instead:
+- Store **references**, not conclusions
+- Reconstruct meaning at runtime
+- User Intelligence Artifacts inform OSQR's behavior but are never exported as dossiers
+
+This ensures:
+- No exploitable centralized profiles
+- No high-value targets for extraction
+- Legal defensibility ("we cannot meaningfully interpret this alone")
+
+### Deletion = Destruction
+
+When a user deletes their data:
+- **Cryptographic key destruction** — Renders data unreadable instantly
+- **No soft-delete** — Data is gone, not archived
+- **No recovery** — This is a feature, not a limitation
+
+Users always have an escape hatch.
+
+### The Defensible Statement
+
+OSQR is architected so we can truthfully say:
+
+> **"Your thoughts are only valuable to you. OSQR is designed so no one else can use them — even us."**
+
+This is achieved through:
+- Per-user encryption
+- No global meaning layer
+- Runtime-only synthesis
+- User-controlled deletion
+- No internal content access
+
+---
+
 ## Related Documents
 
 - [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md)
 - [TELEMETRY_SPEC.md](./TELEMETRY_SPEC.md)
+- [OSQR_CONSTITUTION.md](./OSQR_CONSTITUTION.md) — Privacy principles (Part 2.4)
+- [USER_INTELLIGENCE_ARTIFACTS.md](./USER_INTELLIGENCE_ARTIFACTS.md) — What OSQR infers (invisibly)

@@ -28,8 +28,9 @@ import {
   AlertCircle,
   HelpCircle,
 } from 'lucide-react'
-import { OSCARBubble } from '@/components/oscar/OSCARBubble'
+import { OSCARBubble, type PendingInsight } from '@/components/oscar/OSCARBubble'
 import { ShareActions } from '@/components/share/ShareActions'
+import { ResponseActions } from '@/components/chat/ResponseActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
 import {
   type OnboardingState,
@@ -83,6 +84,9 @@ interface Message {
     confidence: number
     shouldSuggestAltOpinion: boolean
   }
+  // v1.1: Message tracking for feedback
+  messageId?: string
+  tokensUsed?: number
 }
 
 interface RefineResult {
@@ -282,10 +286,15 @@ function analyzeQuestionComplexity(question: string): ComplexityAnalysis {
   }
 }
 
+// localStorage keys for persistence
+const DRAFT_KEY = (workspaceId: string) => `osqr-draft-${workspaceId}`
+const PENDING_REQUEST_KEY = (workspaceId: string) => `osqr-pending-${workspaceId}`
+
 export function RefineFireChat({ workspaceId, onboardingCompleted = false }: RefineFireChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [chatStage, setChatStage] = useState<ChatStage>('input')
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [useKnowledge, setUseKnowledge] = useState(true)
   const [showDebug, setShowDebug] = useState(false)
@@ -408,6 +417,97 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
       }
     }
     loadAnsweredQuestions()
+  }, [workspaceId])
+
+  // PERSISTENCE: Load draft from localStorage on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const savedDraft = localStorage.getItem(DRAFT_KEY(workspaceId))
+    if (savedDraft) {
+      setInput(savedDraft)
+    }
+  }, [workspaceId])
+
+  // PERSISTENCE: Save draft to localStorage on input change (debounced)
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const timer = setTimeout(() => {
+      if (input.trim()) {
+        localStorage.setItem(DRAFT_KEY(workspaceId), input)
+      } else {
+        localStorage.removeItem(DRAFT_KEY(workspaceId))
+      }
+    }, 500) // 500ms debounce
+    return () => clearTimeout(timer)
+  }, [input, workspaceId])
+
+  // PERSISTENCE: Load recent thread history on mount
+  useEffect(() => {
+    async function loadRecentHistory() {
+      try {
+        const response = await fetch(`/api/threads/recent?workspaceId=${workspaceId}&limit=10`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.messages && data.messages.length > 0) {
+            // Transform DB messages to UI format
+            const loadedMessages: Message[] = data.messages.map((msg: any) => ({
+              role: msg.role === 'user' ? 'user' : 'osqr',
+              content: msg.content,
+              thinking: false,
+              messageId: msg.id,
+              mode: msg.metadata?.mode,
+              artifacts: msg.artifacts,
+            }))
+            setMessages(loadedMessages)
+            setChatStage('complete')
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load recent history:', error)
+      } finally {
+        setIsLoadingHistory(false)
+      }
+    }
+    loadRecentHistory()
+  }, [workspaceId])
+
+  // PERSISTENCE: Check for pending request that was interrupted
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const pendingData = localStorage.getItem(PENDING_REQUEST_KEY(workspaceId))
+    if (pendingData) {
+      try {
+        const pending = JSON.parse(pendingData)
+        // If there's a pending request from within the last 5 minutes, show the question
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+        if (pending.timestamp > fiveMinutesAgo && pending.question) {
+          // Check if the answer has arrived in the database
+          fetch(`/api/threads/check-pending?workspaceId=${workspaceId}&question=${encodeURIComponent(pending.question)}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.found && data.answer) {
+                // Answer arrived! Show it
+                setMessages(prev => [
+                  ...prev,
+                  { role: 'user', content: pending.question },
+                  { role: 'osqr', content: data.answer, thinking: false, mode: pending.mode }
+                ])
+                setChatStage('complete')
+              }
+              // Clear the pending request either way
+              localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
+            })
+            .catch(() => {
+              localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
+            })
+        } else {
+          // Too old, clear it
+          localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
+        }
+      } catch {
+        localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
+      }
+    }
   }, [workspaceId])
 
   // STEP 0: Gatekeeper - classify question before allowing expensive modes
@@ -553,6 +653,17 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
     setChatStage('firing')
     setIsLoading(true)
 
+    // PERSISTENCE: Save pending request in case user leaves
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(PENDING_REQUEST_KEY(workspaceId), JSON.stringify({
+        question: finalQuestion,
+        mode: responseMode,
+        timestamp: Date.now(),
+      }))
+      // Clear the draft since we're submitting
+      localStorage.removeItem(DRAFT_KEY(workspaceId))
+    }
+
     // Add user message with the refined question
     setMessages((prev) => [
       ...prev,
@@ -625,6 +736,9 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
                 roundtableDiscussion: data.roundtableDiscussion,
               }
             : undefined,
+          // v1.1: Message tracking for feedback
+          messageId: data.messageId,
+          tokensUsed: data.tokensUsed,
         }
         return updated
       })
@@ -656,6 +770,10 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
       setRefineResult(null)
       setRefinedQuestion('')
       setClarifyingAnswers([])
+      // PERSISTENCE: Clear pending request since we got a response
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
+      }
     }
   }
 
@@ -735,6 +853,22 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
 
   const handleProfileClose = () => {
     setShowProfileQuestion(false)
+  }
+
+  // Handle proactive insight "Tell me more" - starts a conversation from the insight
+  const handleInsightConversation = (insight: PendingInsight) => {
+    // Convert insight to a conversation starter question
+    const conversationStarter = `Tell me more about this: "${insight.title}" - ${insight.message}`
+
+    // Set the input and immediately fire
+    setInput(conversationStarter)
+    // Use thoughtful mode for insight follow-ups (more detailed response)
+    setResponseMode('thoughtful')
+
+    // Fire after a brief delay to let state update
+    setTimeout(() => {
+      handleFire(conversationStarter)
+    }, 100)
   }
 
   const handleShowArtifacts = (artifacts: ArtifactBlock[]) => {
@@ -1057,17 +1191,13 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
                       )}
                     </Card>
 
-                    {/* Share Actions */}
+                    {/* Response Actions - Copy, Read Aloud, Good/Bad feedback */}
                     {!message.thinking && message.content && (
-                      <ShareActions
+                      <ResponseActions
                         content={message.content}
-                        agentName="OSQR"
-                        isDebate={!!message.debug?.panelDiscussion}
-                        panelDiscussion={message.debug?.panelDiscussion?.map((p, i) => ({
-                          content: p.content,
-                          agentName: `Expert ${i + 1}`,
-                        }))}
-                        className="mt-1"
+                        messageId={message.messageId}
+                        workspaceId={workspaceId}
+                        tokensUsed={message.tokensUsed}
                       />
                     )}
 
@@ -1718,6 +1848,9 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
           )
         }}
         alwaysVisible={true}
+        workspaceId={workspaceId}
+        isFocusMode={responseMode === 'contemplate'}
+        onStartConversation={handleInsightConversation}
       />
     </div>
   )

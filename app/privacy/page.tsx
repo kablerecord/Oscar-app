@@ -418,11 +418,11 @@ export default function PrivacyPage() {
             </div>
             <div className="mt-6 flex items-center space-x-4">
               <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                KR
+                OS
               </div>
               <div>
-                <p className="font-semibold text-white">Kable Record</p>
-                <p className="text-sm text-slate-400">Creator of OSQR</p>
+                <p className="font-semibold text-white">The OSQR Team</p>
+                <p className="text-sm text-slate-400">Building better AI tools</p>
               </div>
             </div>
           </div>

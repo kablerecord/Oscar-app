@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { CapabilityLevelIndicator } from '@/components/capability/CapabilityBadge'
+import { FocusModeToggle } from '@/components/focus/FocusModeToggle'
 
 interface TopBarProps {
   user?: {
@@ -69,12 +70,15 @@ export function TopBar({ user, workspaceName = 'My Workspace', capabilityLevel, 
           />
         </div>
 
-        {/* Right: User menu */}
-        <div className="flex items-center space-x-2 sm:space-x-4">
+        {/* Right: Focus Mode + User menu */}
+        <div className="flex items-center space-x-2 sm:space-x-3">
           {/* Mobile search button */}
           <Button variant="ghost" size="icon" className="md:hidden rounded-full">
             <Search className="h-5 w-5" />
           </Button>
+
+          {/* Focus Mode Toggle */}
+          <FocusModeToggle />
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

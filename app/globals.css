@@ -233,6 +233,20 @@ html {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+/* Amber pulse glow for proactive insights */
+@keyframes pulse-glow-amber {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(245, 158, 11, 0.7), 0 0 60px rgba(249, 115, 22, 0.4);
+  }
+}
+
+.animate-pulse-glow-amber {
+  animation: pulse-glow-amber 1.5s ease-in-out infinite;
+}
+
 @keyframes shimmer {
   0% { background-position: -200% 0; }
   100% { background-position: 200% 0; }

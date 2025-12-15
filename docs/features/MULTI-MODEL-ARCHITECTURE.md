@@ -521,6 +521,7 @@ For Council Mode and panel transparency, each model has a defined personality:
 
 - [ROADMAP.md](../../ROADMAP.md) - Section 3.3, 3.3.1, Appendix E
 - [COUNCIL-MODE.md](COUNCIL-MODE.md) - Visible multi-chat feature
+- [SUPREME-COURT-BUTTON.md](SUPREME-COURT-BUTTON.md) - Adversarial deliberation mode
 - [lib/ai/model-router.ts](../../lib/ai/model-router.ts) - Implementation
 - [lib/ai/oscar.ts](../../lib/ai/oscar.ts) - OSQR class
 - [lib/ai/providers/](../../lib/ai/providers/) - Provider adapters

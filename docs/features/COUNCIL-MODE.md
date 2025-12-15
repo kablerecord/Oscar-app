@@ -420,6 +420,8 @@ Export the full council discussion as a PDF/document for reference.
 
 - [ROADMAP.md](../../ROADMAP.md) - Phase 3, Section 3.5
 - [ARCHITECTURE.md](../../ARCHITECTURE.md) - Multi-model architecture
+- [SUPREME-COURT-BUTTON.md](SUPREME-COURT-BUTTON.md) - Adversarial deliberation mode (related but distinct)
+- [MULTI-MODEL-ARCHITECTURE.md](MULTI-MODEL-ARCHITECTURE.md) - Core model routing
 - [lib/ai/model-router.ts](../../lib/ai/model-router.ts) - Question type detection
 - [lib/ai/oscar.ts](../../lib/ai/oscar.ts) - OSQR class
 - [lib/ai/panel.ts](../../lib/ai/panel.ts) - Panel orchestration

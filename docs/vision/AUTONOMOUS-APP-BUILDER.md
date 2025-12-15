@@ -341,15 +341,17 @@ interface ProjectBlueprint {
 ## 10. Relationship to Other Vision Documents
 
 This document builds on:
+- **[DEVELOPMENT-PHILOSOPHY.md](../strategy/DEVELOPMENT-PHILOSOPHY.md)** - Strategic sequencing and timeline (v3.0+)
 - **[VSCODE-DEV-COMPANION.md](./VSCODE-DEV-COMPANION.md)** - The extension that delivers this capability in VS Code
+- **[SUPREME-COURT-BUTTON.md](../features/SUPREME-COURT-BUTTON.md)** - Adversarial deliberation (v3.5+)
 - **ROADMAP.md Phase X** - The lean roadmap entry pointing here
 
 Sequence:
-1. Core OSQR app (now)
+1. Core OSQR app (v1.0)
 2. Intelligence Layer (Phase 3)
-3. VS Code Dev Companion v1
-4. Autonomous Mode (in VS Code)
-5. **Autonomous App Builder** (this document)
+3. VS Code Dev Companion v1 (v2.0)
+4. Autonomous Mode (v2.5)
+5. **Autonomous App Builder** (v3.0) - this document
 
 ---
 

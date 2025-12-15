@@ -23,7 +23,6 @@ export type GKVISection =
   | 'execution'     // Refine→Fire, Constraints→Leverage→Compounding
   | 'ethics'        // Privacy tiers, trust framework
   | 'coaching'      // Universal coaching principles, tone guidelines
-  | 'fourthgen'     // Fourth Generation Formula
   | 'artifacts'     // Artifact generation guidelines
   | 'decisions'     // Decision-making frameworks
   | 'leverage'      // Leverage and compounding principles
@@ -178,30 +177,6 @@ Optimize for long-term integrity, not short-term wins.`,
 - Confident but humble — here to assist, not impress
 - Smart but approachable — explain things clearly without dumbing down
 - Proactive and efficient — anticipate needs when appropriate`,
-
-  fourthgen: `## Fourth Generation Formula
-
-### Core Premise
-Families and individuals rarely fail from lack of opportunity; they fail from lack of **transferable capability**.
-
-### The Equation
-Capability = Identity (who I am) + Action (what I do consistently) + Persistence (how long I stay in the game)
-
-### The Goal
-Build **BUILDERS** across generations, not just wealth.
-
-### Core Loop
-Identity → Capability → Output → Legacy
-
-OSQR's job is to:
-1. Help the user **upgrade identity** (who they believe they are)
-2. Translate identity into **capabilities and skills**
-3. Turn capabilities into **outputs** (work, projects, businesses, health, relationships)
-4. Turn sustained output into **legacy** (what remains after they're gone)
-
-OSQR aims to: increase clarity, improve decision quality, compress time to results, build durable self-respect, protect long-term integrity and relationships.
-
-OSQR is not just a Q&A tool. OSQR is an **Operating System for Capability**.`,
 
   artifacts: `## Artifact Generation
 
@@ -388,13 +363,13 @@ export function getLevelAppropriateContext(level: number): string {
   else if (level <= 6) {
     sections.push('execution', 'capability')
   }
-  // Creators (7-9): Focus on leverage and Fourth Gen thinking
+  // Creators (7-9): Focus on leverage and systems thinking
   else if (level <= 9) {
-    sections.push('fourthgen', 'execution')
+    sections.push('leverage', 'execution', 'decisions')
   }
   // Architects (10-12): Full strategic context
   else {
-    sections.push('fourthgen', 'identity', 'execution')
+    sections.push('leverage', 'identity', 'execution', 'decisions')
   }
 
   return getGlobalContextMultiple(sections)
@@ -405,10 +380,10 @@ export function getLevelAppropriateContext(level: number): string {
  */
 export function getQuestionTypeContext(questionType: string): GKVISection[] {
   const mapping: Record<string, GKVISection[]> = {
-    high_stakes: ['coaching', 'ethics', 'fourthgen', 'decisions'],
+    high_stakes: ['coaching', 'ethics', 'decisions', 'leverage'],
     analytical: ['execution', 'capability', 'patterns'],
     creative: ['identity', 'coaching'],
-    reasoning: ['execution', 'fourthgen', 'leverage'],
+    reasoning: ['execution', 'leverage', 'decisions'],
     coding: ['artifacts', 'execution'],
     summarization: ['coaching'],
     conversational: ['coaching', 'relationships'],
@@ -440,12 +415,14 @@ export function buildGKVIContext(options: {
       sectionsSet.add('execution')
       sectionsSet.add('capability')
     } else if (options.userLevel <= 9) {
-      sectionsSet.add('fourthgen')
+      sectionsSet.add('leverage')
       sectionsSet.add('execution')
+      sectionsSet.add('decisions')
     } else {
-      sectionsSet.add('fourthgen')
+      sectionsSet.add('leverage')
       sectionsSet.add('identity')
       sectionsSet.add('execution')
+      sectionsSet.add('decisions')
     }
   }
 

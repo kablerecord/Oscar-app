@@ -11,17 +11,19 @@ datasource db {
 }
 
 model User {
-  id         String        @id @default(cuid())
-  email      String        @unique
-  name       String?
-  password   String?
-  image      String?
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
-  accounts   Account[]
-  sessions   Session[]
-  settings   UserSetting[]
-  workspaces Workspace[]
+  id                 String                  @id @default(cuid())
+  email              String                  @unique
+  name               String?
+  password           String?
+  image              String?
+  encryptionKey      Json? // Wrapped DEK for per-user encryption (v1.1)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  accounts           Account[]
+  sessions           Session[]
+  settings           UserSetting[]
+  workspaces         Workspace[]
+  insightPreferences UserInsightPreferences?
 
   @@index([email])
 }
@@ -43,6 +45,7 @@ model Workspace {
   capabilityHistory     CapabilityAssessment[]
   threads               ChatThread[]
   documents             Document[]
+  insights              Insight[]
   mscCategories         MSCCategory[]
   mscItems              MSCItem[]
   profileAnswers        ProfileAnswer[]
@@ -285,9 +288,9 @@ model CapabilityAssessment {
 model MSCItem {
   id          String    @id @default(cuid())
   workspaceId String
-  category    String    // 'goal', 'project', 'idea', or custom category id
-  content     String    // Title/main content
-  description String?   // Optional expanded description/notes
+  category    String // 'goal', 'project', 'idea', or custom category id
+  content     String // Title/main content
+  description String? // Optional expanded description/notes
   isPinned    Boolean   @default(false)
   sortOrder   Int       @default(0)
   status      String    @default("active") // 'active', 'in_progress', 'completed', 'archived'
@@ -306,7 +309,7 @@ model MSCItem {
 model MSCCategory {
   id          String    @id @default(cuid())
   workspaceId String
-  name        String    // Display name
+  name        String // Display name
   icon        String    @default("folder") // Lucide icon name
   color       String    @default("text-gray-600") // Tailwind color class
   sortOrder   Int       @default(0)
@@ -320,25 +323,39 @@ model MSCCategory {
 
 // Access Codes for early access signup
 model AccessCode {
-  id          String    @id @default(cuid())
-  code        String    @unique
-  label       String?   // Who this code is for (e.g., "Jesse", "Mom")
-  maxUses     Int       @default(1)    // How many times this code can be used
-  useCount    Int       @default(0)    // How many times it's been used
-  usedBy      String[]  // Emails of users who used it (array for multi-use codes)
-  createdAt   DateTime  @default(now())
+  id        String   @id @default(cuid())
+  code      String   @unique
+  label     String? // Who this code is for (e.g., "Jesse", "Mom")
+  maxUses   Int      @default(1) // How many times this code can be used
+  useCount  Int      @default(0) // How many times it's been used
+  usedBy    String[] // Emails of users who used it (array for multi-use codes)
+  createdAt DateTime @default(now())
 
   @@index([code])
+}
+
+// Password Reset Tokens (v1.1)
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  email     String
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([token])
+  @@index([expiresAt])
 }
 
 // Background Tasks (J-3)
 model BackgroundTask {
   id           String    @id @default(cuid())
-  type         String    // Task type identifier
-  payload      Json      // Task-specific data
+  type         String // Task type identifier
+  payload      Json // Task-specific data
   workspaceId  String
   status       String    @default("pending") // pending, running, completed, failed, cancelled
-  priority     String    @default("normal")  // low, normal, high, critical
+  priority     String    @default("normal") // low, normal, high, critical
   scheduledFor DateTime  @default(now())
   startedAt    DateTime?
   completedAt  DateTime?
@@ -354,4 +371,53 @@ model BackgroundTask {
   @@index([status])
   @@index([scheduledFor])
   @@index([priority])
+}
+
+// ============================================
+// TIL Proactive Insights System
+// ============================================
+
+// Persisted insights for tracking and learning
+model Insight {
+  id          String    @id @default(cuid())
+  workspaceId String
+  category    String // contradiction, clarify, next_step, recall
+  priority    Int // 1-10 priority score
+  confidence  Float     @default(0.5) // How confident we are in this insight
+  title       String // Short title shown in bubble
+  message     String // Brief message (bubble view)
+  context     Json? // Source data and context
+  status      String    @default("queued") // queued, surfaced, dismissed, engaged, expired
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime // When insight becomes stale
+  surfacedAt  DateTime? // When shown to user
+  engagedAt   DateTime? // When user clicked "tell me more"
+  dismissedAt DateTime? // When user dismissed
+  feedback    Json? // Rating, reason, etc.
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, expiresAt])
+  @@index([workspaceId, category])
+}
+
+// User preferences for insight delivery
+model UserInsightPreferences {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  bubbleMode        String   @default("on") // on, off, quiet
+  maxPerHour        Int      @default(3) // Interrupt budget
+  maxPerSession     Int      @default(10)
+  // Category toggles (which categories to show)
+  showContradiction Boolean  @default(true)
+  showClarify       Boolean  @default(true)
+  showNextStep      Boolean  @default(true)
+  showRecall        Boolean  @default(true)
+  // Category engagement stats for preference learning
+  categoryStats     Json? // { contradiction: { shown: 0, engaged: 0 }, ... }
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

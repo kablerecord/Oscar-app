@@ -460,8 +460,11 @@ export async function POST(req: NextRequest) {
       }
 
       // J-1: TIL Session Tracking - Track conversation for temporal intelligence
+      // Now includes cognitive profiling with 50+ behavioral dimensions
       try {
-        await trackConversation(workspaceId, message, cleanAnswer)
+        await trackConversation(workspaceId, message, cleanAnswer, {
+          mode, // Track which response mode was used
+        })
       } catch (error) {
         console.error('[TIL] Session tracking error:', error)
       }

@@ -1,10 +1,499 @@
 # OSQR Implementation Roadmap
 
 **Generated from:** OSQR Master Plan (175K characters, 25K words)
-**Last updated:** 2025-12-05
+**Last updated:** 2025-12-14
 **Owner:** Kable Record
 
 This roadmap extracts actionable implementation items from the OSQR Master Plan document, organized by development phase. Each item maps back to specific sections in the master plan.
+
+---
+
+## Section 0: Strategic Vision — Capability → Creation → Commerce
+
+> **Status:** Long-term directional truth. NOT part of v1 implementation.
+> **Purpose:** Define OSQR's end-state so near-term builds don't drift.
+> **Guiding Principle:** *"We are better together than separate."*
+
+This section captures the strategic north star for OSQR. Reference it when making architectural decisions to ensure short-term wins don't create long-term drift. Implementation begins only after core v1 features are stable and proven.
+
+---
+
+### 0.0 The Governance Stack
+
+> **Full Specs:** [docs/OSQR_CONSTITUTION.md](docs/OSQR_CONSTITUTION.md) | [docs/OSQR_PHILOSOPHY.md](docs/OSQR_PHILOSOPHY.md)
+
+```
+Layer 0 — CONSTITUTION (immutable principles)
+    │     What OSQR will never do, what it will always do
+    │
+    ▼
+Layer 1 — PHILOSOPHY (detailed beliefs)
+    │     How OSQR views growth, effort, imagination, people
+    │
+    ▼
+Layer 2 — ARCHITECTURE (system specs)
+    │     How systems work: PKV, routing, plugins, safety
+    │
+    ▼
+Layer 3 — FEATURES (this roadmap)
+          What gets built, when, how it shows up
+```
+
+**Lower layers cannot contradict higher layers.**
+
+**The Soul (Constitution Summary):**
+
+OSQR is a capability operating system that multiplies people at whatever level they operate. It meets users where they are, supplies imagination where it's lacking, and accelerates capability where it exists.
+
+**What OSQR Will Never Do:**
+- Remove user agency or make decisions without consent
+- Deceive users about its capabilities
+- Promise outcomes it cannot deliver or remove the need for effort
+- Sell user data or train on user content without consent
+- Shame users or exploit vulnerabilities
+
+**What OSQR Will Always Do:**
+- Meet users where they are
+- Reduce confusion (not effort)
+- Favor capabilities over outcomes
+- Reveal, don't perform
+
+**When Users Ask About OSQR:**
+> "I multiply whatever you bring. I reduce confusion, not effort. I show what's possible. You decide what to build."
+
+---
+
+### 0.1 The OSQR Thesis
+
+**OSQR** = **O**perating **S**ystem for **Q**uantum **R**easoning
+
+OSQR is not an AI tool. OSQR is a **capability operating system**.
+
+> OSQR exists to transform clarity into capability,
+> capability into execution,
+> and execution into real-world outcomes (including money).
+
+**The Filter:** If a feature does not:
+- Improve judgment
+- Reduce friction to execution
+- Increase follow-through
+- Or compound leverage
+
+…it does not belong.
+
+**The Insight:** A tool is something ready to do work. If we define too heavily how that tool should work, we limit what people can do with it. OSQR provides the capability infrastructure; users and plugin creators define the applications.
+
+---
+
+### 0.2 The Architecture Layers
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     OSQR CORE                                    │
+│            Formation · Judgment · Clarity                        │
+│     (The executive function - decides WHAT should exist)         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     PLUGINS                                      │
+│            Bounded Expertise · Domain Knowledge                  │
+│     (Specialists that multiply OSQR, never fragment it)          │
+│                   💰 20% Revenue Share                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   CREATION LAYER                                 │
+│            VS Code · Artifacts · Real Output                     │
+│     (Value created inside tools, not chat boxes)                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     AGENTS                                       │
+│            Persistence · Follow-through · Momentum               │
+│     (Solve human failures: remembering, finishing, consistency)  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   DISTRIBUTION                                   │
+│            Convert execution into reach                          │
+│     ("This should be a thread" / "This needs a landing page")    │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   MARKETPLACE                                    │
+│            Outcomes as building blocks                           │
+│     (Not a plugin store - an OUTCOME store)                      │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   META-OSQR                                      │
+│            Self-audit · Prevent bloat · Preserve elegance        │
+│     ("The best part is no part" applied inward)                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 0.3 OSQR Core (Non-Negotiable)
+
+**Role:** Formation · Judgment · Clarity
+**What it is:** The executive function of the system
+
+**Core Responsibilities:**
+- Question refinement (Refine → Fire)
+- Priority ordering
+- Constraint identification
+- Tradeoff reasoning
+- Synthesis across perspectives
+- Final judgment
+
+**What Core Does NOT Do:**
+- Execute tasks (that's Agents)
+- Write large volumes of code (that's Creation Layer)
+- Market products (that's Distribution)
+- Automate blindly (that's dangerous)
+
+> OSQR Core decides *what should exist* — never *how everything is done*.
+> This preserves trust and prevents runaway autonomy.
+
+---
+
+### 0.4 Plugin Marketplace (The 20% Model)
+
+**The Insight:** Monetize knowledge by allowing users to create plugins for their expertise. Share the wealth to accelerate adoption.
+
+**Revenue Model:**
+- Plugin creators keep **80%** of revenue
+- OSQR takes **20%** platform fee
+- This attracts more creators → more plugins → more users → compounds growth
+
+**Why 20%:**
+- 100% to creators = no sustainable platform
+- 60% to OSQR = resentment, slower adoption
+- 20% to OSQR = appreciated, accelerates network effects
+
+**Plugin Characteristics:**
+- Narrow scope (specialists, not generalists)
+- Explicit boundaries
+- Opinionated within domain
+- Cannot override OSQR Core judgment
+- Can recommend, execute, or simulate outcomes
+
+**Example Plugins:**
+- Dan Martell's coaching methodology
+- Pricing Strategy Plugin
+- Go-To-Market Plugin
+- Security / Compliance Plugin
+- Fitness / Health Plugin
+- Theology / Philosophy Plugin
+- Hormozi-style acquisition plugins
+
+**Safety & Governance:**
+- Plugin Constitution (allowed / disallowed domains) — see [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md)
+- Screening & approval process
+- Tiered permissions (advise vs execute)
+- No hidden autonomy
+
+> Plugins multiply OSQR — they never fragment it.
+
+---
+
+### 0.4.1 OSQR Core vs Plugin Separation
+
+> **Full Spec:** [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md)
+
+**The Defining Rule:**
+
+> OSQR may coach on *process*.
+> Plugins may coach on *standards*.
+
+**OSQR Core (Neutral, Universal):**
+- Question refinement, synthesis, tradeoff analysis
+- Memory, context, pattern detection
+- "Here are the options" / "Based on your stated goals..."
+- Does NOT impose values, apply pressure, or define success
+
+**Plugins (Directional, Opt-in):**
+- Value hierarchies, standards, expectations
+- Pressure, urgency, accountability
+- Identity language, worldview, philosophy
+- Can be demanding, narrow, intense — because user consented
+
+**The Permission Model:**
+
+Every OSQR Core constraint unlocks a plugin capability:
+
+| OSQR Core Rule | Plugin Permission |
+|----------------|-------------------|
+| Does not impose values | May define value hierarchies |
+| Does not apply pressure | May be demanding, urgent |
+| Does not define success | May define outcomes |
+| Does not shape identity | May use tribal language |
+| Does not judge character | May call out avoidance |
+
+**The Founder Plugin:**
+
+Kable's philosophy, Fourth Generation Formula, and book content must be **extracted** from OSQR Core and relocated to a plugin. This:
+- Keeps OSQR universally useful
+- Makes plugins necessary (not decorative)
+- Serves as reference implementation for other creators
+- Free 30-day trial teaches market what plugins can do
+
+---
+
+### 0.4.2 Plugin Safety & Platform Values
+
+> **Full Spec:** [docs/PLUGIN_ARCHITECTURE.md](docs/PLUGIN_ARCHITECTURE.md)
+
+**Safety Model:**
+
+> OSQR does not police ideas. OSQR polices *agency, consent, and deception*.
+
+**The Four Red Lines:**
+
+1. **Removal of Agency** — No plugin may make itself non-optional
+2. **Deception** — Intensity must be disclosed upfront
+3. **Psychological Coercion** — Pressure is allowed; coercion is not
+4. **Irreversible Harm** — No dangerous instructions
+
+**Platform Values:**
+
+OSQR is a values-aware platform. Neutrality does not mean emptiness.
+
+OSQR will **not** host plugins whose core purpose is:
+- Promotion of harm, cruelty, or dehumanization
+- Glorification of destruction or nihilism
+- Mockery of sincerely held spiritual belief as a core mechanic
+- Erosion of personal responsibility or human dignity
+
+**Plugin Consent Contract:**
+
+Every plugin must declare before installation:
+- Tone (neutral → confrontational)
+- Domain and intensity level
+- What it WILL and WILL NOT do
+- Who should NOT install it
+
+Freedom of exit is the protection.
+
+---
+
+### 0.4.3 Creator Plugin Operations
+
+> **Full Spec:** [docs/CREATOR_MARKETPLACE.md](docs/CREATOR_MARKETPLACE.md)
+
+**What a Plugin IS:**
+
+> A **Judgment Profile** that temporarily changes how OSQR thinks.
+
+Users don't buy content — they **borrow expert judgment**.
+
+**Plugin Quality Gate (3-of-6 Rule):**
+
+Every marketplace plugin must change at least 3 of these dimensions:
+
+| Dimension | What Changes |
+|-----------|--------------|
+| Attention | What OSQR notices/ignores |
+| Questions | What OSQR asks |
+| Judgment | Pushback strength, decisiveness |
+| Option Space | How aggressively choices are pruned |
+| Standards | What is unacceptable |
+| Outcome Bias | Speed vs polish, learning vs execution |
+
+**Creator Onboarding:**
+
+Conversation-first. No portals, no forms.
+
+Entry question: *"What decision do people come to you for?"*
+
+OSQR interviews creators into existence by extracting:
+- Priority hierarchies
+- Non-negotiable rules
+- Edge case handling
+- Completion thresholds
+
+**Creator Tiers:**
+
+| Tier | Access |
+|------|--------|
+| Creator Mode | Private plugins, testing |
+| Marketplace Candidate | Can submit for listing (60-90 day account age) |
+| Verified Creator | Premium placement, proven results |
+
+**Plugin Council Mode (v1.5+):**
+
+Multiple plugins can be invoked for comparison — but only explicitly:
+- "Compare how Martell and Hormozi would approach this"
+- OSQR preserves each perspective, then reasons about disagreement
+- Forces choice or proposes synthesis
+- Never averages opinions
+
+---
+
+### 0.5 Marketplace as Outcome Store
+
+**Key Distinction:** The marketplace is NOT a plugin store. It is an **outcome store**.
+
+Users don't buy tools — they buy results:
+- "Launch a SaaS"
+- "Get first 10 customers"
+- "Price this correctly"
+- "Automate my workflow"
+- "Turn idea into revenue"
+
+**Each outcome bundle includes:**
+- OSQR Core guidance
+- Required plugins
+- Optional agents
+- Proven execution path
+- Guardrails
+- Success patterns
+
+**Compounding Effect:**
+- Builders succeed → tell others
+- Creators earn → promote OSQR
+- OSQR improves → outcomes improve
+- Moat deepens organically
+
+> If people make real money with OSQR, leaving becomes irrational.
+
+---
+
+### 0.6 The Flywheel
+
+```
+Clarity
+  ↓
+Capability
+  ↓
+Creation
+  ↓
+Execution
+  ↓
+Distribution
+  ↓
+Revenue
+  ↓
+More Builders
+  ↓
+Stronger OSQR
+  ↓
+(back to Clarity)
+```
+
+OSQR grows **by making others powerful**.
+
+This is:
+- Morally aligned
+- Strategically unstoppable
+- Historically proven (AWS, Shopify, App Store)
+
+---
+
+### 0.7 Agents & Persistence Layer
+
+**Role:** Consistency · Follow-through · Momentum
+
+Humans fail at:
+- Remembering
+- Finishing
+- Loop-closing
+- Consistency
+
+Agents exist to solve *that* — not creativity.
+
+**Agent Behaviors:**
+- Monitor dropped threads
+- Execute obvious next steps
+- Maintain state across time
+- Batch questions instead of interrupting
+- Work asynchronously
+
+**Guardrails:**
+- No silent irreversible actions
+- Explicit autonomy levels
+- Logged assumptions
+- Human-in-the-loop checkpoints
+
+> Intelligence without persistence is wasted.
+> Agents turn insight into motion.
+
+---
+
+### 0.8 Distribution Intelligence
+
+**Role:** Convert execution into reach
+
+Creation without distribution is a dead end.
+
+**Distribution Intelligence Knows:**
+- What is being built
+- The audience
+- Proven channels
+- Format fit (post, page, demo, email, integration)
+
+**Example Suggestions:**
+- "This should be a thread"
+- "This needs a landing page"
+- "This wants a demo video"
+- "This maps to a cold email"
+- "This should be an integration listing"
+
+**Important Rule:**
+> OSQR does NOT spam.
+> It removes friction from *intentional* distribution.
+
+---
+
+### 0.9 Constitutional Non-Goals
+
+OSQR will **NOT**:
+- Replace human judgment
+- Become fully autonomous by default
+- Be a generic "AI app"
+- Optimize for engagement over outcomes
+- Sell user data
+- Compete with creators it empowers
+
+These are *constitutional constraints* — not features to add later, but principles that define what OSQR refuses to become.
+
+---
+
+### 0.10 Implementation Guidance
+
+**Do not build Section 0 now.**
+
+Instead:
+- Use this section as a **north star**
+- Sanity-check every new feature against it
+- Prevent short-term wins from creating long-term drift
+- Let v1/v2 earn the right to exist before this vision activates
+
+**The Sentence to Remember:**
+> OSQR becomes more by helping others build, earn, and succeed —
+> not by trying to do everything itself.
+
+---
+
+## Strategic Development Philosophy
+
+> **See:** [docs/strategy/DEVELOPMENT-PHILOSOPHY.md](docs/strategy/DEVELOPMENT-PHILOSOPHY.md)
+
+This roadmap defines **WHAT** to build. The Development Philosophy document defines **HOW** we build it:
+
+- Documentation-first development approach
+- Version sequencing (v1.0 → v2.0 → v3.0+)
+- VoiceQuote demonstration strategy
+- Competitive positioning
+- Success metrics framework
+- Timeline targets
 
 ---
 
@@ -670,6 +1159,8 @@ AI capabilities improve quarterly. Photos stored today can be retroactively anal
 
 ## UX Principles (From Master Plan Part 3A)
 
+> **Full Spec:** [docs/UX_PHILOSOPHY.md](docs/UX_PHILOSOPHY.md)
+
 ### Core Philosophy
 1. **Simple Surface, Powerful Depth** - Hide complexity until needed
 2. **One Main Decision Rule** - Never overwhelm with choices
@@ -687,6 +1178,175 @@ AI capabilities improve quarterly. Photos stored today can be retroactively anal
 - Avoid popups when possible
 - Inline interactions preferred
 - Full-screen only for major actions
+
+---
+
+## Version 1.1: Security, Focus & Polish
+*Target: Next sprint after v1.0 launch*
+*Focus: Per-user encryption, Focus Mode, password recovery, response actions*
+
+### v1.1.1 Per-User Encryption Layer ⭐ CRITICAL
+*Full encryption per Constitution spec — "OSQR will always provide a way to delete everything (cryptographic destruction, not soft-delete)"*
+
+**Implementation:**
+- [ ] **Per-user encryption keys** — Each user gets unique encryption key derived from password
+- [ ] **Envelope encryption** — Data encrypted with user key, user key encrypted with master key
+- [ ] **PKV content encryption** — All document content encrypted at rest
+- [ ] **Chat message encryption** — Conversation content encrypted
+- [ ] **Cryptographic deletion** — Destroy user key = all data unrecoverable
+- [ ] **Key rotation support** — Ability to re-encrypt with new keys
+- [ ] **Zero-knowledge architecture** — OSQR cannot read user data without user present
+
+**Technical Approach:**
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    User Password                             │
+│                         │                                    │
+│                         ▼                                    │
+│              Key Derivation (PBKDF2/Argon2)                 │
+│                         │                                    │
+│                         ▼                                    │
+│                User Encryption Key (UEK)                     │
+│                         │                                    │
+│            ┌───────────┴───────────┐                        │
+│            ▼                       ▼                        │
+│     Encrypt PKV Data         Encrypt Messages               │
+│                                                              │
+│  Master Key encrypts UEK for recovery (optional)            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Why this matters:**
+- Constitutional requirement (Section 2.4)
+- True privacy (not even admin can read user data)
+- GDPR/CCPA compliance via cryptographic destruction
+- Trust differentiator vs competitors
+
+**Estimate:** 2-4 hours at current velocity
+
+### v1.1.2 Focus Mode
+*Toggle in top-right, explained in onboarding*
+
+**Implementation:**
+- [ ] **Focus Mode toggle icon** — Small icon in top-right, next to user icon
+- [ ] **ON state** — Blurs left panel (MSC/nav) and right panel (if exists)
+- [ ] **OFF state** — Everything visible, normal operation
+- [ ] **User preference persistence** — Store Focus Mode state per user
+- [ ] **Onboarding explanation** — Step showing toggle and explaining behavior
+- [ ] **Blur CSS system** — Reusable blur/mute classes with smooth transitions
+
+**Visual Behavior:**
+| State | Left Panel | Center (Chat) | Right Panel |
+|-------|------------|---------------|-------------|
+| ON | Blurred | Sharp | Blurred |
+| OFF | Visible | Sharp | Visible |
+
+**Estimate:** 1-2 hours
+
+### v1.1.3 Forgot Password (Resend Integration)
+*Email-based password recovery*
+
+**Implementation:**
+- [ ] **Resend SDK integration** — Add @resend/node package
+- [ ] **Password reset tokens** — Database model for secure tokens
+- [ ] **Forgot password page** — /forgot-password route
+- [ ] **Reset password page** — /reset-password?token=xxx route
+- [ ] **Email template** — Branded password reset email
+- [ ] **Token expiration** — 1-hour validity with single-use
+- [ ] **Rate limiting** — Prevent abuse (max 3 requests per email per hour)
+- [ ] **Add "Forgot password?" link** — Below login form
+
+**Database Schema:**
+```prisma
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+```
+
+**Estimate:** 2-3 hours
+
+### v1.1.4 Response Action Buttons
+*Quick actions below chat responses*
+
+**User-Facing Buttons (All Users):**
+- [ ] **Read Aloud** — Text-to-speech using Web Speech API
+- [ ] **Good Response** — Thumbs up (stores feedback for learning)
+- [ ] **Bad Response** — Thumbs down (stores feedback + optional reason)
+- [ ] **Copy** — Copy response to clipboard
+
+**Admin-Only Buttons (Master tier / your account):**
+- [ ] **Token Count** — Show tokens used for this response
+- [ ] **Flag for Review** — Mark response for later analysis
+- [ ] **View Raw** — Show raw API response data
+
+**Implementation:**
+- [ ] **Button bar component** — Appears below each assistant message
+- [ ] **Feedback storage** — ChatMessage metadata field for thumbs up/down
+- [ ] **TTS integration** — Web Speech API with voice selection
+- [ ] **Admin detection** — Check user tier or email for admin features
+- [ ] **Token tracking** — Store tokensUsed in message metadata
+
+**Estimate:** 2-3 hours
+
+---
+
+### 1.9 Focus Mode (Cognitive Noise Cancellation) ⭐ NEW
+*"Noise-canceling headphones for thinking."*
+
+> **Full Spec:** [docs/UX_PHILOSOPHY.md](docs/UX_PHILOSOPHY.md)
+
+**What it is:**
+A UX system that reduces cognitive load by visually de-emphasizing features, data, and UI elements that are not relevant to the user's current moment of focus.
+
+**The Dimmer Metaphor:**
+Focus Mode behaves like a light dimmer — gradually reducing cognitive noise without removing context. Nothing disappears. Nothing is deleted. Nothing is blocked.
+
+**v1 Behavior:**
+| Rule | Behavior |
+|------|----------|
+| **Default state** | ON for all new users |
+| **Persistence** | User's choice persists after first toggle |
+| **Explanation** | Covered in onboarding ("I'll reveal things at the right time") |
+| **Override** | User can turn off manually at any time |
+
+**What Gets Blurred (v1):**
+| Element | Focus Mode Behavior |
+|---------|---------------------|
+| Input box | Always sharp |
+| Current conversation | Always sharp |
+| MSC/Progress | Blurred (if exists) |
+| Secondary panels | Blurred |
+| Navigation | Slightly muted |
+| Suggestions | Blurred unless contextually relevant |
+
+**Visual Treatment:**
+- Soft blur (not full opacity)
+- Reduced saturation
+- Lower contrast
+- Muted hover states
+- Subtle transitions (150-300ms, easing-heavy)
+
+**NOT v1 (Future Extensions):**
+- Long-press override panel
+- Adaptive Focus (learns preferences)
+- Named focus modes (Deep Work, Decision, Build, Reflect)
+- Graduated intensity levels
+
+**Implementation:**
+- [ ] **Focus Mode toggle** — Icon in top-right of input panel
+- [ ] **Blur CSS system** — Reusable blur/mute classes
+- [ ] **Onboarding explanation** — "I'll reveal things at the right time"
+- [ ] **User preference persistence** — Store Focus Mode state
+- [ ] **Element targeting** — Define what blurs at each state
 
 ---
 
@@ -709,8 +1369,10 @@ OSQR launches with **Pro and Master tiers only**. No Lite/Free tier at launch.
 |------|-------------|--------------|------------|
 | **OSQR Pro** | $49/mo | $79/mo | Elite clarity + multi-model thinking |
 | **OSQR Master** | $149/mo | $249/mo | OS-level intelligence + all features |
+| **Enterprise** | — | $4,000+/mo | Organization-level OS (see [Appendix G](#appendix-g-enterprise-tier-vision-future)) |
 
 **No Lite tier at launch.** Lite will be introduced after premium brand is established.
+**Enterprise tier is future.** See Appendix G for full vision.
 
 ### Founder Pricing
 
@@ -1472,6 +2134,95 @@ When implementing, we'll need to solve:
 ### Monetization Note
 
 Collaboration features naturally unlock a **Team tier** ($XX/month/seat). Pricing TBD based on market conditions at time of development.
+
+---
+
+## Appendix G: Enterprise Tier Vision (Future)
+
+> **Status:** Strategic vision. Do not build until v2+ is stable.
+> **Timeframe:** 12-24 months out. Revisit when individual tiers have proven product-market fit.
+
+### What Enterprise Is
+
+OSQR Enterprise is the **organization-level operating system** — not just "more expensive Pro."
+
+It enables:
+- Coaching companies to deploy OSQR across all clients
+- SaaS teams to have shared AI workflows
+- Agencies to operationalize their methodologies
+- Any organization to have a custom "AI brain" trained on their content
+
+### Why Enterprise Matters
+
+| Lever | Impact |
+|-------|--------|
+| **Revenue** | $4K-$25K/month per org vs $29-99/user |
+| **Stickiness** | Org-wide adoption = high switching cost |
+| **Distribution** | One enterprise deal = hundreds of downstream users |
+| **Moat** | Custom agents trained on org content can't be replicated |
+
+### Enterprise vs White-Labeling
+
+**Enterprise is better than white-labeling because:**
+- White-labeling fragments control and brand
+- Enterprise preserves OSQR sovereignty
+- You build one OS; clients customize on top
+- No code forks, no feature divergence
+
+### Tier Structure (Projected)
+
+| Tier | Price | Target |
+|------|-------|--------|
+| **Pro** | $29/mo | Individual creators |
+| **Master** | $99/mo | Power users |
+| **Enterprise** | $4,000/mo | Organizations, coaching companies |
+| **Enterprise+** | $10,000-$25,000/mo | Large orgs, compliance needs |
+
+### Enterprise Features (Phased)
+
+**Enterprise v1 (Foundation)**
+- Organization PKV (shared vaults)
+- Admin dashboard (add/remove users, roles, billing)
+- Team collaboration (shared conversations, projects)
+- Custom organization agent
+- Priority onboarding
+
+**Enterprise v2 (Growth)**
+- Cohort management (for coaching companies)
+- Integration suite (Slack, Notion, HubSpot, etc.)
+- Custom model routing rules
+- Organization-wide behavioral intelligence
+
+**Enterprise v3 (Platform)**
+- Private deployments (SOC2/HIPAA environments)
+- Org-level app builder
+- Departmental agents (Sales, Marketing, Ops, Support)
+- Enterprise reporting and analytics
+
+### Prerequisites (Must Complete First)
+
+- [ ] Core v1 shipped and stable
+- [ ] Pro/Master tiers generating revenue
+- [ ] Council Mode operational
+- [ ] PKV proven at scale
+- [ ] Basic integrations working
+
+### The Philosophy
+
+> **Enterprise gives organizations the power of OSQR without giving away control of OSQR.**
+
+No fragmentation. No white-label chaos. One platform, many deployments.
+
+### Example Use Case: Coaching Company
+
+A coaching company like SaaS Academy could:
+1. Upload all playbooks, frameworks, and SOPs to Org PKV
+2. Deploy custom "Coach Agent" trained on their methodology
+3. Give every client founder their own OSQR instance
+4. Track cohort progress through admin dashboard
+5. Scale their coaching without scaling headcount
+
+This turns methodology into software.
 
 ---
 

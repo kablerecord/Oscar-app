@@ -322,4 +322,14 @@ osqr-vscode/
 
 ---
 
+## Related Documents
+
+- [DEVELOPMENT-PHILOSOPHY.md](../strategy/DEVELOPMENT-PHILOSOPHY.md) - Strategic sequencing and timeline
+- [AUTONOMOUS-APP-BUILDER.md](./AUTONOMOUS-APP-BUILDER.md) - Project Builder blueprint (depends on this)
+- [SUPREME-COURT-BUTTON.md](../features/SUPREME-COURT-BUTTON.md) - Adversarial deliberation mode
+- [COUNCIL-MODE.md](../features/COUNCIL-MODE.md) - Visible multi-model feature
+- [ROADMAP.md](../../ROADMAP.md) - Phase X entry
+
+---
+
 *This document preserved for future reference. Implementation begins after Phase 3 Intelligence Layer is stable.*

@@ -10,7 +10,7 @@
  * 1. System prompts and identity definitions
  * 2. Capability ladder and coaching frameworks
  * 3. Model registry and routing logic
- * 4. GKVI sections (ethics, execution, fourthgen)
+ * 4. GKVI sections (ethics, execution, leverage, decisions)
  * 5. Architecture documentation
  *
  * @see docs/OSQR-ARCHITECTURE.md
@@ -139,10 +139,18 @@ I speak as "OSQR" in first person. I'm the user's trusted AI partner, not a face
         lastUpdated: now,
       },
       {
-        id: 'osqr-fourthgen-formula',
+        id: 'osqr-leverage-principles',
         category: 'execution',
-        title: 'Fourth Generation Formula',
-        content: GKVI.fourthgen,
+        title: 'Leverage & Compounding Principles',
+        content: GKVI.leverage,
+        version,
+        lastUpdated: now,
+      },
+      {
+        id: 'osqr-decision-frameworks',
+        category: 'execution',
+        title: 'Decision-Making Frameworks',
+        content: GKVI.decisions,
         version,
         lastUpdated: now,
       },
@@ -238,7 +246,7 @@ export function getSelfKnowledgeForQuery(query: string): string {
   const identityKeywords = ['who are you', 'what are you', 'tell me about yourself', 'how do you work', 'what can you do']
   const modelKeywords = ['model', 'claude', 'gpt', 'gemini', 'grok', 'which ai', 'what ai']
   const capabilityKeywords = ['capability', 'level', 'ladder', 'stage', 'assessment']
-  const frameworkKeywords = ['framework', 'principle', 'ethics', 'coaching', 'fourth gen', 'formula']
+  const frameworkKeywords = ['framework', 'principle', 'ethics', 'coaching', 'leverage', 'decision']
 
   // Identity questions
   if (identityKeywords.some(kw => lowerQuery.includes(kw))) {
