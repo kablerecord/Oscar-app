@@ -291,6 +291,9 @@ export function progressOnboarding(
         case 'explain_modes':
           newState.stage = 'invite_first_question'
           break
+        case 'invite_first_question':
+          newState.stage = 'idle'
+          break
       }
       break
 

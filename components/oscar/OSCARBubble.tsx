@@ -599,7 +599,7 @@ export function OSCARBubble({
                           key={choice}
                           onClick={() => handleChoiceSelect(choice)}
                           disabled={isSubmitting}
-                          className="w-full rounded-xl px-6 py-4 text-base font-medium bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02]"
+                          className="w-full rounded-xl px-6 py-4 text-base font-medium bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] cursor-pointer disabled:cursor-not-allowed"
                         >
                           {choice}
                         </button>
@@ -638,7 +638,7 @@ export function OSCARBubble({
                               key={choice}
                               onClick={() => handleChoiceSelect(choice)}
                               disabled={isSubmitting}
-                              className={`w-full rounded-xl px-5 py-3.5 text-left text-base transition-all ${
+                              className={`w-full rounded-xl px-5 py-3.5 text-left text-base transition-all cursor-pointer disabled:cursor-not-allowed ${
                                 answer === choice
                                   ? 'bg-blue-500 text-white'
                                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-700'
