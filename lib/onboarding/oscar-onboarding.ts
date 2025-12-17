@@ -59,6 +59,15 @@ export interface OnboardingState {
 }
 
 // Messages OSQR says at each stage
+//
+// DESIGN PRINCIPLE (from OSQR-IDENTITY-SURFACES.md):
+// "OSQR is someone, not something."
+//
+// The first session teaches the identity model through experience, not explanation.
+// No tooltips. No tutorials. Just OSQR being OSQR.
+// Users learn that OSQR initiates surface transitions. They don't "navigate"—
+// they converse, and OSQR decides when to shift gears.
+//
 export const OSCAR_MESSAGES: Record<OnboardingStage, {
   greeting?: string
   message: string
@@ -69,39 +78,41 @@ export const OSCAR_MESSAGES: Record<OnboardingStage, {
   autoAdvanceDelay?: number
   showBrain?: boolean  // Show the brain icon
 }> = {
-  // ===== Phase 1: Introduction =====
+  // ===== Phase 1: Introduction (Relationship First) =====
+  // Per identity doc: "Hey. I'm OSQR. What's on your mind?"
+  // Warm, not robotic. A friend looking up when you walk in.
   welcome: {
     greeting: getTimeBasedGreeting(),
-    message: "I'm OSQR — your AI thinking partner.",
-    subMessage: "I help you work through problems, make better decisions, and get things done faster.",
+    message: "I'm OSQR.",
+    subMessage: "I'll be your thinking partner — someone to work through problems with, not just a tool to get answers from.",
     inputType: 'choice',
-    choices: ["Nice to meet you!"],
+    choices: ["Hey OSQR"],
     nextStage: 'explain_purpose',
     showBrain: true,
   },
 
   explain_purpose: {
-    message: "I'm not like other AI assistants. I don't just give you one answer — I consult a panel of AI experts, synthesize their best insights, and give you something actually useful.",
-    subMessage: "Think of me as having GPT-4, Claude, and other top AIs all working together for you.",
+    message: "I'm here whenever you need to think something through — big decisions, stuck problems, or just getting clarity on what matters.",
+    subMessage: "The more we work together, the better I'll understand how you think.",
     inputType: 'choice',
-    choices: ["How does that work?", "Sounds powerful"],
+    choices: ["What can you help with?", "Let's get started"],
     nextStage: 'explain_how',
   },
 
   explain_how: {
-    message: "When you ask me something important, I'll run it by my panel. Each AI thinks about it differently. Then I synthesize the best parts into one clear answer.",
-    subMessage: "You get multiple perspectives without having to manage multiple AI subscriptions.",
+    message: "Anything, really. Work problems, personal decisions, creative projects, learning something new...",
+    subMessage: "I flex to what you need. Some days that's quick answers, other days it's deep thinking.",
     inputType: 'choice',
-    choices: ["Got it, let's go!"],
+    choices: ["Got it"],
     nextStage: 'ask_ready',
   },
 
-  // ===== Phase 2: Get to know user =====
+  // ===== Phase 2: Get to know user (Conversational) =====
+  // Per identity doc: Users learn through natural conversation, not forms
   ask_ready: {
-    message: "Before we dive in, I'd love to learn a bit about you. The more I know, the more helpful I can be.",
-    subMessage: "Just a few quick questions — takes about 30 seconds.",
+    message: "Quick thing — I'd love to know a bit about you. Helps me be more useful.",
     inputType: 'choice',
-    choices: ["Sure, let's do it", "Skip for now"],
+    choices: ["Sure", "Skip for now"],
     nextStage: 'get_name',
   },
 
@@ -112,34 +123,35 @@ export const OSCAR_MESSAGES: Record<OnboardingStage, {
   },
 
   get_working_on: {
-    message: "What are you working on right now?",
-    subMessage: "A project, business, learning something new, career transition...",
+    message: "What's on your mind these days? What are you working on?",
+    subMessage: "Could be a project, a decision, learning something — whatever's taking up headspace.",
     inputType: 'text',
     nextStage: 'get_challenge',
   },
 
   get_challenge: {
-    message: "What's the biggest thing slowing you down or frustrating you?",
-    subMessage: "This helps me understand where I can help most.",
+    message: "And what's the hard part? Where do you get stuck?",
     inputType: 'text',
     nextStage: 'explain_modes',
   },
 
-  // ===== Phase 3: First experience =====
+  // ===== Phase 3: First experience (Teach by Doing) =====
+  // Per identity doc: "The first session IS real use. OSQR just happens to be meeting someone new."
+  // Don't explain modes upfront — let them discover naturally
   explain_modes: {
-    message: "Perfect! Now you're set up. One more thing — I have three modes:",
-    subMessage: "**Quick** → Fast answers for simple questions\n**Thoughtful** → Panel discussion for important decisions\n**Contemplate** → Deep analysis for your biggest challenges",
+    message: "Perfect. Now I have some context.",
+    subMessage: "One thing — when you need me to really think through something important, just ask. I'll take more time and dig deeper.",
     inputType: 'choice',
-    choices: ["Got it!"],
+    choices: ["Sounds good"],
     nextStage: 'invite_first_question',
   },
 
   invite_first_question: {
-    greeting: "You're all set!",
-    message: "Let's try it out. I'll step aside so you can ask your first question.",
-    subMessage: "Type something you're actually working on in the chat — I work best with real problems.",
+    greeting: "Alright.",
+    message: "What's on your mind?",
+    subMessage: "Type something you're actually thinking about — I work best with real problems.",
     inputType: 'choice',
-    choices: ["Let's go!"],
+    choices: ["Let me think..."],
     nextStage: 'idle',
   },
 
@@ -149,58 +161,54 @@ export const OSCAR_MESSAGES: Record<OnboardingStage, {
     nextStage: 'post_first_answer',
   },
 
+  // Per identity doc: OSQR initiates surface transitions
+  // After first answer, gently mention capabilities without being pushy
   post_first_answer: {
-    greeting: "Nice!",
-    message: "That was Quick mode — great for everyday questions. When you need deeper thinking, switch to 'Thoughtful' and I'll consult my panel.",
-    subMessage: "The button is right above the input box. Try it on your next important question!",
-    inputType: 'none',
-    autoAdvanceDelay: 6000,
-    nextStage: 'idle',
-  },
-
-  // ===== Phase 4: Ongoing =====
-  idle: {
-    message: "I'm here when you need me.",
-    inputType: 'none',
-  },
-
-  thoughtful_discovery: {
-    greeting: "You found Thoughtful mode!",
-    message: "This is where it gets interesting. I'm consulting multiple AI perspectives right now and will synthesize their best insights.",
-    subMessage: "Takes a bit longer, but you'll get a much richer answer. Worth it for important decisions.",
+    message: "By the way — when you have something really important to work through, I can go deeper. Just say so and I'll take my time with it.",
     inputType: 'none',
     autoAdvanceDelay: 5000,
     nextStage: 'idle',
   },
 
-  contemplate_discovery: {
-    greeting: "Welcome to Contemplate mode!",
-    message: "This is for your biggest decisions — career moves, major investments, strategic pivots. I'll do multiple rounds of deep analysis.",
-    subMessage: "I'll explore every angle. This takes time, but the output is worth it.",
+  // ===== Phase 4: Ongoing (Quiet Availability) =====
+  // Per identity doc: "Silence is not absence—it's companionship."
+  idle: {
+    message: "I'm here when you need me.",
     inputType: 'none',
-    autoAdvanceDelay: 6000,
+  },
+
+  // Discovery moments — gentle, not tutorial-like
+  // Per identity doc: "Sometimes being there matters more than saying something"
+  thoughtful_discovery: {
+    message: "I'm going to take my time with this one. Bringing in different perspectives to make sure I give you something useful.",
+    inputType: 'none',
+    autoAdvanceDelay: 4000,
+    nextStage: 'idle',
+  },
+
+  contemplate_discovery: {
+    message: "This deserves deep thought. I'll explore this from every angle — give me a minute.",
+    inputType: 'none',
+    autoAdvanceDelay: 5000,
     nextStage: 'idle',
   },
 
   upload_discovery: {
-    message: "Pro tip: You can upload documents to your knowledge base. The more context I have about your world, the better I can help.",
-    subMessage: "Click 'Vault' in the sidebar to add files, notes, or even chat exports.",
+    message: "The more I know about your world, the more I can help. You can add documents to your Vault whenever you want.",
     inputType: 'none',
     autoAdvanceDelay: 5000,
     nextStage: 'idle',
   },
 
   chat_history_discovery: {
-    greeting: "Quick tip!",
-    message: "Power users upload their ChatGPT and Claude conversation exports. It gives me years of context about how you think and what you're working on.",
-    subMessage: "For best practices, ask me any questions about what and how to upload in the Vault.",
+    message: "If you've used other AIs, you can import those conversations. Gives me years of context about how you think.",
     inputType: 'none',
-    autoAdvanceDelay: 7000,
+    autoAdvanceDelay: 6000,
     nextStage: 'idle',
   },
 
   completed: {
-    message: "I know you pretty well now. Ready when you are!",
+    message: "Ready when you are.",
     inputType: 'none',
   },
 }

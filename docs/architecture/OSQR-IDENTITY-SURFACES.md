@@ -1,7 +1,7 @@
 # OSQR Identity & Surfaces Architecture
 
 **Version:** 1.1
-**Date:** December 17, 2024
+**Date:** December 17, 2025
 **Status:** Canonical
 **Owner:** Kable Record
 **Revision:** Added positioning principle, first-session flow, plugin tone rules, presence states, and trust patterns
