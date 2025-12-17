@@ -5,6 +5,12 @@ import { generateEmbedding, formatEmbeddingForPostgres } from '@/lib/ai/embeddin
 import { canUploadDocument, canUploadFileSize } from '@/lib/tiers/check'
 import { parsePDF } from '@/lib/utils/pdf-parser'
 import OpenAI from 'openai'
+import { createHash } from 'crypto'
+
+// Generate SHA-256 hash of content for duplicate detection
+function generateContentHash(content: string): string {
+  return createHash('sha256').update(content).digest('hex')
+}
 
 // Lazy initialization to avoid build-time errors
 let openaiClient: OpenAI | null = null
@@ -182,6 +188,35 @@ export async function POST(req: NextRequest) {
         data: { charCount, wordCount }
       })
 
+      // Check for duplicate content BEFORE expensive AI analysis
+      const contentHash = generateContentHash(fileContent)
+      const existingDocument = await prisma.document.findFirst({
+        where: {
+          workspaceId,
+          contentHash,
+        },
+        select: {
+          id: true,
+          title: true,
+          createdAt: true,
+        }
+      })
+
+      if (existingDocument) {
+        await sendEvent({
+          phase: 'error',
+          progress: 0,
+          message: `Duplicate content detected. This file's content matches "${existingDocument.title}" (uploaded ${existingDocument.createdAt.toLocaleDateString()}).`,
+          data: {
+            error: 'Duplicate content',
+            existingDocumentId: existingDocument.id,
+            existingDocumentTitle: existingDocument.title,
+          }
+        })
+        await writer.close()
+        return
+      }
+
       // Phase 3: Analyzing content
       await sendEvent({
         phase: 'analyzing',
@@ -277,13 +312,14 @@ Respond in this JSON format:
         })
       }
 
-      // Create document record
+      // Create document record with content hash for duplicate detection
       const document = await prisma.document.create({
         data: {
           workspaceId,
           projectId: project.id,
           title: fileName,
           textContent: fileContent,
+          contentHash, // SHA-256 hash for duplicate detection
           sourceType: 'file_upload',
           originalFilename: fileName,
           metadata: {

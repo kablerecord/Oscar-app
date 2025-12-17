@@ -1,40 +1,31 @@
 /**
- * PDF Parser using pdfjs-dist directly
+ * PDF Parser using unpdf
  *
- * We use pdfjs-dist directly instead of pdf-parse because pdf-parse has a bug
- * where it tries to load test fixture files at import time, causing ENOENT errors
- * in production environments.
+ * We use unpdf instead of pdfjs-dist because pdfjs-dist requires browser APIs
+ * like DOMMatrix that don't exist in Node.js server environments.
+ *
+ * unpdf is a Node.js-compatible PDF text extraction library.
  */
 
-import type { TextItem } from 'pdfjs-dist/types/src/display/api'
+import { extractText, getDocumentProxy } from 'unpdf'
 
 /**
  * Parse PDF buffer and extract text content
- * Uses pdfjs-dist directly to avoid pdf-parse's test file loading bug
+ * Uses unpdf which is Node.js compatible (no browser APIs required)
  */
 export async function parsePDF(buffer: Buffer): Promise<{ text: string; numPages: number }> {
-  // Dynamic import to load pdfjs-dist only when needed
-  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs')
-
-  // Convert Buffer to Uint8Array for pdfjs-dist
+  // Convert Buffer to Uint8Array for unpdf
   const uint8Array = new Uint8Array(buffer)
 
-  const loadingTask = pdfjsLib.getDocument({ data: uint8Array })
-  const pdf = await loadingTask.promise
+  // Get document proxy to get page count
+  const pdf = await getDocumentProxy(uint8Array)
+  const numPages = pdf.numPages
 
-  let fullText = ''
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i)
-    const textContent = await page.getTextContent()
-    const pageText = textContent.items
-      .filter((item): item is TextItem => 'str' in item)
-      .map((item) => item.str)
-      .join(' ')
-    fullText += pageText + '\n'
-  }
+  // Extract text from all pages
+  const { text } = await extractText(uint8Array, { mergePages: true })
 
   return {
-    text: fullText.trim(),
-    numPages: pdf.numPages
+    text: text.trim(),
+    numPages
   }
 }

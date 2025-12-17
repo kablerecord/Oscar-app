@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 // Build version - update this with each significant deploy
-const BUILD_VERSION = 'v1.2.0-pdfjs-only'
+const BUILD_VERSION = 'v1.3.0-unpdf-dedup'
 
 export async function GET() {
   return NextResponse.json({

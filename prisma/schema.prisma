@@ -79,6 +79,7 @@ model Document {
   originalFilename String?
   mimeType         String?
   textContent      String
+  contentHash      String?         // SHA-256 hash of content for duplicate detection
   metadata         Json?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
@@ -89,6 +90,7 @@ model Document {
   @@index([workspaceId])
   @@index([projectId])
   @@index([sourceType])
+  @@index([workspaceId, contentHash]) // For fast duplicate checking
 }
 
 model DocumentChunk {
