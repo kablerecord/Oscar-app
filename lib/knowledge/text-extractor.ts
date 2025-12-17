@@ -57,10 +57,10 @@ export class TextExtractor {
    */
   private static async extractPdf(filePath: string): Promise<string> {
     try {
-      // Using pdf-parse v1.x which exports a function directly
-      const pdfParse = require('pdf-parse')
+      // Use our custom PDF parser that avoids pdf-parse's test file bug
+      const { parsePDF } = await import('@/lib/utils/pdf-parser')
       const dataBuffer = await fs.readFile(filePath)
-      const data = await pdfParse(dataBuffer)
+      const data = await parsePDF(dataBuffer)
       return data.text
     } catch (error) {
       throw new Error(`Failed to extract PDF: ${error}`)
