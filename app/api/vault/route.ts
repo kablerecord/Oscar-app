@@ -3,9 +3,9 @@ import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
 
 const QuerySchema = z.object({
-  workspaceId: z.string().optional(),
-  sourceType: z.string().optional(),
-  search: z.string().optional(),
+  workspaceId: z.string().nullish(),
+  sourceType: z.string().nullish(),
+  search: z.string().nullish(),
   page: z.coerce.number().default(1),
   limit: z.coerce.number().default(20),
 })
