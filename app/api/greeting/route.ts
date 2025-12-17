@@ -65,6 +65,10 @@ Context:
 Return ONLY the greeting text, nothing else. 1-2 sentences max.`
 
   try {
+    // Add timeout to prevent slow greetings
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -73,14 +77,19 @@ Return ONLY the greeting text, nothing else. 1-2 sentences max.`
       ],
       max_tokens: 100,
       temperature: 0.8,
-    })
+    }, { signal: controller.signal })
+
+    clearTimeout(timeout)
 
     const greeting = response.choices[0]?.message?.content?.trim()
     if (greeting) {
       return [greeting]
     }
   } catch (error) {
-    console.error('AI greeting generation failed:', error)
+    // Silently fail - will use static greeting
+    if (error instanceof Error && error.name !== 'AbortError') {
+      console.error('AI greeting generation failed:', error)
+    }
   }
 
   // Fallback to empty - will use static greeting
@@ -203,28 +212,37 @@ export async function GET(req: NextRequest) {
       where: { userId: session.user.id },
     })
 
-    // Calculate streak
+    // Calculate streak efficiently - single query to get all recent usage dates
     let currentStreak = 0
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    thirtyDaysAgo.setHours(0, 0, 0, 0)
+
+    const recentUsage = await prisma.usageRecord.findMany({
+      where: {
+        userId: session.user.id,
+        date: { gte: thirtyDaysAgo },
+      },
+      select: { date: true },
+      orderBy: { date: 'desc' },
+    })
+
+    // Get unique days with activity
+    const activeDays = new Set(
+      recentUsage.map(r => {
+        const d = new Date(r.date)
+        return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      })
+    )
+
+    // Count consecutive days from today
     const checkDate = new Date()
     checkDate.setHours(0, 0, 0, 0)
-
-    for (let i = 0; i < 365; i++) {
-      const dayStart = new Date(checkDate)
-      dayStart.setDate(dayStart.getDate() - i)
-      const dayEnd = new Date(dayStart)
-      dayEnd.setDate(dayEnd.getDate() + 1)
-
-      const hadActivity = await prisma.usageRecord.count({
-        where: {
-          userId: session.user.id,
-          date: {
-            gte: dayStart,
-            lt: dayEnd,
-          },
-        },
-      })
-
-      if (hadActivity > 0) {
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(checkDate)
+      d.setDate(d.getDate() - i)
+      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+      if (activeDays.has(key)) {
         currentStreak++
       } else if (i > 0) {
         break
