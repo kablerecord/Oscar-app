@@ -157,12 +157,27 @@ function analyzeForRefinement(question: string): RefinementSuggestion | null {
   const wordCount = words.length
 
   // Too short - needs more context
-  if (wordCount < 4 && q.length > 0) {
+  if (wordCount < 3 && q.length > 0) {
     return {
       type: 'add_context',
       message: 'Add more context for a better answer',
       example: 'Try: "How do I [your question] for [your specific situation]?"',
     }
+  }
+
+  // Simple factual questions - these are fine as-is, don't need Fire
+  const simpleFactualPatterns = [
+    /^what (is|are|was|were) \d/,           // "what is 2 x 2"
+    /^how (much|many|old|long|tall|far)/,   // "how much is..."
+    /^when (is|was|did|does|will)/,         // "when is..."
+    /^where (is|are|was|were|do|does)/,     // "where is..."
+    /^who (is|was|are|were)/,               // "who is..."
+    /^define\b/,                             // "define X"
+    /^what does .+ mean/,                    // "what does X mean"
+    /^\d+ [\+\-\*\/x×÷] \d+/,               // math expressions
+  ]
+  if (simpleFactualPatterns.some(p => p.test(q))) {
+    return null // Simple questions don't need refinement hints, show Send
   }
 
   // Vague questions that could use specificity
@@ -175,21 +190,11 @@ function analyzeForRefinement(question: string): RefinementSuggestion | null {
     /^help me with/,
     /^i need help/,
   ]
-  if (vagueStarters.some(p => p.test(q)) && wordCount < 10) {
+  if (vagueStarters.some(p => p.test(q)) && wordCount < 8) {
     return {
       type: 'be_specific',
       message: 'Be more specific about what you want to know',
       example: 'Instead of "tell me about X", try "what are the key considerations for X when Y?"',
-    }
-  }
-
-  // Questions without clear goal
-  const hasGoalWords = /\b(to|for|so that|in order to|because|want to|need to|trying to)\b/.test(q)
-  if (wordCount > 5 && wordCount < 15 && !hasGoalWords && !q.includes('?')) {
-    return {
-      type: 'add_goal',
-      message: 'Consider adding your goal or intended outcome',
-      example: 'Add "so I can..." or "because I want to..." to get more targeted advice',
     }
   }
 
@@ -200,7 +205,7 @@ function analyzeForRefinement(question: string): RefinementSuggestion | null {
     /everything about/,
     /all about/,
   ]
-  if (broadPatterns.some(p => p.test(q)) && !q.includes('specific')) {
+  if (broadPatterns.some(p => p.test(q)) && !q.includes('specific') && wordCount < 10) {
     return {
       type: 'clarify_scope',
       message: 'This is broad - consider narrowing the scope',
@@ -215,8 +220,8 @@ function analyzeForRefinement(question: string): RefinementSuggestion | null {
     /\bor\b.*\?$/,
     /choose between/,
   ]
-  if (decisionPatterns.some(p => p.test(q)) && wordCount < 20) {
-    const hasConstraints = /\b(budget|time|cost|deadline|experience|skill|goal|priority)\b/.test(q)
+  if (decisionPatterns.some(p => p.test(q)) && wordCount < 15) {
+    const hasConstraints = /\b(budget|time|cost|deadline|experience|skill|goal|priority|because|for my|for our)\b/.test(q)
     if (!hasConstraints) {
       return {
         type: 'add_constraints',
@@ -226,8 +231,26 @@ function analyzeForRefinement(question: string): RefinementSuggestion | null {
     }
   }
 
-  // Good question - no suggestions needed
-  if (wordCount >= 10 || q.includes('?') && wordCount >= 6) {
+  // Signals of a thoughtful question - Fire worthy
+  const thoughtfulSignals = [
+    /\b(my|our|i'm|we're|i am|we are)\b/,     // Personal context
+    /\b(because|since|given that|considering)\b/, // Reasoning
+    /\b(goal|objective|trying to|want to|need to)\b/, // Intent
+    /\b(situation|context|scenario|case)\b/,   // Context awareness
+    /\b(specifically|in particular|especially)\b/, // Specificity
+    /\b(business|project|team|company|product)\b/, // Domain context
+    /\b(strategy|approach|framework|system)\b/, // Strategic thinking
+  ]
+
+  const thoughtfulCount = thoughtfulSignals.filter(p => p.test(q)).length
+
+  // Good question if:
+  // - Has 2+ thoughtful signals, OR
+  // - Has 1 thoughtful signal AND 5+ words, OR
+  // - Has a question mark AND 6+ words AND isn't a simple factual question
+  if (thoughtfulCount >= 2 ||
+      (thoughtfulCount >= 1 && wordCount >= 5) ||
+      (q.includes('?') && wordCount >= 6)) {
     return {
       type: 'good',
       message: 'Looking good!',
