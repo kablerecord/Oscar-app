@@ -264,7 +264,7 @@ export function progressOnboarding(
   action: {
     type: 'answer' | 'skip' | 'auto_advance' | 'asked_question' | 'mode_changed' | 'answer_received'
     answer?: string
-    mode?: 'quick' | 'thoughtful' | 'contemplate'
+    mode?: 'quick' | 'thoughtful' | 'contemplate' | 'supreme'
   }
 ): OnboardingState {
   const newState = { ...state }
