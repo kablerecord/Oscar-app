@@ -78,7 +78,7 @@ export default async function VaultPage() {
 
         {/* Document list */}
         <div className="pt-4">
-          <h2 className="text-lg font-semibold text-white mb-4">
+          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
             All Documents
           </h2>
           <DocumentList

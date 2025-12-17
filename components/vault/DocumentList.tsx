@@ -283,7 +283,7 @@ export function DocumentList({
         ) : documents.length === 0 ? (
           <Card className="p-8 text-center">
             <FileText className="mx-auto h-12 w-12 text-neutral-500" />
-            <p className="mt-4 text-neutral-400">
+            <p className="mt-4 text-neutral-600 dark:text-neutral-400">
               No documents found
             </p>
           </Card>
@@ -318,10 +318,10 @@ export function DocumentList({
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-medium text-white truncate">
+                      <h3 className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
                         {doc.title}
                       </h3>
-                      <span className="text-sm text-neutral-400">
+                      <span className="text-sm text-neutral-500 dark:text-neutral-400">
                         {formatDate(doc.createdAt)}
                       </span>
                     </div>
@@ -354,7 +354,7 @@ export function DocumentList({
       {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between border-t pt-4">
-          <p className="text-sm text-neutral-300">
+          <p className="text-sm text-neutral-600 dark:text-neutral-300">
             Showing {(pagination.page - 1) * pagination.limit + 1} -{' '}
             {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
             {pagination.total} documents

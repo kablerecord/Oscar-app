@@ -45,10 +45,10 @@ export function VaultPageClient({ workspaceId, children }: VaultPageClientProps)
     <div className="space-y-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">
+          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
             Memory Vault
           </h1>
-          <p className="mt-2 text-neutral-300">
+          <p className="mt-2 text-neutral-600 dark:text-neutral-300">
             Browse and manage your indexed documents. OSQR uses this knowledge to give you personalized answers.
           </p>
         </div>
