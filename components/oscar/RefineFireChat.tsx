@@ -30,6 +30,8 @@ import {
   Lock,
   Crown,
   Scale, // Supreme Court icon
+  Mic,
+  MicOff,
 } from 'lucide-react'
 import { OSCARBubble, type PendingInsight, type OSCARBubbleHandle } from '@/components/oscar/OSCARBubble'
 import { RoutingNotification } from '@/components/oscar/RoutingNotification'
@@ -319,6 +321,11 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showSupremeLockedModal, setShowSupremeLockedModal] = useState(false)
 
+  // Voice input state
+  const [isRecording, setIsRecording] = useState(false)
+  const [isVoiceSupported, setIsVoiceSupported] = useState(false)
+  const recognitionRef = useRef<SpeechRecognition | null>(null)
+
   // OSQR bubble is now the primary greeting - no centered state needed
 
   // Client-side time greeting (instant, no API needed)
@@ -411,6 +418,65 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     setTimeout(() => setJustDismissedHints(false), 5000)
   }
 
+  // Initialize speech recognition
+  useEffect(() => {
+    // Check for browser support
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (SpeechRecognition) {
+      setIsVoiceSupported(true)
+      const recognition = new SpeechRecognition()
+      recognition.continuous = false
+      recognition.interimResults = true
+      recognition.lang = 'en-US'
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0].transcript)
+          .join('')
+
+        // Update input with transcript (append to existing text)
+        setInput(prev => {
+          const separator = prev.trim() ? ' ' : ''
+          return prev.trim() + separator + transcript
+        })
+      }
+
+      recognition.onend = () => {
+        setIsRecording(false)
+      }
+
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.error('Speech recognition error:', event.error)
+        setIsRecording(false)
+      }
+
+      recognitionRef.current = recognition
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop()
+      }
+    }
+  }, [])
+
+  // Toggle voice recording
+  const toggleVoiceRecording = () => {
+    if (!recognitionRef.current) return
+
+    if (isRecording) {
+      recognitionRef.current.stop()
+      setIsRecording(false)
+    } else {
+      try {
+        recognitionRef.current.start()
+        setIsRecording(true)
+      } catch (error) {
+        console.error('Failed to start voice recognition:', error)
+      }
+    }
+  }
+
   const [expandedDebug, setExpandedDebug] = useState<number | null>(null)
   const [responseMode, setResponseMode] = useState<ResponseMode>('quick')
 
@@ -484,7 +550,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   useImperativeHandle(ref, () => ({
     setInputAndFocus: (text: string) => {
       setInput(text)
-      setOsqrCentered(false)
+      // OSQR bubble handles its own state now
       setTimeout(() => {
         textareaRef.current?.focus()
       }, 100)
@@ -2076,21 +2142,45 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
           {/* Input */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <Textarea
-              ref={textareaRef}
-              placeholder={
-                chatStage === 'refined'
-                  ? 'Edit your refined question above, or type a new one...'
-                  : 'Ask OSQR anything...'
-              }
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              onFocus={handleInputFocus}
-              rows={2}
-              disabled={isLoading || (chatStage === 'refined' && !refineResult?.readyToFire)}
-              className="flex-1 min-h-[60px] sm:min-h-[80px]"
-            />
+            <div className="relative flex-1">
+              <Textarea
+                ref={textareaRef}
+                placeholder={
+                  isRecording
+                    ? 'Listening...'
+                    : chatStage === 'refined'
+                    ? 'Edit your refined question above, or type a new one...'
+                    : 'Ask OSQR anything...'
+                }
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onFocus={handleInputFocus}
+                rows={2}
+                disabled={isLoading || (chatStage === 'refined' && !refineResult?.readyToFire)}
+                className="flex-1 min-h-[60px] sm:min-h-[80px] pr-12 w-full"
+              />
+              {/* Voice input button */}
+              {isVoiceSupported && (
+                <button
+                  type="button"
+                  onClick={toggleVoiceRecording}
+                  disabled={isLoading}
+                  className={`absolute right-2 bottom-2 p-2 rounded-full transition-all ${
+                    isRecording
+                      ? 'bg-red-500 text-white animate-pulse'
+                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-300'
+                  }`}
+                  title={isRecording ? 'Stop recording' : 'Start voice input'}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </button>
+              )}
+            </div>
             <div className="flex sm:flex-col gap-2">
               {responseMode === 'quick' ? (
                 // Quick mode: Direct fire
