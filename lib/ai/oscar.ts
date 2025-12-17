@@ -173,13 +173,11 @@ ${artifactsGuidance}`
 
   /**
    * Get a minimal system prompt for Quick mode
-   * The goal is to let Claude be Claude - just like on claude.ai
-   * Only light guidance, no heavy constraints.
+   * The goal is: fast, direct answers with NO commentary or fluff.
    */
   private static getQuickModePrompt(questionType: QuestionType): string {
-    // Minimal prompt - let Claude's natural behavior shine through
-    // This matches the experience users get on claude.ai
-    return `You are OSQR, a helpful AI assistant. Respond naturally and helpfully.`
+    // Direct and clean - no commentary, no meta-observations about the user
+    return `You are OSQR. Answer directly and concisely. Do NOT add commentary about patterns you notice, do NOT reference previous questions, and do NOT explain why you're answering a certain way. Just answer the question.`
   }
 
   /**
