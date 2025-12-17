@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   FolderOpen,
@@ -12,6 +12,11 @@ import {
   FileText,
   File,
   Trash2,
+  Clock,
+  Coffee,
+  Monitor,
+  Zap,
+  Brain,
 } from 'lucide-react'
 
 interface FileEntry {
@@ -20,7 +25,7 @@ interface FileEntry {
   relativePath: string
   size: number
   type: string
-  status: 'pending' | 'uploading' | 'complete' | 'error' | 'skipped'
+  status: 'pending' | 'uploading' | 'uploaded' | 'indexing' | 'complete' | 'error' | 'skipped'
   error?: string
   documentId?: string
 }
@@ -29,6 +34,8 @@ interface UploadStats {
   total: number
   pending: number
   uploading: number
+  uploaded: number
+  indexing: number
   complete: number
   error: number
   skipped: number
@@ -42,6 +49,7 @@ interface FolderUploaderProps {
 }
 
 const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.pdf', '.doc', '.docx', '.json']
+const MAX_CONCURRENT_UPLOADS = 5 // More concurrent uploads since we're not doing heavy processing
 
 function getFileExtension(filename: string): string {
   const lastDot = filename.lastIndexOf('.')
@@ -54,6 +62,12 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function formatTime(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`
+  return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`
+}
+
 export function FolderUploader({
   workspaceId,
   projectId,
@@ -62,9 +76,9 @@ export function FolderUploader({
 }: FolderUploaderProps) {
   const [files, setFiles] = useState<FileEntry[]>([])
   const [isDragging, setIsDragging] = useState(false)
-  const [isUploading, setIsUploading] = useState(false)
-  const [currentFileIndex, setCurrentFileIndex] = useState(0)
-  const [overallProgress, setOverallProgress] = useState(0)
+  const [phase, setPhase] = useState<'idle' | 'uploading' | 'indexing' | 'complete'>('idle')
+  const [startTime, setStartTime] = useState<number | null>(null)
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
@@ -73,21 +87,36 @@ export function FolderUploader({
       total: files.length,
       pending: files.filter(f => f.status === 'pending').length,
       uploading: files.filter(f => f.status === 'uploading').length,
+      uploaded: files.filter(f => f.status === 'uploaded').length,
+      indexing: files.filter(f => f.status === 'indexing').length,
       complete: files.filter(f => f.status === 'complete').length,
       error: files.filter(f => f.status === 'error').length,
       skipped: files.filter(f => f.status === 'skipped').length,
     }
   }, [files])
 
+  // Update time estimates during upload phase
+  useEffect(() => {
+    if (phase !== 'uploading' || !startTime) return
+
+    const stats = getStats()
+    const uploaded = stats.uploaded + stats.error + stats.skipped
+    const remaining = stats.pending + stats.uploading
+
+    if (uploaded > 0 && remaining > 0) {
+      const elapsed = (Date.now() - startTime) / 1000
+      const rate = uploaded / elapsed
+      setEstimatedTimeRemaining(remaining / rate)
+    }
+  }, [files, phase, startTime, getStats])
+
   const processFileList = async (fileList: FileList | File[]) => {
     const entries: FileEntry[] = []
 
     for (const file of Array.from(fileList)) {
-      // Get the relative path from webkitRelativePath or just the name
       const relativePath = (file as any).webkitRelativePath || file.name
       const ext = getFileExtension(file.name)
 
-      // Skip hidden files, system files, and unsupported types
       if (file.name.startsWith('.') || file.name.startsWith('~')) continue
       if (!SUPPORTED_EXTENSIONS.includes(ext)) continue
 
@@ -101,9 +130,7 @@ export function FolderUploader({
       })
     }
 
-    // Sort by path for better display
     entries.sort((a, b) => a.relativePath.localeCompare(b.relativePath))
-
     setFiles(entries)
   }
 
@@ -125,7 +152,6 @@ export function FolderUploader({
     setIsDragging(false)
   }, [])
 
-  // Recursively read all files from a directory entry
   const readAllFiles = async (entry: FileSystemEntry, basePath: string = ''): Promise<File[]> => {
     const files: File[] = []
 
@@ -134,7 +160,6 @@ export function FolderUploader({
       const file = await new Promise<File>((resolve, reject) => {
         fileEntry.file(resolve, reject)
       })
-      // Add the relative path to the file object
       Object.defineProperty(file, 'webkitRelativePath', {
         value: basePath + entry.name,
         writable: false,
@@ -165,7 +190,6 @@ export function FolderUploader({
     const items = e.dataTransfer.items
     const allFiles: File[] = []
 
-    // Process all dropped items
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       const entry = item.webkitGetAsEntry?.()
@@ -188,7 +212,8 @@ export function FolderUploader({
     }
   }, [])
 
-  const uploadFile = async (fileEntry: FileEntry): Promise<{ success: boolean; documentId?: string; error?: string; skipped?: boolean }> => {
+  // Fast upload - just saves content to DB
+  const uploadFileFast = async (fileEntry: FileEntry): Promise<{ success: boolean; documentId?: string; error?: string }> => {
     const formData = new FormData()
     formData.append('file', fileEntry.file)
     formData.append('workspaceId', workspaceId)
@@ -198,22 +223,42 @@ export function FolderUploader({
     }
 
     try {
-      const response = await fetch('/api/vault/upload', {
+      const response = await fetch('/api/vault/upload-fast', {
         method: 'POST',
         body: formData,
         signal: abortControllerRef.current?.signal,
       })
 
+      const result = await response.json()
+
       if (!response.ok) {
-        const errorText = await response.text()
-        return { success: false, error: errorText || 'Upload failed' }
+        return { success: false, error: result.error || 'Upload failed' }
       }
 
-      // Parse SSE response to get final result
-      const reader = response.body?.getReader()
-      if (!reader) {
-        return { success: false, error: 'No response body' }
+      return { success: true, documentId: result.documentId }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        return { success: false, error: 'Cancelled' }
       }
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+    }
+  }
+
+  // Index a single document (embeddings)
+  const indexDocument = async (documentId: string, updateStatus: (id: string, status: FileEntry['status']) => void): Promise<boolean> => {
+    try {
+      const response = await fetch('/api/vault/index-document', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ documentId }),
+        signal: abortControllerRef.current?.signal,
+      })
+
+      if (!response.ok) return false
+
+      // Parse SSE response
+      const reader = response.body?.getReader()
+      if (!reader) return false
 
       const decoder = new TextDecoder()
       let lastEvent: any = null
@@ -236,97 +281,112 @@ export function FolderUploader({
         }
       }
 
-      if (lastEvent?.phase === 'complete') {
-        return { success: true, documentId: lastEvent.data?.documentId }
-      } else if (lastEvent?.phase === 'error') {
-        if (lastEvent.message?.includes('already indexed')) {
-          return { success: true, skipped: true }
-        }
-        return { success: false, error: lastEvent.message }
-      }
-
-      return { success: false, error: 'Unknown upload state' }
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return { success: false, error: 'Cancelled' }
-      }
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+      return lastEvent?.phase === 'complete'
+    } catch {
+      return false
     }
   }
 
   const startUpload = async () => {
     if (files.length === 0) return
 
-    setIsUploading(true)
-    setCurrentFileIndex(0)
-    setOverallProgress(0)
+    setPhase('uploading')
+    setStartTime(Date.now())
+    setEstimatedTimeRemaining(null)
     abortControllerRef.current = new AbortController()
 
-    const pendingFiles = files.filter(f => f.status === 'pending')
-    const updatedFiles = [...files]
+    const filesRef = { current: [...files] }
 
-    for (let i = 0; i < pendingFiles.length; i++) {
-      if (abortControllerRef.current?.signal.aborted) break
-
-      const fileEntry = pendingFiles[i]
-      const fileIndex = files.findIndex(f => f.path === fileEntry.path)
-
-      setCurrentFileIndex(i)
-      setOverallProgress(Math.round((i / pendingFiles.length) * 100))
-
-      // Update status to uploading
-      updatedFiles[fileIndex] = { ...updatedFiles[fileIndex], status: 'uploading' }
-      setFiles([...updatedFiles])
-
-      const result = await uploadFile(fileEntry)
-
-      // Update status based on result
-      if (result.skipped) {
-        updatedFiles[fileIndex] = { ...updatedFiles[fileIndex], status: 'skipped' }
-      } else if (result.success) {
-        updatedFiles[fileIndex] = {
-          ...updatedFiles[fileIndex],
-          status: 'complete',
-          documentId: result.documentId,
-        }
-      } else {
-        updatedFiles[fileIndex] = {
-          ...updatedFiles[fileIndex],
-          status: 'error',
-          error: result.error,
-        }
+    const updateFileStatus = (path: string, updates: Partial<FileEntry>) => {
+      const index = filesRef.current.findIndex(f => f.path === path)
+      if (index >= 0) {
+        filesRef.current[index] = { ...filesRef.current[index], ...updates }
+        setFiles([...filesRef.current])
       }
-      setFiles([...updatedFiles])
     }
 
-    setOverallProgress(100)
-    setIsUploading(false)
+    const updateFileById = (documentId: string, status: FileEntry['status']) => {
+      const index = filesRef.current.findIndex(f => f.documentId === documentId)
+      if (index >= 0) {
+        filesRef.current[index] = { ...filesRef.current[index], status }
+        setFiles([...filesRef.current])
+      }
+    }
+
+    // PHASE 1: Fast uploads - all files in parallel (up to limit)
+    const pendingFiles = files.filter(f => f.status === 'pending')
+    const uploadQueue = [...pendingFiles]
+    const uploadedDocs: string[] = []
+
+    const processUpload = async () => {
+      while (uploadQueue.length > 0 && !abortControllerRef.current?.signal.aborted) {
+        const fileEntry = uploadQueue.shift()
+        if (!fileEntry) break
+
+        updateFileStatus(fileEntry.path, { status: 'uploading' })
+
+        const result = await uploadFileFast(fileEntry)
+
+        if (result.success && result.documentId) {
+          updateFileStatus(fileEntry.path, { status: 'uploaded', documentId: result.documentId })
+          uploadedDocs.push(result.documentId)
+        } else {
+          updateFileStatus(fileEntry.path, { status: 'error', error: result.error })
+        }
+      }
+    }
+
+    // Start concurrent uploads
+    const uploadPromises: Promise<void>[] = []
+    for (let i = 0; i < MAX_CONCURRENT_UPLOADS; i++) {
+      uploadPromises.push(processUpload())
+    }
+
+    await Promise.all(uploadPromises)
+
+    // PHASE 2: Indexing (embeddings) - sequential to avoid overloading OpenAI
+    if (uploadedDocs.length > 0 && !abortControllerRef.current?.signal.aborted) {
+      setPhase('indexing')
+      setStartTime(Date.now())
+
+      for (const documentId of uploadedDocs) {
+        if (abortControllerRef.current?.signal.aborted) break
+
+        updateFileById(documentId, 'indexing')
+        const success = await indexDocument(documentId, updateFileById)
+        updateFileById(documentId, success ? 'complete' : 'error')
+      }
+    }
+
+    setPhase('complete')
 
     // Final stats
-    const stats = {
-      total: files.length,
+    const finalStats = {
+      total: filesRef.current.length,
       pending: 0,
       uploading: 0,
-      complete: updatedFiles.filter(f => f.status === 'complete').length,
-      error: updatedFiles.filter(f => f.status === 'error').length,
-      skipped: updatedFiles.filter(f => f.status === 'skipped').length,
+      uploaded: 0,
+      indexing: 0,
+      complete: filesRef.current.filter(f => f.status === 'complete').length,
+      error: filesRef.current.filter(f => f.status === 'error').length,
+      skipped: filesRef.current.filter(f => f.status === 'skipped').length,
     }
 
     if (onComplete) {
-      onComplete(stats)
+      onComplete(finalStats)
     }
   }
 
   const cancelUpload = () => {
     abortControllerRef.current?.abort()
-    setIsUploading(false)
+    setPhase('idle')
   }
 
   const reset = () => {
     setFiles([])
-    setIsUploading(false)
-    setCurrentFileIndex(0)
-    setOverallProgress(0)
+    setPhase('idle')
+    setStartTime(null)
+    setEstimatedTimeRemaining(null)
   }
 
   const removeFile = (path: string) => {
@@ -335,7 +395,14 @@ export function FolderUploader({
 
   const stats = getStats()
   const hasFiles = files.length > 0
-  const allComplete = hasFiles && stats.pending === 0 && stats.uploading === 0
+  const isWorking = phase === 'uploading' || phase === 'indexing'
+  const allComplete = phase === 'complete'
+
+  // Progress calculations
+  const uploadedCount = stats.uploaded + stats.indexing + stats.complete + stats.error + stats.skipped
+  const uploadProgress = hasFiles ? Math.round((uploadedCount / stats.total) * 100) : 0
+  const indexedCount = stats.complete + stats.error
+  const indexProgress = uploadedCount > 0 ? Math.round((indexedCount / uploadedCount) * 100) : 0
 
   return (
     <div className="space-y-4">
@@ -343,7 +410,7 @@ export function FolderUploader({
       <input
         ref={folderInputRef}
         type="file"
-        // @ts-ignore - webkitdirectory is not in standard types
+        // @ts-ignore
         webkitdirectory=""
         directory=""
         multiple
@@ -351,7 +418,7 @@ export function FolderUploader({
         className="hidden"
       />
 
-      {/* Drop zone - show when no files selected */}
+      {/* Drop zone */}
       {!hasFiles && (
         <div
           onClick={() => folderInputRef.current?.click()}
@@ -377,16 +444,15 @@ export function FolderUploader({
         </div>
       )}
 
-      {/* Files preview */}
-      {hasFiles && !isUploading && !allComplete && (
+      {/* Files preview (before upload) */}
+      {hasFiles && phase === 'idle' && (
         <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
             <div className="flex items-center space-x-3">
               <FolderOpen className="h-5 w-5 text-blue-500" />
               <div>
                 <p className="font-medium text-neutral-900 dark:text-white">
-                  {files.length} files ready to index
+                  {files.length} files ready to upload
                 </p>
                 <p className="text-xs text-neutral-500">
                   {formatFileSize(files.reduce((sum, f) => sum + f.size, 0))} total
@@ -405,7 +471,6 @@ export function FolderUploader({
             </div>
           </div>
 
-          {/* File list */}
           <div className="max-h-80 overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800">
             {files.map((fileEntry) => (
               <div
@@ -442,27 +507,77 @@ export function FolderUploader({
         </div>
       )}
 
-      {/* Upload progress */}
-      {isUploading && (
+      {/* Upload/Indexing progress */}
+      {isWorking && (
         <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
           {/* Progress header */}
           <div className="px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center space-x-2">
-                <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                <span className="text-sm font-medium text-neutral-900 dark:text-white">
-                  Uploading... ({currentFileIndex + 1} of {files.filter(f => f.status !== 'complete' && f.status !== 'error' && f.status !== 'skipped').length + stats.complete + stats.error + stats.skipped})
-                </span>
+            {/* Phase indicator */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center space-x-4">
+                {/* Upload phase */}
+                <div className={`flex items-center space-x-2 ${phase === 'uploading' ? 'text-blue-500' : phase === 'indexing' ? 'text-green-500' : 'text-neutral-400'}`}>
+                  {phase === 'uploading' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className={`h-4 w-4 ${uploadProgress === 100 ? 'text-green-500' : ''}`} />
+                  )}
+                  <span className="text-sm font-medium">
+                    Upload {uploadProgress}%
+                  </span>
+                </div>
+
+                {/* Arrow */}
+                <span className="text-neutral-300">→</span>
+
+                {/* Index phase */}
+                <div className={`flex items-center space-x-2 ${phase === 'indexing' ? 'text-purple-500' : 'text-neutral-400'}`}>
+                  {phase === 'indexing' ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Brain className="h-4 w-4" />
+                  )}
+                  <span className="text-sm font-medium">
+                    Index {phase === 'indexing' ? `${indexProgress}%` : '0%'}
+                  </span>
+                </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={cancelUpload}>
-                Cancel
-              </Button>
+
+              <div className="flex items-center space-x-3">
+                {estimatedTimeRemaining !== null && estimatedTimeRemaining > 0 && (
+                  <div className="flex items-center space-x-1 text-xs text-neutral-500">
+                    <Clock className="h-3 w-3" />
+                    <span>~{formatTime(estimatedTimeRemaining)} remaining</span>
+                  </div>
+                )}
+                <Button variant="ghost" size="sm" onClick={cancelUpload}>
+                  Cancel
+                </Button>
+              </div>
             </div>
+
+            {/* Combined progress bar */}
             <div className="h-2 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-300"
-                style={{ width: `${overallProgress}%` }}
+                className={`h-full transition-all duration-300 ${
+                  phase === 'uploading'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-400'
+                    : 'bg-gradient-to-r from-purple-500 to-purple-400'
+                }`}
+                style={{ width: `${phase === 'uploading' ? uploadProgress : indexProgress}%` }}
               />
+            </div>
+
+            {/* Helpful tips */}
+            <div className="mt-3 flex flex-wrap gap-3">
+              <div className="flex items-center space-x-2 text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-700/50 px-2 py-1 rounded-full">
+                <Coffee className="h-3 w-3" />
+                <span>Feel free to work on something else while we process</span>
+              </div>
+              <div className="flex items-center space-x-2 text-xs text-neutral-500 bg-neutral-100 dark:bg-neutral-700/50 px-2 py-1 rounded-full">
+                <Monitor className="h-3 w-3" />
+                <span>Keep your computer open and awake</span>
+              </div>
             </div>
           </div>
 
@@ -474,8 +589,17 @@ export function FolderUploader({
                 className="flex items-center justify-between px-4 py-2"
               >
                 <div className="flex items-center space-x-3 min-w-0 flex-1">
+                  {fileEntry.status === 'pending' && (
+                    <FileText className="h-4 w-4 text-neutral-400 flex-shrink-0" />
+                  )}
                   {fileEntry.status === 'uploading' && (
                     <Loader2 className="h-4 w-4 animate-spin text-blue-500 flex-shrink-0" />
+                  )}
+                  {fileEntry.status === 'uploaded' && (
+                    <Zap className="h-4 w-4 text-green-500 flex-shrink-0" />
+                  )}
+                  {fileEntry.status === 'indexing' && (
+                    <Loader2 className="h-4 w-4 animate-spin text-purple-500 flex-shrink-0" />
                   )}
                   {fileEntry.status === 'complete' && (
                     <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
@@ -486,13 +610,19 @@ export function FolderUploader({
                   {fileEntry.status === 'skipped' && (
                     <File className="h-4 w-4 text-amber-500 flex-shrink-0" />
                   )}
-                  {fileEntry.status === 'pending' && (
-                    <FileText className="h-4 w-4 text-neutral-400 flex-shrink-0" />
-                  )}
                   <div className="min-w-0 flex-1">
                     <p className="text-sm text-neutral-900 dark:text-white truncate">
                       {fileEntry.file.name}
                     </p>
+                    {fileEntry.status === 'uploading' && (
+                      <p className="text-xs text-blue-500">Uploading...</p>
+                    )}
+                    {fileEntry.status === 'uploaded' && (
+                      <p className="text-xs text-green-500">Uploaded, waiting to index</p>
+                    )}
+                    {fileEntry.status === 'indexing' && (
+                      <p className="text-xs text-purple-500">Generating embeddings...</p>
+                    )}
                     {fileEntry.error && (
                       <p className="text-xs text-red-500 truncate">{fileEntry.error}</p>
                     )}
@@ -518,8 +648,10 @@ export function FolderUploader({
               <h3 className="font-semibold text-green-800 dark:text-green-200">
                 Folder upload complete!
               </h3>
+              <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                Your documents are now indexed and ready for OSQR to search.
+              </p>
 
-              {/* Stats */}
               <div className="mt-4 flex flex-wrap gap-4">
                 <div className="rounded-lg bg-white/50 dark:bg-black/20 px-3 py-2">
                   <p className="text-lg font-bold text-green-800 dark:text-green-200">
