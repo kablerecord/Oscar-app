@@ -849,7 +849,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                           <button
                             onClick={handleSkip}
                             disabled={isSubmitting}
-                            className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                            className="cursor-pointer text-sm text-slate-500 hover:text-slate-300 transition-colors"
                           >
                             Skip for now
                           </button>
@@ -939,7 +939,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
         <div className="absolute top-3 right-3 flex items-center gap-0.5 z-20">
           <button
             onClick={handleMinimize}
-            className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
+            className="cursor-pointer rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
             aria-label="Minimize"
           >
             <Minus className="h-3.5 w-3.5" />
@@ -947,7 +947,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
           {!isIntro && (
             <button
               onClick={handleClose}
-              className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
+              className="cursor-pointer rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
               aria-label="Close"
             >
               <X className="h-3.5 w-3.5" />

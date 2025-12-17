@@ -46,6 +46,13 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
   const [showArtifacts, setShowArtifacts] = useState(false)
   const [currentArtifacts, setCurrentArtifacts] = useState<ArtifactBlock[]>([])
 
+  // Prefetch context state
+  const [prefetchedContext, setPrefetchedContext] = useState<{
+    vaultStats?: { documentCount: number; chunkCount: number }
+    mscProjects?: Array<{ id: string; title: string; status: string }>
+    recentThreads?: Array<{ id: string; title: string }>
+  } | null>(null)
+
   // Ref for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -53,6 +60,27 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // Pre-fetch context on mount (Jarvis awareness)
+  useEffect(() => {
+    async function prefetch() {
+      try {
+        const response = await fetch('/api/oscar/prefetch')
+        if (response.ok) {
+          const data = await response.json()
+          setPrefetchedContext({
+            vaultStats: data.vaultStats,
+            mscProjects: data.mscProjects,
+            recentThreads: data.recentThreads,
+          })
+          console.log('[OscarChat] Prefetched context:', data.meta?.totalItems, 'items')
+        }
+      } catch (error) {
+        console.error('[OscarChat] Prefetch failed:', error)
+      }
+    }
+    prefetch()
+  }, [])
 
   // Load answered questions on mount
   useEffect(() => {

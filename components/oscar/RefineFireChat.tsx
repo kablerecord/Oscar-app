@@ -1411,7 +1411,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                 {/* Cancel option */}
                 <button
                   onClick={handleStartOver}
-                  className="mt-4 text-xs text-slate-500 hover:text-slate-400 transition-colors"
+                  className="cursor-pointer mt-4 text-xs text-slate-500 hover:text-slate-400 transition-colors"
                 >
                   ← Start over
                 </button>
@@ -2140,7 +2140,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
               </div>
               <button
                 onClick={handleDismissRefinementHints}
-                className="text-xs text-amber-400/60 hover:text-amber-300 whitespace-nowrap flex-shrink-0"
+                className="cursor-pointer text-xs text-amber-400/60 hover:text-amber-300 whitespace-nowrap flex-shrink-0"
               >
                 See less
               </button>

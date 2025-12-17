@@ -110,14 +110,14 @@ export function ProfileQuestionModal({
             <div className="flex items-center space-x-1">
               <button
                 onClick={() => setIsMinimized(true)}
-                className="rounded p-1 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+                className="cursor-pointer rounded p-1 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
                 aria-label="Minimize"
               >
                 <Minimize2 className="h-4 w-4" />
               </button>
               <button
                 onClick={onClose}
-                className="rounded p-1 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
+                className="cursor-pointer rounded p-1 text-white/80 transition-colors hover:bg-white/20 hover:text-white"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />

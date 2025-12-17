@@ -44,7 +44,7 @@ export function UpgradePrompt({
           {onClose && (
             <button
               onClick={onClose}
-              className="rounded-full p-1 hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
+              className="cursor-pointer rounded-full p-1 hover:bg-amber-200/50 dark:hover:bg-amber-800/50"
             >
               <X className="h-4 w-4 text-amber-600" />
             </button>

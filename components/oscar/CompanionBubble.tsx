@@ -215,14 +215,14 @@ export function CompanionBubble({
         <div className="absolute top-2 right-2 flex items-center gap-0.5 z-10">
           <button
             onClick={() => setIsMinimized(true)}
-            className="rounded-full p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-500 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-400"
+            className="cursor-pointer rounded-full p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-500 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-400"
             aria-label="Minimize"
           >
             <Minus className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={onClose}
-            className="rounded-full p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-500 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-400"
+            className="cursor-pointer rounded-full p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-500 dark:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-400"
             aria-label="Close"
           >
             <X className="h-3.5 w-3.5" />
@@ -327,7 +327,7 @@ export function CompanionBubble({
                 <button
                   onClick={onSkip}
                   disabled={isSubmitting}
-                  className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+                  className="cursor-pointer text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
                 >
                   Skip this one
                 </button>

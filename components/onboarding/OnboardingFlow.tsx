@@ -186,7 +186,7 @@ export function OnboardingFlow({ isOpen, workspaceId, onComplete }: OnboardingFl
           <div className="absolute right-4 top-4 z-10">
             <button
               onClick={handleSkipOnboarding}
-              className="text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+              className="cursor-pointer text-xs text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
             >
               Skip for now
             </button>
@@ -601,7 +601,7 @@ function WelcomeStep({ onNext, onQuickStart }: { onNext: () => void; onQuickStar
 
         <button
           onClick={onQuickStart}
-          className="w-full text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors py-2"
+          className="cursor-pointer w-full text-sm text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300 transition-colors py-2"
         >
           Skip setup → Start chatting immediately
         </button>

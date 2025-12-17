@@ -370,7 +370,7 @@ export function MSCPanel({ workspaceId, isExpanded = true, onToggle, onAskOSQR }
       <div className="w-14 h-full border-l border-neutral-200 dark:border-neutral-800 bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center py-4">
         <button
           onClick={onToggle}
-          className="p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all group"
+          className="cursor-pointer p-2 rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 transition-all group"
           title="Open Command Center"
         >
           <Zap className="h-5 w-5 text-blue-400 group-hover:text-blue-300" />
@@ -443,7 +443,7 @@ export function MSCPanel({ workspaceId, isExpanded = true, onToggle, onAskOSQR }
             </div>
             <button
               onClick={handleLearnMore}
-              className="p-1 rounded-full hover:bg-slate-700/50 transition-colors"
+              className="cursor-pointer p-1 rounded-full hover:bg-slate-700/50 transition-colors"
               title="Learn more about Command Center"
             >
               <HelpCircle className="h-3.5 w-3.5 text-slate-400 hover:text-blue-400" />
@@ -452,7 +452,7 @@ export function MSCPanel({ workspaceId, isExpanded = true, onToggle, onAskOSQR }
           {onToggle && (
             <button
               onClick={onToggle}
-              className="p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+              className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
             >
               <X className="h-4 w-4 text-slate-400 hover:text-white" />
             </button>

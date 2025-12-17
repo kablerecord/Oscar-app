@@ -15,6 +15,8 @@ import { isPlanningRequest, extractPlanParams, generatePlan90, formatPlanForChat
 import { isAuditRequest, extractAuditParams, runSelfAudit, formatAuditForChat } from '@/lib/til/self-audit'
 import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
 import { routeQuestion } from '@/lib/ai/model-router'
+import { getCachedContext, getVaultStats } from '@/lib/context/prefetch'
+import { isDevWorkspace, createTimer, analyzeQuestion, logAnalytics, type AnalyticsEvent } from '@/lib/analytics/dev-analytics'
 
 const RequestSchema = z.object({
   message: z.string().min(1),
@@ -112,6 +114,11 @@ export async function POST(req: NextRequest) {
     // FAST PATH: Quick mode with smart vault access
     // This is the sweet spot: vault context when relevant + speed
     if (mode === 'quick') {
+      // Start timing for dev analytics
+      const timer = createTimer()
+      const questionStats = analyzeQuestion(message)
+      let cacheHit = false
+
       // Detect if this question is likely about the user's vault/documents
       // vs a general question (math, facts, coding, etc.)
       const vaultPatterns = /\b(vault|document|file|upload|my\s+(data|info|project|work|notes|content)|indexed|knowledge\s*base|how\s+many\s+(docs?|documents?|files?|chunks?))\b/i
@@ -132,14 +139,25 @@ export async function POST(req: NextRequest) {
       let autoContext: { context?: string; sources?: { identity: boolean; profile: boolean; msc: boolean; knowledge: boolean; threads: boolean; systemMode: boolean } } = {}
       let vaultStats: { documentCount: number; chunkCount: number } | null = null
 
-      // If asking about vault stats, query the database directly
+      // If asking about vault stats, try prefetch cache first (instant), fall back to DB
       if (isVaultStatsQuestion) {
-        const [docCount, chunkCount] = await Promise.all([
-          prisma.document.count({ where: { workspaceId } }),
-          prisma.documentChunk.count({ where: { document: { workspaceId } } }),
-        ])
-        vaultStats = { documentCount: docCount, chunkCount: chunkCount }
-        console.log(`[OSQR] Vault stats: ${docCount} documents, ${chunkCount} chunks`)
+        // Try the prefetch cache first (populated when user opened chat)
+        const cachedContext = getCachedContext(workspaceId)
+        const cachedStats = getVaultStats(cachedContext)
+
+        if (cachedStats) {
+          vaultStats = cachedStats
+          cacheHit = true
+          console.log(`[OSQR] Vault stats from CACHE: ${cachedStats.documentCount} documents, ${cachedStats.chunkCount} chunks`)
+        } else {
+          // Cache miss - fall back to database query
+          const [docCount, chunkCount] = await Promise.all([
+            prisma.document.count({ where: { workspaceId } }),
+            prisma.documentChunk.count({ where: { document: { workspaceId } } }),
+          ])
+          vaultStats = { documentCount: docCount, chunkCount: chunkCount }
+          console.log(`[OSQR] Vault stats from DB: ${docCount} documents, ${chunkCount} chunks`)
+        }
       }
 
       // Only search vault if question might be relevant (and not just asking for stats)
@@ -209,7 +227,7 @@ export async function POST(req: NextRequest) {
       ])
 
       // Save messages
-      await Promise.all([
+      const [, assistantMessage] = await Promise.all([
         prisma.chatMessage.create({
           data: { threadId: thread.id, role: 'user', content: message },
         }),
@@ -227,6 +245,35 @@ export async function POST(req: NextRequest) {
           },
         }),
       ])
+
+      // Log analytics for dev workspaces (Joe's account)
+      // This collects data to optimize the prefetch system
+      // See docs/TODO-ANALYTICS-REVIEW.md and lib/analytics/dev-analytics.ts
+      if (isDevWorkspace(workspaceId)) {
+        timer.mark('complete')
+        const analyticsEvent: AnalyticsEvent = {
+          totalDurationMs: timer.elapsed(),
+          questionType,
+          complexity,
+          wordCount: questionStats.wordCount,
+          hasVaultKeywords: questionStats.hasVaultKeywords,
+          hasMSCKeywords: questionStats.hasMSCKeywords,
+          requestedMode: 'quick',
+          effectiveMode: 'quick',
+          wasAutoRouted: false,
+          fastPath: true,
+          cacheHit,
+          cacheSource: cacheHit ? 'prefetch' : 'none',
+          usedKnowledge: !!autoContext.context,
+          usedMSC: false,
+          usedProfile: false,
+          knowledgeChunksReturned: 0,
+          responseWordCount: answer.split(/\s+/).length,
+          hasArtifacts: false,
+        }
+        // Don't await - fire and forget
+        logAnalytics(workspaceId, thread.id, assistantMessage.id, analyticsEvent)
+      }
 
       return NextResponse.json({
         answer,

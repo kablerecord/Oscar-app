@@ -58,7 +58,7 @@ export function TopBar({ user, workspaceName = 'My Workspace', capabilityLevel, 
           {/* Hamburger menu - only on mobile */}
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            className="cursor-pointer lg:hidden p-2 -ml-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
           >
             <Menu className="h-5 w-5" />
           </button>

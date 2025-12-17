@@ -135,7 +135,7 @@ export function CouncilPanel({
                   </div>
                   <button
                     onClick={() => setExpandedAgent(isExpanded ? null : response.agentId)}
-                    className="text-slate-500 hover:text-slate-300"
+                    className="cursor-pointer text-slate-500 hover:text-slate-300"
                   >
                     {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                   </button>
@@ -168,7 +168,7 @@ export function CouncilPanel({
         <div className="border-t border-slate-700/50 pt-4">
           <button
             onClick={() => setShowRoundtable(!showRoundtable)}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 mb-3"
+            className="cursor-pointer flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 mb-3"
           >
             {showRoundtable ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             <span>Roundtable Reactions ({roundtableResponses.length} responses)</span>
@@ -204,7 +204,7 @@ export function CouncilPanel({
         <div className="border-t border-slate-700/50 pt-4">
           <button
             onClick={() => setShowSynthesis(!showSynthesis)}
-            className="flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 mb-3"
+            className="cursor-pointer flex items-center gap-2 text-sm text-slate-400 hover:text-slate-200 mb-3"
           >
             <Sparkles className="h-4 w-4 text-purple-400" />
             {showSynthesis ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
