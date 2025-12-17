@@ -256,6 +256,26 @@ Agents self-assess certainty at decision points:
 - Touching critical systems
 - Deleting/significantly changing existing code
 
+### Threshold Calibration
+
+**Important:** The 70% and 90% thresholds are **initial conservative values**, not research-derived constants.
+
+**How thresholds evolve:**
+
+1. **Start conservative** - More checkpoints than necessary is better than wrong autonomous decisions
+2. **Track override rates** - If users override 50% of 70%-confidence decisions, the threshold needs to move up
+3. **Learning loop adjusts** - GPKV aggregates override patterns across all users
+4. **Per-task-type tuning** - Auth decisions may need 85% threshold while documentation may work at 60%
+
+**The goal:** Thresholds that match actual user preferences, derived from real usage data rather than assumptions.
+
+| If override rate is... | Then threshold should... |
+|-----------------------|--------------------------|
+| >40% | Move up significantly |
+| 20-40% | Move up slightly |
+| 10-20% | About right |
+| <10% | Could move down (more autonomy) |
+
 ### Checkpoint Interface
 
 ```

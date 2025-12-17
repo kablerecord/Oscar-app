@@ -391,6 +391,66 @@ Founding tiers are limited quantity. Annual commitments lock in relationships. O
 
 ---
 
+## Plugin Creator Economics
+
+### Revenue Split
+
+**Standard split: 70/30 (creator keeps 70%)**
+
+This is the industry standard that signals "we want creators to win":
+- Apple App Store: 70/30
+- Shopify App Store: 70/30 (80/20 after first $1M)
+- Gumroad: 70/30
+
+**Founding Creator Bonus: 80/20**
+
+First 50 plugin creators get 80/20 split locked for life. Incentivizes early ecosystem building.
+
+### What Creators Get
+
+| Benefit | Description |
+|---------|-------------|
+| GPKV namespace | Their own intelligence layer that compounds |
+| 70% revenue | On all subscriptions through their plugin |
+| Distribution | Access to OSQR's user base |
+| Defensible moat | Patterns can't be copied overnight |
+| Analytics | Usage data, retention, conversion |
+
+### What Creators Provide
+
+| Contribution | Description |
+|--------------|-------------|
+| Domain expertise | Deep knowledge in their vertical |
+| Workflow design | How users should work |
+| Ongoing refinement | Updates based on user feedback |
+| Community | Bring their audience to OSQR |
+
+### Example Economics
+
+A React Development plugin with 500 subscribers at $20/month:
+- Monthly revenue: $10,000
+- Creator share (70%): $7,000/month
+- OSQR share (30%): $3,000/month
+
+At scale (2,000 subscribers): $28,000/month creator income.
+
+### Why This Works
+
+1. **Creators have skin in the game** - More usage = more revenue
+2. **OSQR gets ecosystem** - Plugins bring users who wouldn't otherwise come
+3. **Users get specialization** - Better experience in their domain
+4. **Network effects compound** - Plugin GPKV patterns make OSQR smarter for everyone
+
+### Split Governance
+
+Revenue split is revisable after marketplace proves out, but:
+- Existing creators keep their locked rate
+- Any changes apply only to new creators
+- 60 days notice before any policy change
+- Founder commits to never going below 60/40
+
+---
+
 ## Key Principles
 
 1. **Never price on time.** Price on capacity, output, and commitment.

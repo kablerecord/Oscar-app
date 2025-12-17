@@ -188,6 +188,58 @@ A "React Development" plugin isn't just prompts. It's thousands of React-specifi
 
 ---
 
+## Enterprise Private GPKV
+
+Enterprise customers have different needs. Private GPKV is a **feature, not a bug**.
+
+### Why Enterprise Wants Private GPKV
+
+1. **Competitive advantage** - Their patterns stay internal, not shared with competitors
+2. **Data purity** - They don't want their data polluted with others' patterns
+3. **Compliance/legal** - Regulations may require data isolation
+4. **IP protection** - Proprietary workflows stay proprietary
+
+### Configuration Options
+
+| Mode | Reads From | Writes To | Use Case |
+|------|-----------|-----------|----------|
+| **Hybrid** (default) | Public GPKV + Private | Private only | Best of both worlds |
+| **Read-only public** | Public GPKV only | Private only | Benefit from community, contribute nothing |
+| **Fully isolated** | Private only | Private only | Maximum data separation |
+
+### The Explicit Tradeoff
+
+Enterprise customers **knowingly trade network effects for privacy.**
+
+| What They Get | What They Give Up |
+|---------------|-------------------|
+| Complete data isolation | Collective intelligence from other users |
+| Proprietary pattern protection | Community-learned solutions |
+| Compliance satisfaction | Faster pattern accumulation |
+| Competitive advantage preservation | Cross-pollination benefits |
+
+### Pricing Implication
+
+Private GPKV is a premium feature:
+- Requires dedicated infrastructure
+- No benefit from shared pattern deduplication
+- Higher storage costs (no cross-user compression)
+- Priced into Enterprise tier ($50k+/year)
+
+### Hybrid Mode (Recommended for Most Enterprise)
+
+Most enterprise customers will choose hybrid:
+- **Read** from public GPKV (get community knowledge)
+- **Write** only to private GPKV (protect proprietary patterns)
+
+This gives them 80% of the network effect benefits while maintaining data sovereignty.
+
+### Implementation Note
+
+Private GPKV is architecturally identical to public GPKV—just namespaced and access-controlled. No special infrastructure beyond tenant isolation.
+
+---
+
 ## The Balance
 
 ### Too Much in Core (Risk)
