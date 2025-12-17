@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/db/prisma'
 import { generateEmbedding, formatEmbeddingForPostgres } from '@/lib/ai/embeddings'
 import { canUploadDocument, canUploadFileSize } from '@/lib/tiers/check'
+import { parsePDF } from '@/lib/utils/pdf-parser'
 import OpenAI from 'openai'
 
 // Lazy initialization to avoid build-time errors
@@ -134,8 +135,7 @@ export async function POST(req: NextRequest) {
 
       if (fileType === 'application/pdf') {
         const buffer = Buffer.from(await file.arrayBuffer())
-        const pdfParse = (await import('pdf-parse')).default
-        const pdfData = await pdfParse(buffer)
+        const pdfData = await parsePDF(buffer)
         fileContent = pdfData.text
       } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx')) {
         const buffer = Buffer.from(await file.arrayBuffer())
