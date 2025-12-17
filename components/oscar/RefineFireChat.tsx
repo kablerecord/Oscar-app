@@ -321,6 +321,17 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
   // OSQR centered greeting state - starts in center, slides to corner on input focus
   const [osqrCentered, setOsqrCentered] = useState(true)
+
+  // Client-side time greeting (instant, no API needed)
+  const getTimeGreeting = (): { greeting: string; emoji: string } => {
+    const hour = new Date().getHours()
+    if (hour >= 5 && hour < 12) return { greeting: 'Good morning', emoji: '☀️' }
+    if (hour >= 12 && hour < 17) return { greeting: 'Good afternoon', emoji: '🌤️' }
+    if (hour >= 17 && hour < 21) return { greeting: 'Good evening', emoji: '🌅' }
+    return { greeting: 'Burning the midnight oil', emoji: '🌙' }
+  }
+
+  // Initialize with instant default greeting (no loading state)
   const [greetingData, setGreetingData] = useState<{
     timeGreeting?: { greeting: string; emoji: string }
     firstName?: string
@@ -333,8 +344,14 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       capabilityLevel: number
     }
     isNewUser?: boolean
-  } | null>(null)
-  const [greetingLoading, setGreetingLoading] = useState(true)
+  }>({
+    timeGreeting: getTimeGreeting(),
+    contextualMessages: [
+      "Welcome! I'm your personal AI thinking partner.",
+      "Ask me anything - I'll help you sharpen your question first, then get the best answer."
+    ],
+    isNewUser: true,
+  })
 
   // Auto-routing notification state
   const [routingNotification, setRoutingNotification] = useState<{
@@ -569,19 +586,22 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     loadAnsweredQuestions()
   }, [workspaceId])
 
-  // Fetch personalized greeting data
+  // Fetch personalized greeting data (updates default greeting when ready)
   useEffect(() => {
     async function fetchGreeting() {
       try {
         const response = await fetch(`/api/greeting?workspaceId=${workspaceId}`)
         if (response.ok) {
           const data = await response.json()
-          setGreetingData(data)
+          // Merge API data with current time greeting
+          setGreetingData(prev => ({
+            ...data,
+            timeGreeting: data.timeGreeting || prev.timeGreeting,
+          }))
         }
       } catch (error) {
         console.error('Failed to fetch greeting:', error)
-      } finally {
-        setGreetingLoading(false)
+        // Keep default greeting on error
       }
     }
     fetchGreeting()
@@ -1159,73 +1179,52 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                 <Sparkles className="absolute -right-2 -top-2 h-6 w-6 text-blue-400" />
               </div>
 
-              {/* Personalized Greeting */}
-              {greetingLoading ? (
-                <div className="flex items-center gap-2 text-slate-400">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  <span>Loading your personalized experience...</span>
+              {/* Personalized Greeting - Always shown instantly */}
+              <>
+                {/* Time-based greeting with user's name */}
+                <h3 className="mb-3 text-3xl font-bold text-white transition-all duration-300">
+                  {greetingData.timeGreeting?.emoji} {greetingData.timeGreeting?.greeting}, <span className="shimmer-text" data-text={greetingData.firstName || 'there'}>{greetingData.firstName || 'there'}</span>
+                </h3>
+
+                {/* Contextual messages */}
+                <div className="max-w-lg space-y-2 mb-6">
+                  {greetingData.contextualMessages?.map((msg, idx) => (
+                    <p key={idx} className="text-base text-slate-300 leading-relaxed transition-all duration-300">
+                      {msg}
+                    </p>
+                  ))}
                 </div>
-              ) : greetingData ? (
-                <>
-                  {/* Time-based greeting with user's name */}
-                  <h3 className="mb-3 text-3xl font-bold text-white">
-                    {greetingData.timeGreeting?.emoji} {greetingData.timeGreeting?.greeting}, <span className="shimmer-text" data-text={greetingData.firstName || 'there'}>{greetingData.firstName || 'there'}</span>
-                  </h3>
 
-                  {/* Contextual messages */}
-                  <div className="max-w-lg space-y-2 mb-6">
-                    {greetingData.contextualMessages?.map((msg, idx) => (
-                      <p key={idx} className="text-base text-slate-300 leading-relaxed">
-                        {msg}
-                      </p>
-                    ))}
+                {/* Stats pills - only show if we have meaningful data */}
+                {greetingData.stats && !greetingData.isNewUser && (
+                  <div className="flex flex-wrap justify-center gap-3 mb-6">
+                    {greetingData.stats.currentStreak > 0 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 ring-1 ring-amber-500/30 text-xs font-medium text-amber-300">
+                        <Zap className="h-3 w-3" />
+                        <span>{greetingData.stats.currentStreak} day streak</span>
+                      </div>
+                    )}
+                    {greetingData.stats.vaultDocuments > 0 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/15 ring-1 ring-purple-500/30 text-xs font-medium text-purple-300">
+                        <Brain className="h-3 w-3" />
+                        <span>{greetingData.stats.vaultDocuments} docs in vault</span>
+                      </div>
+                    )}
+                    {greetingData.stats.totalQuestions > 0 && (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-xs font-medium text-blue-300">
+                        <MessageSquare className="h-3 w-3" />
+                        <span>{greetingData.stats.totalQuestions} questions asked</span>
+                      </div>
+                    )}
                   </div>
+                )}
 
-                  {/* Stats pills - only show if we have meaningful data */}
-                  {greetingData.stats && !greetingData.isNewUser && (
-                    <div className="flex flex-wrap justify-center gap-3 mb-6">
-                      {greetingData.stats.currentStreak > 0 && (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 ring-1 ring-amber-500/30 text-xs font-medium text-amber-300">
-                          <Zap className="h-3 w-3" />
-                          <span>{greetingData.stats.currentStreak} day streak</span>
-                        </div>
-                      )}
-                      {greetingData.stats.vaultDocuments > 0 && (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/15 ring-1 ring-purple-500/30 text-xs font-medium text-purple-300">
-                          <Brain className="h-3 w-3" />
-                          <span>{greetingData.stats.vaultDocuments} docs in vault</span>
-                        </div>
-                      )}
-                      {greetingData.stats.totalQuestions > 0 && (
-                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-xs font-medium text-blue-300">
-                          <MessageSquare className="h-3 w-3" />
-                          <span>{greetingData.stats.totalQuestions} questions asked</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* CTA */}
-                  <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
-                    <Target className="h-4 w-4" />
-                    <span>{greetingData.isNewUser ? "Refine → Fire: Better questions, better answers" : "What's on your mind?"}</span>
-                  </div>
-                </>
-              ) : (
-                // Fallback if greeting data failed to load
-                <>
-                  <h3 className="mb-3 text-3xl font-bold text-white">
-                    Hello, I'm <span className="shimmer-text" data-text="OSQR">OSQR</span>
-                  </h3>
-                  <p className="max-w-lg text-base text-slate-300 mb-6 leading-relaxed">
-                    Your personal AI operating system. I'll help you sharpen your question first, then consult a panel of AI experts for the best possible answer.
-                  </p>
-                  <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
-                    <Target className="h-4 w-4" />
-                    <span>Refine → Fire: Better questions, better answers</span>
-                  </div>
-                </>
-              )}
+                {/* CTA */}
+                <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
+                  <Target className="h-4 w-4" />
+                  <span>{greetingData.isNewUser ? "Refine → Fire: Better questions, better answers" : "What's on your mind?"}</span>
+                </div>
+              </>
             </div>
           )}
 
