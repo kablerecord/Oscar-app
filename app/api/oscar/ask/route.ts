@@ -118,17 +118,32 @@ export async function POST(req: NextRequest) {
       const metaPatterns = /\b(osqr|about\s+me|my\s+profile|settings?)\b/i
       const isLikelyVaultQuestion = vaultPatterns.test(message) || metaPatterns.test(message)
 
+      // Detect if asking specifically about vault stats (counts, numbers)
+      const vaultStatsPattern = /\b(how\s+many|count|number\s+of|total)\b.*\b(files?|docs?|documents?|chunks?|items?|vault|indexed)\b/i
+      const isVaultStatsQuestion = vaultStatsPattern.test(message)
+
       // Skip vault search for obvious non-vault questions
       const isObviouslyGeneral = (
         questionType === 'conversational' && complexity <= 1 && !isLikelyVaultQuestion
       ) || /^\s*\d+\s*[\+\-\*\/x×]\s*\d+\s*$/.test(message) // pure math
 
-      console.log(`[OSQR] FAST PATH: Single AI (${questionType}, complexity: ${complexity}, vaultSearch: ${!isObviouslyGeneral})`)
+      console.log(`[OSQR] FAST PATH: Single AI (${questionType}, complexity: ${complexity}, vaultSearch: ${!isObviouslyGeneral}, vaultStats: ${isVaultStatsQuestion})`)
 
       let autoContext: { context?: string; sources?: { identity: boolean; profile: boolean; msc: boolean; knowledge: boolean; threads: boolean; systemMode: boolean } } = {}
+      let vaultStats: { documentCount: number; chunkCount: number } | null = null
 
-      // Only search vault if question might be relevant
-      if (!isObviouslyGeneral) {
+      // If asking about vault stats, query the database directly
+      if (isVaultStatsQuestion) {
+        const [docCount, chunkCount] = await Promise.all([
+          prisma.document.count({ where: { workspaceId } }),
+          prisma.documentChunk.count({ where: { document: { workspaceId } } }),
+        ])
+        vaultStats = { documentCount: docCount, chunkCount: chunkCount }
+        console.log(`[OSQR] Vault stats: ${docCount} documents, ${chunkCount} chunks`)
+      }
+
+      // Only search vault if question might be relevant (and not just asking for stats)
+      if (!isObviouslyGeneral && !isVaultStatsQuestion) {
         const { assembleContext } = await import('@/lib/context/auto-context')
         autoContext = await assembleContext(workspaceId, message, {
           includeProfile: true,
@@ -150,7 +165,9 @@ export async function POST(req: NextRequest) {
       // Build system prompt based on whether we have vault context
       let systemPrompt = 'You are OSQR. Answer directly and concisely. Do NOT add commentary about patterns you notice, do NOT reference previous questions, and do NOT explain why you\'re answering a certain way. Just answer the question.'
 
-      if (autoContext.context) {
+      if (vaultStats) {
+        systemPrompt += `\n\nVault Statistics for this user:\n- Documents: ${vaultStats.documentCount}\n- Chunks (searchable pieces): ${vaultStats.chunkCount}\n\nUse these numbers to answer the user's question about their vault.`
+      } else if (autoContext.context) {
         systemPrompt += '\n\nYou have access to the user\'s knowledge base. When answering questions about their documents/vault, reference specific information from the context provided.'
       } else if (isLikelyVaultQuestion) {
         // They asked about vault but we didn't find anything
