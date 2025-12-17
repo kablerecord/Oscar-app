@@ -119,32 +119,28 @@ ${artifactsGuidance}`
   }
 
   /**
-   * Quick mode: Fast response using dynamically routed model based on question type
-   * "OSQR is the AI that knows when to think"
+   * Quick mode: Direct conversation with Claude Sonnet - like chatting on claude.ai
    *
-   * Routes to optimal model based on question type:
-   * - factual/summarization → Fast model (Haiku/GPT-4o-mini)
-   * - creative → Claude (best at creative writing, tone, nuance)
-   * - coding → GPT-4o or Claude Sonnet (strong at code)
-   * - analytical/reasoning → Best available based on complexity
+   * No routing, no complex system prompts. Just Claude being Claude.
+   * This gives users the same experience as chatting directly with Anthropic.
    *
-   * Time: ~5-15 seconds depending on model selected
+   * Time: ~2-8 seconds (single model, no panel)
    */
   private static async quickResponse(request: Omit<OSQRRequest, 'mode'>): Promise<OSQRResponse> {
     const { userMessage, panelAgents, context, includeDebate, userId } = request
 
-    // Route the question to determine optimal model
+    // Still detect question type for metadata, but don't use it for routing
     const routingDecision = routeQuestion(userMessage)
-    const { recommendedModel, questionType, confidence, shouldSuggestAltOpinion } = routingDecision
+    const { questionType, confidence, shouldSuggestAltOpinion } = routingDecision
 
-    console.log(`OSQR: Quick mode - routing "${questionType}" question to ${recommendedModel.model} (confidence: ${confidence})`)
+    console.log(`OSQR: Quick mode - using Claude Sonnet 4 (like claude.ai)`)
 
-    // Build the quick agent with the routed model
+    // Always use Claude Sonnet 4 - the same model users experience on claude.ai
     const quickAgent: PanelAgent = {
       id: 'osqr-quick',
       name: 'OSQR Quick',
-      provider: recommendedModel.provider,
-      modelName: recommendedModel.model,
+      provider: 'anthropic',
+      modelName: 'claude-sonnet-4-20250514',
       systemPrompt: this.getQuickModePrompt(questionType),
     }
 
@@ -165,8 +161,9 @@ ${artifactsGuidance}`
       routing: {
         questionType,
         modelUsed: {
-          provider: recommendedModel.provider,
-          model: recommendedModel.model,
+          provider: 'anthropic',
+          model: 'claude-sonnet-4-20250514',
+          name: 'Claude Sonnet 4',
         },
         confidence,
         shouldSuggestAltOpinion,
@@ -175,52 +172,14 @@ ${artifactsGuidance}`
   }
 
   /**
-   * Get a question-type-specific system prompt for Quick mode
-   * QUICK = FAST + CONCISE. No fluff, no meta-commentary, no explaining why you answered the way you did.
+   * Get a minimal system prompt for Quick mode
+   * The goal is to let Claude be Claude - just like on claude.ai
+   * Only light guidance, no heavy constraints.
    */
   private static getQuickModePrompt(questionType: QuestionType): string {
-    const basePrompt = `You are OSQR in Quick mode. Be EXTREMELY concise.
-
-CRITICAL RULES:
-- For simple questions (math, definitions, facts): Just give the answer. Nothing else.
-- NEVER explain WHY you're being concise or mention "Quick mode"
-- NEVER add meta-commentary about the question type
-- If the answer is a single word or number, that's your entire response
-- Only add context if it's genuinely necessary and useful
-
-Bad: "4. The answer is straightforward multiplication."
-Good: "4"
-
-Bad: "Paris is the capital of France, as it has been since the French Revolution..."
-Good: "Paris"`
-
-    // Add question-type specific guidance (but keep it minimal)
-    const typeGuidance: Record<QuestionType, string> = {
-      factual: '', // No extra guidance needed - base prompt handles it
-      creative: `
-
-Creative task - be imaginative but still concise.`,
-      coding: `
-
-Show working code. Minimal explanation unless needed.`,
-      analytical: `
-
-Compare key points briefly. No lengthy analysis.`,
-      reasoning: `
-
-Walk through logic, but keep it tight.`,
-      summarization: `
-
-Bullet points or 2-3 sentences max.`,
-      conversational: `
-
-Match their energy. Brief and friendly.`,
-      high_stakes: `
-
-Be thoughtful but still concise. Key points only.`,
-    }
-
-    return basePrompt + (typeGuidance[questionType] || '')
+    // Minimal prompt - let Claude's natural behavior shine through
+    // This matches the experience users get on claude.ai
+    return `You are OSQR, a helpful AI assistant. Respond naturally and helpfully.`
   }
 
   /**
