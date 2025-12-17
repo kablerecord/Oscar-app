@@ -67,7 +67,7 @@ Return ONLY the greeting text, nothing else. 1-2 sentences max.`
   try {
     // Add timeout to prevent slow greetings
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+    const timeout = setTimeout(() => controller.abort(), 1500) // 1.5 second timeout
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -300,8 +300,8 @@ export async function GET(req: NextRequest) {
       daysSinceLastVisit = Math.floor((Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24))
     }
 
-    // Determine if this is a new user
-    const isNewUser = !workspace?.onboardingCompleted || totalUsage < 5
+    // Determine if this is a new user - only if they haven't completed onboarding
+    const isNewUser = !workspace?.onboardingCompleted
 
     // Generate AI-powered greeting for returning users with context
     let contextualMessages: string[] = []
@@ -388,7 +388,7 @@ export async function GET(req: NextRequest) {
       profile: profileContext,
       pinnedItems,
       recentInsights,
-      isNewUser: !workspace?.onboardingCompleted || totalUsage < 5,
+      isNewUser,
     })
   } catch (error) {
     console.error('Failed to fetch greeting data:', error)

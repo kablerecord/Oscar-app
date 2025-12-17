@@ -1169,7 +1169,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                 <>
                   {/* Time-based greeting with user's name */}
                   <h3 className="mb-3 text-3xl font-bold text-white">
-                    {greetingData.timeGreeting?.emoji} {greetingData.timeGreeting?.greeting}, <span className="shimmer-text">{greetingData.firstName || 'there'}</span>
+                    {greetingData.timeGreeting?.emoji} {greetingData.timeGreeting?.greeting}, <span className="shimmer-text" data-text={greetingData.firstName || 'there'}>{greetingData.firstName || 'there'}</span>
                   </h3>
 
                   {/* Contextual messages */}
@@ -1215,7 +1215,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                 // Fallback if greeting data failed to load
                 <>
                   <h3 className="mb-3 text-3xl font-bold text-white">
-                    Hello, I'm <span className="shimmer-text">OSQR</span>
+                    Hello, I'm <span className="shimmer-text" data-text="OSQR">OSQR</span>
                   </h3>
                   <p className="max-w-lg text-base text-slate-300 mb-6 leading-relaxed">
                     Your personal AI operating system. I'll help you sharpen your question first, then consult a panel of AI experts for the best possible answer.

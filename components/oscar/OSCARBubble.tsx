@@ -739,7 +739,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                   {/* Main message */}
                   <h3 className="mb-3 text-2xl font-bold text-white leading-tight">
                     {onboardingState.stage === 'welcome' ? (
-                      <>I'm <span className="shimmer-text">OSQR</span> — your AI thinking partner.</>
+                      <>I'm <span className="shimmer-text" data-text="OSQR">OSQR</span> — your AI thinking partner.</>
                     ) : (
                       content.message
                     )}
@@ -970,7 +970,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
               {/* Main message */}
               <h3 className="mb-2 text-lg font-bold text-white">
                 {onboardingState.stage === 'welcome' ? (
-                  <>I'm <span className="shimmer-text">OSQR</span> — your AI thinking partner.</>
+                  <>I'm <span className="shimmer-text" data-text="OSQR">OSQR</span> — your AI thinking partner.</>
                 ) : (
                   content.message
                 )}

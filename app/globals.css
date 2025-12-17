@@ -115,7 +115,7 @@ html {
   background-clip: text;
 }
 
-/* Shimmer animation for OSQR text - static gradient with white sweep clipped to text */
+/* Shimmer animation for text - static gradient with white sweep clipped to text */
 .shimmer-text {
   position: relative;
   display: inline;
@@ -126,7 +126,7 @@ html {
 }
 
 .shimmer-text::before {
-  content: 'OSQR';
+  content: attr(data-text);
   position: absolute;
   top: 0;
   left: 0;
