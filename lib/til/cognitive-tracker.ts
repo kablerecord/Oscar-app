@@ -24,7 +24,9 @@ export interface QuestionMetrics {
   isFollowUp: boolean  // Related to previous question?
   responseMode: 'quick' | 'thoughtful' | 'contemplate'
   topicCategory: string  // Detected topic
-  sentiment: 'positive' | 'neutral' | 'negative' | 'urgent'
+  sentiment: 'positive' | 'neutral' | 'negative' | 'urgent' | 'grateful'
+  isGratitude: boolean  // Explicit gratitude expression (thanks, appreciate, helpful)
+  socialSignal: 'rapport' | 'transactional' | 'none'  // Social interaction style
 }
 
 export interface CognitiveSessionMetrics {
@@ -53,6 +55,16 @@ export interface CommunicationPreferences {
   usesEmojis: boolean
   technicalDepthTolerance: 'low' | 'medium' | 'high'
   preferredFormats: ('bullets' | 'prose' | 'code' | 'tables')[]
+}
+
+// Social interaction patterns - how they engage with OSQR socially
+export interface SocialMetrics {
+  gratitudeRate: number  // 0.0 to 1.0 - how often they say thanks/appreciate
+  rapportBuilding: number  // 0.0 to 1.0 - how often they make social comments
+  interactionStyle: 'connector' | 'transactor' | 'mixed'  // Do they build rapport or just get answers?
+  positiveClosings: number  // Count of "thanks", "helpful", "appreciate it", etc.
+  acknowledgementsGiven: number  // Count of messages that acknowledge OSQR's help
+  totalMessages: number  // For calculating rates
 }
 
 export interface TemporalPatterns {
@@ -124,6 +136,7 @@ export interface CognitiveProfile {
   engagementMetrics: EngagementMetrics
   learningMetrics: LearningMetrics
   relationshipMetrics: RelationshipMetrics
+  socialMetrics: SocialMetrics  // NEW: Track gratitude and social interaction style
 
   // Profile classification
   primaryProfile: 'analytical' | 'strategic' | 'creative' | 'operational' | 'mixed'
@@ -286,11 +299,29 @@ function analyzeQuestion(question: string, metadata: any): QuestionMetrics {
   // Context detection
   const hasContext = /because|since|given that|context:|background:/i.test(question)
 
-  // Sentiment detection (basic)
+  // Gratitude detection - explicit thanks or appreciation
+  const gratitudePatterns = /\b(thanks|thank you|thx|ty|appreciate|appreciated|helpful|that helps|this helps|got it|makes sense|perfect|exactly what i needed|just what i needed|so helpful|really helpful|thanks for|thank u)\b/i
+  const isGratitude = gratitudePatterns.test(question)
+
+  // Rapport building detection - social/friendly comments beyond the transactional
+  const rapportPatterns = /\b(you're (great|awesome|the best|amazing)|nice work|good job|love (this|that|it)|interesting|cool|wow|haha|lol|btw|by the way|hope you're|how are you|good morning|good evening|cheers|have a (good|great|nice))\b/i
+  const isRapportBuilding = rapportPatterns.test(question)
+
+  // Sentiment detection (now includes grateful)
   let sentiment: QuestionMetrics['sentiment'] = 'neutral'
-  if (/urgent|asap|immediately|critical|emergency/i.test(question)) sentiment = 'urgent'
+  if (isGratitude) sentiment = 'grateful'
+  else if (/urgent|asap|immediately|critical|emergency/i.test(question)) sentiment = 'urgent'
   else if (/frustrated|stuck|confused|lost|help/i.test(question)) sentiment = 'negative'
   else if (/excited|great|awesome|love|perfect/i.test(question)) sentiment = 'positive'
+
+  // Social signal classification
+  let socialSignal: QuestionMetrics['socialSignal'] = 'none'
+  if (isGratitude || isRapportBuilding) {
+    socialSignal = 'rapport'
+  } else if (questionMarks > 0 && wordCount < 20) {
+    // Short, direct questions without social niceties = transactional
+    socialSignal = 'transactional'
+  }
 
   // Topic detection (basic categories)
   const topicPatterns: Record<string, RegExp> = {
@@ -318,6 +349,8 @@ function analyzeQuestion(question: string, metadata: any): QuestionMetrics {
     responseMode: metadata.responseMode,
     topicCategory,
     sentiment,
+    isGratitude,
+    socialSignal,
   }
 }
 
@@ -456,6 +489,14 @@ function createDefaultProfile(workspaceId: string): CognitiveProfile {
       dependencyIndicators: 0,
       teachingReceptivity: 'medium',
       collaborationStyle: 'collaborative',
+    },
+    socialMetrics: {
+      gratitudeRate: 0,
+      rapportBuilding: 0,
+      interactionStyle: 'mixed',
+      positiveClosings: 0,
+      acknowledgementsGiven: 0,
+      totalMessages: 0,
     },
     primaryProfile: 'mixed',
     secondaryTraits: [],

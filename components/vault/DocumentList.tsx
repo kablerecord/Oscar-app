@@ -46,6 +46,7 @@ const sourceIcons: Record<string, React.ElementType> = {
   chat_export: MessageSquare,
   chatgpt_conversation: MessageSquare,
   claude_conversation: MessageSquare,
+  conversation: MessageSquare,  // Auto-saved OSQR conversations
   upload: Upload,
   note: StickyNote,
   system: FileText,
@@ -57,6 +58,7 @@ const sourceColors: Record<string, string> = {
   chat_export: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
   chatgpt_conversation: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
   claude_conversation: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  conversation: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300',  // Auto-saved OSQR chats
   upload: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
   note: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
   system: 'bg-slate-100 text-slate-700 dark:bg-slate-800/50 dark:text-slate-300',
@@ -70,6 +72,7 @@ const formatSourceType = (type: string) => {
     chat_export: 'Chat Export',
     chatgpt_conversation: 'ChatGPT',
     claude_conversation: 'Claude',
+    conversation: 'OSQR Chat',  // Auto-saved conversations
     note: 'Note',
     system: 'System',
     other: 'Other',

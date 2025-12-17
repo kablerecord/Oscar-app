@@ -187,7 +187,7 @@ export async function generateAnalyticsReport(workspaceId: string): Promise<{
       role: 'assistant',
       metadata: {
         path: ['_analyticsVersion'],
-        not: null,
+        not: { equals: {} },  // Check that the path exists (not undefined/empty)
       },
     },
     include: {
@@ -207,7 +207,7 @@ export async function generateAnalyticsReport(workspaceId: string): Promise<{
 
   // Process analytics
   const analytics = messages.map(m => {
-    const meta = m.metadata as AnalyticsEvent & { _analyticsVersion?: number }
+    const meta = m.metadata as unknown as AnalyticsEvent & { _analyticsVersion?: number }
     const userQuestion = m.thread.messages[0]?.content || ''
     return { ...meta, question: userQuestion }
   }).filter(a => a._analyticsVersion)

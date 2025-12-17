@@ -130,14 +130,27 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
     tier: 2,
     ttlMinutes: 5,
     fetcher: async (workspaceId) => {
-      const msc = await prisma.mSC.findFirst({
+      // Get MSC items (projects) for this workspace
+      const items = await prisma.mSCItem.findMany({
         where: { workspaceId },
         orderBy: { updatedAt: 'desc' },
+        take: 10,
+        select: {
+          id: true,
+          content: true,  // Title/main content
+          status: true,
+          description: true,  // Optional notes
+          category: true,
+        },
       })
-      if (!msc?.data) return []
-
-      const data = msc.data as { projects?: Array<{ id: string; title: string; status: string; summary?: string }> }
-      return (data.projects || []).slice(0, 10)
+      // Map to expected format
+      return items.map(item => ({
+        id: item.id,
+        title: item.content,
+        status: item.status,
+        summary: item.description,
+        category: item.category,
+      }))
     },
   },
   {
@@ -163,14 +176,14 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
     tier: 2,
     ttlMinutes: 10,
     fetcher: async (workspaceId) => {
-      const msc = await prisma.mSC.findFirst({
-        where: { workspaceId },
+      // Get goals from MSCItem (category='goal')
+      const goals = await prisma.mSCItem.findMany({
+        where: { workspaceId, category: 'goal', status: 'active' },
         orderBy: { updatedAt: 'desc' },
+        take: 10,
+        select: { content: true },
       })
-      if (!msc?.data) return []
-
-      const data = msc.data as { goals?: string[] }
-      return data.goals || []
+      return goals.map(g => g.content)
     },
   },
 
@@ -255,19 +268,22 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
     tier: 4,
     ttlMinutes: 10,
     fetcher: async (workspaceId) => {
-      const msc = await prisma.mSC.findFirst({
-        where: { workspaceId },
+      // Get projects with descriptions from MSCItem
+      const projects = await prisma.mSCItem.findMany({
+        where: {
+          workspaceId,
+          category: 'project',
+          description: { not: null },
+        },
         orderBy: { updatedAt: 'desc' },
+        take: 20,
+        select: { content: true, description: true },
       })
-      if (!msc?.data) return {}
-
-      const data = msc.data as { projects?: Array<{ id: string; title: string; summary?: string }> }
-      const projects = data.projects || []
 
       return Object.fromEntries(
         projects
-          .filter(p => p.summary)
-          .map(p => [p.title, p.summary!])
+          .filter(p => p.description)
+          .map(p => [p.content, p.description!])
       )
     },
   },
@@ -395,7 +411,7 @@ async function fetchTier(
     items.map(async (item) => {
       try {
         const value = await item.fetcher(workspaceId)
-        ;(context as Record<string, unknown>)[item.key] = value
+        ;(context as unknown as Record<string, unknown>)[item.key] = value
         context._meta.totalItems++
       } catch (error) {
         console.warn(`[Prefetch] Failed to fetch ${item.key}:`, error)
