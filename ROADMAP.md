@@ -1348,6 +1348,41 @@ model PasswordResetToken {
 
 **Estimate:** 2-3 hours
 
+### v1.1.5 Project Effort Tracking ⭐ NEW
+*"How much time have I invested in this?"*
+
+**Origin:**
+The wish to ask OSQR "how long have I worked on OSQR?" — and realizing he can't answer yet. This is the kind of meta-insight that makes documentation-first development tangible.
+
+**What it is:**
+Temporal tracking of project effort. OSQR could log session time, correlate it with commits or doc updates, and give you actual build metrics.
+
+**Example Query:**
+> "How much time have I spent on OSQR?"
+> "You've invested 31 hours across 17 days."
+
+**Data Sources:**
+- [ ] **VS Code session time** — Track active editing time per project (extension integration)
+- [ ] **Git commit activity** — Commits, additions, deletions, file changes
+- [ ] **OSQR conversation history** — Questions asked about this project
+- [ ] **Document updates** — Edits to project docs indexed in Vault
+- [ ] **Build/deploy events** — CI/CD activity if connected
+
+**Implementation (v1):**
+- [ ] **ProjectTimeLog model** — Store session start/end, project context
+- [ ] **Git activity parser** — Extract commit stats from local repos
+- [ ] **Natural language query** — "How long have I worked on X?"
+- [ ] **Effort summary generation** — "31 hours across 17 days, 47 commits"
+
+**Future Extensions:**
+- VS Code extension for real-time session tracking
+- Integration with GitHub/GitLab APIs
+- Effort visualization (timeline, heatmap)
+- Comparison across projects
+- Estimated vs actual time tracking
+
+**Estimate:** 4-6 hours (basic), 2+ days (full VS Code integration)
+
 ---
 
 ### 1.9 Focus Mode (Cognitive Noise Cancellation) ⭐ NEW

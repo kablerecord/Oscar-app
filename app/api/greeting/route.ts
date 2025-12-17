@@ -2,14 +2,89 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
+import OpenAI from 'openai'
 
-// Get time-based greeting
+// Get time-based greeting (fallback)
 function getTimeGreeting(): { greeting: string; emoji: string } {
   const hour = new Date().getHours()
   if (hour >= 5 && hour < 12) return { greeting: 'Good morning', emoji: '☀️' }
   if (hour >= 12 && hour < 17) return { greeting: 'Good afternoon', emoji: '🌤️' }
   if (hour >= 17 && hour < 21) return { greeting: 'Good evening', emoji: '🌅' }
   return { greeting: 'Burning the midnight oil', emoji: '🌙' }
+}
+
+// Generate AI-powered contextual greeting
+async function generateAIGreeting(context: {
+  firstName: string
+  timeOfDay: string
+  recentTopics: string[]
+  currentProjects: string[]
+  goals: string[]
+  lastConversation?: { topic: string; timestamp: Date }
+  daysSinceLastVisit: number
+  streak: number
+  isNewUser: boolean
+}): Promise<string[]> {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+
+  const systemPrompt = `You are OSQR, a warm AI thinking partner. Generate a brief, personalized greeting for the user.
+
+Your greeting should:
+- Be conversational and warm, like a friend
+- Reference something specific to THEIR context if available
+- Be 1-2 short sentences max
+- Feel natural, not scripted or robotic
+- NEVER be generic like "How can I help you today?"
+
+OSQR's voice:
+- Conversational, not formal
+- Brief, not verbose
+- Warm, not clinical
+- Uses contractions (you're, let's, don't)
+- Sometimes starts with "Hey" or just dives in
+
+Examples of good greetings:
+- "Hey. Still wrestling with that API integration?"
+- "Back for more. Want to pick up where we left off on the pricing strategy?"
+- "Morning. That deadline for the investor deck is tomorrow - want to run through it?"
+- "You've been on a roll this week. What's next?"
+- "Haven't seen you in a few days. Everything okay?"`
+
+  const userPrompt = `Generate a personalized greeting for ${context.firstName}.
+
+Context:
+- Time: ${context.timeOfDay}
+- Recent conversation topics: ${context.recentTopics.length > 0 ? context.recentTopics.join(', ') : 'None yet'}
+- Current projects: ${context.currentProjects.length > 0 ? context.currentProjects.join(', ') : 'None specified'}
+- Their goals: ${context.goals.length > 0 ? context.goals.join(', ') : 'Not specified'}
+- Last conversation: ${context.lastConversation ? `"${context.lastConversation.topic}" (${Math.floor((Date.now() - context.lastConversation.timestamp.getTime()) / (1000 * 60 * 60))} hours ago)` : 'None'}
+- Days since last visit: ${context.daysSinceLastVisit}
+- Current streak: ${context.streak} days
+- New user: ${context.isNewUser ? 'Yes' : 'No'}
+
+Return ONLY the greeting text, nothing else. 1-2 sentences max.`
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt }
+      ],
+      max_tokens: 100,
+      temperature: 0.8,
+    })
+
+    const greeting = response.choices[0]?.message?.content?.trim()
+    if (greeting) {
+      return [greeting]
+    }
+  } catch (error) {
+    console.error('AI greeting generation failed:', error)
+  }
+
+  // Fallback to empty - will use static greeting
+  return []
 }
 
 export async function GET(req: NextRequest) {
@@ -162,48 +237,119 @@ export async function GET(req: NextRequest) {
     // Build personalized message
     const firstName = user?.name?.split(' ')[0] || 'there'
 
-    // Generate contextual message based on what we know
+    // Get recent chat history for context
+    let recentConversations: { title: string; updatedAt: Date }[] = []
+    let lastUserMessage: { content: string; createdAt: Date } | null = null
+    try {
+      // Get recent chat threads
+      recentConversations = await prisma.chatThread.findMany({
+        where: { workspaceId },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+        select: {
+          title: true,
+          updatedAt: true,
+        },
+      })
+
+      // Get the most recent user message to understand what they were working on
+      const recentThread = await prisma.chatThread.findFirst({
+        where: { workspaceId },
+        orderBy: { updatedAt: 'desc' },
+        select: {
+          messages: {
+            where: { role: 'user' },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: {
+              content: true,
+              createdAt: true,
+            },
+          },
+        },
+      })
+      if (recentThread?.messages?.[0]) {
+        lastUserMessage = recentThread.messages[0]
+      }
+    } catch {
+      // Chat history query failed - that's fine
+    }
+
+    // Calculate days since last visit
+    let daysSinceLastVisit = 0
+    if (recentConversations.length > 0) {
+      const lastActivity = recentConversations[0].updatedAt
+      daysSinceLastVisit = Math.floor((Date.now() - lastActivity.getTime()) / (1000 * 60 * 60 * 24))
+    }
+
+    // Determine if this is a new user
+    const isNewUser = !workspace?.onboardingCompleted || totalUsage < 5
+
+    // Generate AI-powered greeting for returning users with context
     let contextualMessages: string[] = []
 
-    // Time-based context
-    if (timeGreeting.emoji === '🌙') {
-      contextualMessages.push("Late night thinking session? I'm here for it.")
+    if (!isNewUser && (recentConversations.length > 0 || profileContext.workingOn || profileContext.goal)) {
+      // Build context for AI greeting
+      const recentTopics = recentConversations
+        .map(c => c.title)
+        .filter(t => t && t !== 'New conversation')
+        .slice(0, 3)
+
+      const currentProjects = [
+        profileContext.workingOn,
+        ...pinnedItems.filter(p => p.category === 'project').map(p => p.content),
+      ].filter(Boolean) as string[]
+
+      const goals = [
+        profileContext.goal,
+        ...pinnedItems.filter(p => p.category === 'goal').map(p => p.content),
+      ].filter(Boolean) as string[]
+
+      // Try AI greeting
+      const aiGreeting = await generateAIGreeting({
+        firstName,
+        timeOfDay: timeGreeting.greeting.toLowerCase(),
+        recentTopics,
+        currentProjects,
+        goals,
+        lastConversation: lastUserMessage ? {
+          topic: lastUserMessage.content.slice(0, 100),
+          timestamp: lastUserMessage.createdAt,
+        } : undefined,
+        daysSinceLastVisit,
+        streak: currentStreak,
+        isNewUser,
+      })
+
+      if (aiGreeting.length > 0) {
+        contextualMessages = aiGreeting
+      }
     }
 
-    // Streak encouragement
-    if (currentStreak >= 7) {
-      contextualMessages.push(`${currentStreak} day streak - you're building something good here.`)
-    } else if (currentStreak >= 3) {
-      contextualMessages.push(`${currentStreak} days in a row. Momentum is building.`)
-    }
-
-    // Vault context
-    if (documentCount > 0) {
-      contextualMessages.push(`I've got ${documentCount} documents in your vault ready to help.`)
-    } else {
-      contextualMessages.push("Your vault is empty - index some documents and I'll remember everything for you.")
-    }
-
-    // Project/goal context
-    if (profileContext.workingOn) {
-      contextualMessages.push(`Still working on "${profileContext.workingOn}"? Let's make progress.`)
-    }
-
-    if (profileContext.goal) {
-      contextualMessages.push(`Keeping your eye on: "${profileContext.goal}"`)
-    }
-
-    // Recent activity context
-    if (recentInsights.length > 0) {
-      contextualMessages.push(`Found ${recentInsights.length} insights for you recently.`)
-    }
-
-    // New user welcome
-    if (!workspace?.onboardingCompleted || totalUsage < 5) {
-      contextualMessages = [
-        "Welcome! I'm your personal AI thinking partner.",
-        "Ask me anything - I'll help you sharpen your question first, then get the best answer.",
-      ]
+    // Fallback to static greeting if AI failed or for new users
+    if (contextualMessages.length === 0) {
+      if (isNewUser) {
+        contextualMessages = [
+          "Welcome! I'm your personal AI thinking partner.",
+          "Ask me anything - I'll help you sharpen your question first, then get the best answer.",
+        ]
+      } else {
+        // Static fallback
+        if (timeGreeting.emoji === '🌙') {
+          contextualMessages.push("Late night thinking session? I'm here for it.")
+        }
+        if (currentStreak >= 7) {
+          contextualMessages.push(`${currentStreak} day streak - you're building something good here.`)
+        } else if (currentStreak >= 3) {
+          contextualMessages.push(`${currentStreak} days in a row. Momentum is building.`)
+        }
+        if (profileContext.workingOn) {
+          contextualMessages.push(`Still working on "${profileContext.workingOn}"? Let's make progress.`)
+        }
+        if (contextualMessages.length === 0) {
+          contextualMessages.push("What's on your mind?")
+        }
+      }
     }
 
     // Pick 2-3 messages that feel most relevant

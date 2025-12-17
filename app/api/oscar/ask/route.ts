@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { OSQR, type OSQRRequest } from '@/lib/ai/oscar'
+import { OSQR, type OSQRRequest, type ResponseMode } from '@/lib/ai/oscar'
 import { type PanelAgent } from '@/lib/ai/panel'
 import { prisma } from '@/lib/db/prisma'
 import { z } from 'zod'
@@ -14,6 +14,7 @@ import { trackConversation, getTILContext } from '@/lib/til'
 import { isPlanningRequest, extractPlanParams, generatePlan90, formatPlanForChat } from '@/lib/til/planner'
 import { isAuditRequest, extractAuditParams, runSelfAudit, formatAuditForChat } from '@/lib/til/self-audit'
 import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
+import { routeQuestion } from '@/lib/ai/model-router'
 
 const RequestSchema = z.object({
   message: z.string().min(1),
@@ -98,6 +99,64 @@ export async function POST(req: NextRequest) {
 
     if (systemMode) {
       console.log('[OSQR] System Mode active - restricting to OSQR system docs')
+    }
+
+    // ==========================================================================
+    // SMART AUTO-ROUTING: Analyze question and potentially adjust mode
+    // If user selected thoughtful/contemplate but question is simple/factual,
+    // downgrade to quick mode and use indexed files instead
+    // ==========================================================================
+    const questionAnalysis = routeQuestion(message)
+    const questionType = questionAnalysis.questionType
+    const complexity = questionAnalysis.complexity
+
+    // Track if we auto-routed to a different mode
+    let autoRouted = false
+    let autoRoutedReason = ''
+    let effectiveMode: ResponseMode = mode
+
+    // Auto-downgrade conditions:
+    // 1. User selected thoughtful/contemplate but complexity is low (1-2)
+    // 2. Question is factual/conversational type
+    // 3. System mode is active (OSQR docs can be answered from indexed files)
+    const shouldDowngrade = (
+      (mode === 'thoughtful' || mode === 'contemplate') &&
+      (
+        (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) ||
+        (systemMode && complexity <= 3) // OSQR questions can usually be answered from docs
+      )
+    )
+
+    if (shouldDowngrade) {
+      effectiveMode = 'quick'
+      autoRouted = true
+
+      if (systemMode) {
+        autoRoutedReason = "I found the answer in my indexed documentation, so I used Quick mode instead of consulting the full panel."
+      } else if (questionType === 'factual') {
+        autoRoutedReason = "This looked like a straightforward factual question, so I used Quick mode to get you a faster answer."
+      } else {
+        autoRoutedReason = "This seemed like a simple question, so I used Quick mode instead of the full panel discussion."
+      }
+
+      console.log(`[OSQR] Auto-routed: ${mode} → ${effectiveMode} (${questionType}, complexity: ${complexity})`)
+    }
+
+    // Auto-upgrade conditions:
+    // 1. User selected quick but question is high-stakes or very complex
+    const shouldUpgrade = (
+      mode === 'quick' &&
+      (questionType === 'high_stakes' || complexity >= 4)
+    )
+
+    if (shouldUpgrade) {
+      effectiveMode = complexity >= 4 && questionType === 'high_stakes' ? 'contemplate' : 'thoughtful'
+      autoRouted = true
+      autoRoutedReason = questionType === 'high_stakes'
+        ? "This seems like an important decision, so I'm consulting my full panel to give you better perspectives."
+        : "This question has some complexity to it, so I'm bringing in my panel for a more thorough answer."
+
+      console.log(`[OSQR] Auto-routed: ${mode} → ${effectiveMode} (${questionType}, complexity: ${complexity})`)
     }
 
     // ==========================================================================
@@ -326,12 +385,13 @@ export async function POST(req: NextRequest) {
     }
 
     // Ask OSQR with user's capability level for GKVI context
+    // Use effectiveMode (may be auto-routed from original mode)
     const osqrRequest: OSQRRequest = {
       userMessage: message,
       panelAgents,
       context,
       includeDebate,
-      mode,
+      mode: effectiveMode, // Use effective mode (may be auto-routed)
       userLevel, // Pass capability level for level-aware GKVI context
     }
 
@@ -519,7 +579,16 @@ export async function POST(req: NextRequest) {
         panelDiscussion: response.panelDiscussion,
         roundtableDiscussion: response.roundtableDiscussion,
         // New routing metadata - "OSQR knows when to think"
-        routing: response.routing,
+        routing: {
+          ...response.routing,
+          // Auto-routing info for UI notification
+          autoRouted,
+          autoRoutedReason,
+          requestedMode: mode,
+          effectiveMode,
+          questionType,
+          complexity,
+        },
         // J-2: Auto-context sources used
         contextSources: autoContext.sources,
       },

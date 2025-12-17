@@ -32,6 +32,7 @@ import {
   Scale, // Supreme Court icon
 } from 'lucide-react'
 import { OSCARBubble, type PendingInsight, type OSCARBubbleHandle } from '@/components/oscar/OSCARBubble'
+import { RoutingNotification } from '@/components/oscar/RoutingNotification'
 import { ShareActions } from '@/components/share/ShareActions'
 import { ResponseActions } from '@/components/chat/ResponseActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
@@ -334,6 +335,16 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     isNewUser?: boolean
   } | null>(null)
   const [greetingLoading, setGreetingLoading] = useState(true)
+
+  // Auto-routing notification state
+  const [routingNotification, setRoutingNotification] = useState<{
+    autoRouted: boolean
+    autoRoutedReason: string
+    requestedMode: 'quick' | 'thoughtful' | 'contemplate'
+    effectiveMode: 'quick' | 'thoughtful' | 'contemplate'
+    questionType: string
+    complexity: number
+  } | null>(null)
 
   // Check if user can access Contemplate mode (master tier only)
   const canUseContemplate = userTier === 'master'
@@ -911,6 +922,18 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       if (data.artifacts && data.artifacts.length > 0) {
         setCurrentArtifacts(data.artifacts)
         setShowArtifacts(true)
+      }
+
+      // Show routing notification if auto-routed
+      if (data.routing?.autoRouted) {
+        setRoutingNotification({
+          autoRouted: data.routing.autoRouted,
+          autoRoutedReason: data.routing.autoRoutedReason,
+          requestedMode: data.routing.requestedMode,
+          effectiveMode: data.routing.effectiveMode,
+          questionType: data.routing.questionType,
+          complexity: data.routing.complexity,
+        })
       }
 
       // Trigger onboarding progress for first question asked (will show post_first_answer stage)
@@ -2292,6 +2315,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           </div>
         </div>
       )}
+
+      {/* Routing Notification - shows when OSQR auto-routes to a different mode */}
+      <RoutingNotification
+        routing={routingNotification}
+        onDismiss={() => setRoutingNotification(null)}
+      />
     </div>
   )
 })
