@@ -2182,41 +2182,93 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
               )}
             </div>
             <div className="flex sm:flex-col gap-2">
-              {responseMode === 'quick' ? (
-                // Quick mode: Direct fire
-                <Button
-                  onClick={() => handleGatekeeper()}
-                  disabled={isLoading || !input.trim()}
-                  size="lg"
-                  className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                >
-                  {isLoading ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Zap className="mr-2 h-4 w-4" />
-                      Fire
-                    </>
-                  )}
-                </Button>
-              ) : (
-                // Thoughtful/Contemplate mode: Goes through gatekeeper first
-                <Button
-                  onClick={handleGatekeeper}
-                  disabled={isLoading || !input.trim() || chatStage === 'refined' || chatStage === 'gatekeeper-prompt'}
-                  size="lg"
-                  className="flex-1 sm:flex-initial px-4 sm:px-6"
-                >
-                  {isLoading && (chatStage === 'refining' || chatStage === 'gating') ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      Ask
-                    </>
-                  )}
-                </Button>
-              )}
+              {/* Context-aware button: Fire (orange) for refined/good questions, Send (default) otherwise */}
+              {(() => {
+                // Fire button is the "reward" - only shown when question is ready
+                const showFireButton = refinementSuggestion?.type === 'good' || chatStage === 'refined'
+
+                if (responseMode === 'quick') {
+                  // Quick mode
+                  if (showFireButton) {
+                    // Good question - show Fire button
+                    return (
+                      <Button
+                        onClick={() => handleGatekeeper()}
+                        disabled={isLoading || !input.trim()}
+                        size="lg"
+                        className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <>
+                            <Zap className="mr-2 h-4 w-4" />
+                            Fire
+                          </>
+                        )}
+                      </Button>
+                    )
+                  } else {
+                    // Simple/unrefined question - show Send button
+                    return (
+                      <Button
+                        onClick={() => handleGatekeeper()}
+                        disabled={isLoading || !input.trim()}
+                        size="lg"
+                        className="flex-1 sm:flex-initial px-4 sm:px-6"
+                      >
+                        {isLoading ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="mr-2 h-4 w-4" />
+                            Send
+                          </>
+                        )}
+                      </Button>
+                    )
+                  }
+                } else {
+                  // Thoughtful/Contemplate mode
+                  if (showFireButton) {
+                    return (
+                      <Button
+                        onClick={handleGatekeeper}
+                        disabled={isLoading || !input.trim() || chatStage === 'gatekeeper-prompt'}
+                        size="lg"
+                        className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                      >
+                        {isLoading && (chatStage === 'refining' || chatStage === 'gating') ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <>
+                            <Zap className="mr-2 h-4 w-4" />
+                            Fire
+                          </>
+                        )}
+                      </Button>
+                    )
+                  } else {
+                    return (
+                      <Button
+                        onClick={handleGatekeeper}
+                        disabled={isLoading || !input.trim() || chatStage === 'refined' || chatStage === 'gatekeeper-prompt'}
+                        size="lg"
+                        className="flex-1 sm:flex-initial px-4 sm:px-6"
+                      >
+                        {isLoading && (chatStage === 'refining' || chatStage === 'gating') ? (
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                        ) : (
+                          <>
+                            <Send className="mr-2 h-4 w-4" />
+                            Ask
+                          </>
+                        )}
+                      </Button>
+                    )
+                  }
+                }
+              })()}
             </div>
           </div>
         </div>

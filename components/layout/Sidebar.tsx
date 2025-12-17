@@ -23,6 +23,81 @@ import {
   Clock,
   X,
 } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
+// Calculate how well OSQR knows the user (composite knowledge score)
+function calculateKnowledgeScore(params: {
+  profileCompletion: number  // 0-100
+  documentsCount: number
+  documentsMax: number
+  totalQuestions?: number
+  pinnedItemsCount: number
+}): { score: number; label: string } {
+  // Profile completion: 40% weight (most important for understanding user)
+  const profileScore = params.profileCompletion * 0.4
+
+  // Vault documents: 30% weight (max out at 50 docs = 100%)
+  const docNormalized = Math.min(params.documentsCount / 50, 1) * 100
+  const docScore = docNormalized * 0.3
+
+  // Usage/engagement: 30% weight (based on questions and pinned items)
+  const questionsNormalized = Math.min((params.totalQuestions || 0) / 100, 1) * 100
+  const pinnedNormalized = Math.min(params.pinnedItemsCount / 10, 1) * 100
+  const engagementScore = ((questionsNormalized + pinnedNormalized) / 2) * 0.3
+
+  const totalScore = Math.round(profileScore + docScore + engagementScore)
+
+  // Generate friendly label based on score
+  let label: string
+  if (totalScore < 15) {
+    label = 'Just getting started'
+  } else if (totalScore < 30) {
+    label = 'Learning your style'
+  } else if (totalScore < 50) {
+    label = 'Understanding you'
+  } else if (totalScore < 70) {
+    label = 'Knowing you well'
+  } else if (totalScore < 85) {
+    label = 'Deep understanding'
+  } else {
+    label = 'Fully attuned'
+  }
+
+  return { score: totalScore, label }
+}
+
+// Map capability levels to friendly labels
+function getCapabilityLabel(level: number): { label: string; description: string } {
+  if (level <= 1) return {
+    label: 'Building',
+    description: 'You\'re building your foundation. Every question strengthens how OSQR can help you.'
+  }
+  if (level <= 3) return {
+    label: 'Growing',
+    description: 'Your thinking patterns are developing. OSQR is learning your style.'
+  }
+  if (level <= 5) return {
+    label: 'Operating',
+    description: 'You\'re in operator mode. Systems and consistency are forming.'
+  }
+  if (level <= 7) return {
+    label: 'Creating',
+    description: 'Creator level. You\'re building leverage and multiplying your impact.'
+  }
+  if (level <= 9) return {
+    label: 'Architecting',
+    description: 'Architect mode. You\'re designing systems that outlast you.'
+  }
+  return {
+    label: 'Mastering',
+    description: 'Master level. Your documented wisdom is your legacy.'
+  }
+}
 
 interface SidebarProps {
   workspaceId?: string
@@ -378,13 +453,24 @@ export function Sidebar({ workspaceId, onClose }: SidebarProps) {
                   </div>
                 </div>
                 {/* Capability Level */}
-                <div className="flex items-center justify-between pt-1">
-                  <span className="text-[10px] text-slate-400">Capability Level</span>
-                  <div className="flex items-center gap-1">
-                    <TrendingUp className="h-3 w-3 text-green-400" />
-                    <span className="text-xs font-bold text-green-400">{quickStats.capabilityLevel}</span>
-                  </div>
-                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center justify-between pt-1 cursor-help">
+                        <span className="text-[10px] text-slate-400">Capability</span>
+                        <div className="flex items-center gap-1">
+                          <TrendingUp className="h-3 w-3 text-green-400" />
+                          <span className="text-xs font-bold text-green-400">
+                            {getCapabilityLabel(quickStats.capabilityLevel).label}
+                          </span>
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-[200px] bg-slate-800 border-slate-700 text-slate-200">
+                      <p className="text-xs">{getCapabilityLabel(quickStats.capabilityLevel).description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
             </div>
           )}
@@ -443,33 +529,41 @@ export function Sidebar({ workspaceId, onClose }: SidebarProps) {
             </div>
           )}
 
-          {/* Profile Snapshot */}
-          {profileInfo && (
+          {/* Profile / Knowledge Score */}
+          {profileInfo && quickStats && (
             <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-3">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-purple-400" />
-                  <span className="text-xs font-semibold text-slate-300">Profile</span>
+                  <span className="text-xs font-semibold text-slate-300">OSQR Knows You</span>
                 </div>
                 <Link href="/profile" className="text-[10px] text-slate-500 hover:text-slate-300 flex items-center gap-0.5">
-                  Complete <ChevronRight className="h-3 w-3" />
+                  Improve <ChevronRight className="h-3 w-3" />
                 </Link>
               </div>
-              <div>
-                <div className="flex justify-between text-[10px] text-slate-400 mb-1">
-                  <span>OSQR knows you</span>
-                  <span>{profileInfo.completionPercent}%</span>
-                </div>
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
-                    style={{ width: `${profileInfo.completionPercent}%` }}
-                  />
-                </div>
-                <p className="text-[10px] text-slate-500 mt-2">
-                  {profileInfo.answeredQuestions} of {profileInfo.totalQuestions} questions answered
-                </p>
-              </div>
+              {(() => {
+                const knowledge = calculateKnowledgeScore({
+                  profileCompletion: profileInfo.completionPercent,
+                  documentsCount: quickStats.documentsCount,
+                  documentsMax: quickStats.documentsMax,
+                  totalQuestions: usageStreak?.totalQuestions,
+                  pinnedItemsCount: pinnedItems.length,
+                })
+                return (
+                  <div>
+                    <div className="flex justify-between text-[10px] text-slate-400 mb-1">
+                      <span>{knowledge.label}</span>
+                      <span>{knowledge.score}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
+                        style={{ width: `${knowledge.score}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
 
