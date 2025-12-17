@@ -102,13 +102,76 @@ export async function POST(req: NextRequest) {
     }
 
     // ==========================================================================
-    // SMART AUTO-ROUTING: Analyze question and potentially adjust mode
-    // If user selected thoughtful/contemplate but question is simple/factual,
-    // downgrade to quick mode and use indexed files instead
+    // ULTRA-FAST PATH: For quick mode with simple questions, skip everything
+    // This gives sub-3-second responses for basic questions
     // ==========================================================================
     const questionAnalysis = routeQuestion(message)
     const questionType = questionAnalysis.questionType
     const complexity = questionAnalysis.complexity
+
+    // FAST PATH: Skip ALL processing for simple quick mode questions
+    if (mode === 'quick' && complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) {
+      console.log(`[OSQR] FAST PATH: Skipping all processing (${questionType}, complexity: ${complexity})`)
+
+      // Direct Claude call with minimal overhead
+      const { ProviderRegistry } = await import('@/lib/ai/providers')
+      const provider = ProviderRegistry.getProvider('anthropic', {
+        apiKey: process.env.ANTHROPIC_API_KEY || '',
+        model: 'claude-sonnet-4-20250514',
+      })
+
+      const answer = await provider.generate({
+        messages: [
+          { role: 'system', content: 'You are OSQR. Answer directly and concisely. Do NOT add commentary about patterns you notice, do NOT reference previous questions, and do NOT explain why you\'re answering a certain way. Just answer the question.' },
+          { role: 'user', content: message },
+        ],
+        temperature: 0.3,
+      })
+
+      // Minimal database operations - create thread + messages in parallel
+      const [thread] = await Promise.all([
+        prisma.chatThread.create({
+          data: {
+            workspaceId,
+            title: message.slice(0, 100),
+            mode: 'panel',
+          },
+        }),
+      ])
+
+      // Save messages
+      await Promise.all([
+        prisma.chatMessage.create({
+          data: { threadId: thread.id, role: 'user', content: message },
+        }),
+        prisma.chatMessage.create({
+          data: {
+            threadId: thread.id,
+            role: 'assistant',
+            provider: 'anthropic',
+            content: answer,
+            metadata: { fastPath: true },
+          },
+        }),
+      ])
+
+      return NextResponse.json({
+        answer,
+        threadId: thread.id,
+        routing: {
+          questionType,
+          modelUsed: { provider: 'anthropic', model: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4' },
+          confidence: questionAnalysis.confidence,
+          shouldSuggestAltOpinion: false,
+          fastPath: true,
+          complexity,
+        },
+      })
+    }
+
+    // ==========================================================================
+    // STANDARD PATH: Full processing for complex questions
+    // ==========================================================================
 
     // Track if we auto-routed to a different mode
     let autoRouted = false
