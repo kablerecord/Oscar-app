@@ -447,11 +447,11 @@ export function FolderUploader({
       {/* Files preview (before upload) */}
       {hasFiles && phase === 'idle' && (
         <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-            <div className="flex items-center space-x-3">
-              <FolderOpen className="h-5 w-5 text-blue-500" />
-              <div>
-                <p className="font-medium text-neutral-900 dark:text-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+            <div className="flex items-center space-x-3 min-w-0">
+              <FolderOpen className="h-5 w-5 text-blue-500 flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="font-medium text-neutral-900 dark:text-white truncate">
                   {files.length} files ready to upload
                 </p>
                 <p className="text-xs text-neutral-500">
@@ -459,7 +459,7 @@ export function FolderUploader({
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 flex-shrink-0">
               <Button variant="ghost" size="sm" onClick={reset}>
                 <Trash2 className="h-4 w-4 mr-1" />
                 Clear

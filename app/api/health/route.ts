@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 
 // Build version - update this with each significant deploy
-const BUILD_VERSION = 'v1.0.0-onboarding-fix'
+const BUILD_VERSION = 'v1.1.0-two-phase-upload'
 
 export async function GET() {
   return NextResponse.json({
