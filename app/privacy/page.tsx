@@ -24,6 +24,20 @@ export default function PrivacyPage() {
       </div>
 
       <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6 lg:px-8">
+        {/* Manifesto Banner */}
+        <Link
+          href="/manifesto"
+          className="mb-12 block rounded-xl border border-purple-500/30 bg-gradient-to-r from-purple-500/10 to-indigo-500/10 p-6 hover:border-purple-500/50 transition-colors group"
+        >
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-purple-400 font-semibold mb-1">New: Trust & Privacy Manifesto</p>
+              <p className="text-slate-400 text-sm">Read our founder&apos;s personal commitment to privacy and why OSQR is built on architectural trust, not promises.</p>
+            </div>
+            <ArrowLeft className="h-5 w-5 text-purple-400 rotate-180 group-hover:translate-x-1 transition-transform" />
+          </div>
+        </Link>
+
         {/* Hero */}
         <div className="text-center mb-16">
           <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 shadow-lg shadow-emerald-500/25">
@@ -417,12 +431,12 @@ export default function PrivacyPage() {
               </p>
             </div>
             <div className="mt-6 flex items-center space-x-4">
-              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold">
-                OS
+              <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-500 to-indigo-500 flex items-center justify-center text-white font-bold">
+                KR
               </div>
               <div>
-                <p className="font-semibold text-white">The OSQR Team</p>
-                <p className="text-sm text-slate-400">Building better AI tools</p>
+                <p className="font-semibold text-white">Kable Record</p>
+                <p className="text-sm text-slate-400">Founder & 100% Owner, OSQR</p>
               </div>
             </div>
           </div>
