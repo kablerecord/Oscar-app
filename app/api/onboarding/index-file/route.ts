@@ -82,9 +82,9 @@ export async function POST(req: NextRequest) {
 
     if (fileType === 'application/pdf') {
       const buffer = Buffer.from(await file.arrayBuffer())
-      // Dynamic import to avoid pdf-parse test file issue at build time
-      const pdfParse = (await import('pdf-parse')).default
-      const pdfData = await pdfParse(buffer)
+      // Use our custom PDF parser that avoids pdf-parse's test file bug
+      const { parsePDF } = await import('@/lib/utils/pdf-parser')
+      const pdfData = await parsePDF(buffer)
       fileContent = pdfData.text
     } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileName.endsWith('.docx')) {
       // Handle Word documents using mammoth
