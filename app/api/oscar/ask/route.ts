@@ -109,22 +109,74 @@ export async function POST(req: NextRequest) {
     const questionType = questionAnalysis.questionType
     const complexity = questionAnalysis.complexity
 
-    // FAST PATH: Skip ALL processing for simple quick mode questions
-    if (mode === 'quick' && complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) {
-      console.log(`[OSQR] FAST PATH: Skipping all processing (${questionType}, complexity: ${complexity})`)
+    // FAST PATH: Quick mode with smart vault access
+    // This is the sweet spot: vault context when relevant + speed
+    if (mode === 'quick') {
+      // Detect if this question is likely about the user's vault/documents
+      // vs a general question (math, facts, coding, etc.)
+      const vaultPatterns = /\b(vault|document|file|upload|my\s+(data|info|project|work|notes|content)|indexed|knowledge\s*base|how\s+many\s+(docs?|documents?|files?|chunks?))\b/i
+      const metaPatterns = /\b(osqr|about\s+me|my\s+profile|settings?)\b/i
+      const isLikelyVaultQuestion = vaultPatterns.test(message) || metaPatterns.test(message)
 
-      // Direct Claude call with minimal overhead
+      // Skip vault search for obvious non-vault questions
+      const isObviouslyGeneral = (
+        questionType === 'conversational' && complexity <= 1 && !isLikelyVaultQuestion
+      ) || /^\s*\d+\s*[\+\-\*\/x×]\s*\d+\s*$/.test(message) // pure math
+
+      console.log(`[OSQR] FAST PATH: Single AI (${questionType}, complexity: ${complexity}, vaultSearch: ${!isObviouslyGeneral})`)
+
+      let autoContext: { context?: string; sources?: { identity: boolean; profile: boolean; msc: boolean; knowledge: boolean; threads: boolean; systemMode: boolean } } = {}
+
+      // Only search vault if question might be relevant
+      if (!isObviouslyGeneral) {
+        const { assembleContext } = await import('@/lib/context/auto-context')
+        autoContext = await assembleContext(workspaceId, message, {
+          includeProfile: true,
+          includeMSC: false, // Skip for speed
+          includeKnowledge: true, // Search vault for relevant questions
+          includeThreads: false, // Skip for speed
+          maxKnowledgeChunks: 3, // Limit for speed
+          systemMode,
+        })
+      }
+
+      // Direct Claude call with vault context
       const { ProviderRegistry } = await import('@/lib/ai/providers')
       const provider = ProviderRegistry.getProvider('anthropic', {
         apiKey: process.env.ANTHROPIC_API_KEY || '',
         model: 'claude-sonnet-4-20250514',
       })
 
+      // Build system prompt based on whether we have vault context
+      let systemPrompt = 'You are OSQR. Answer directly and concisely. Do NOT add commentary about patterns you notice, do NOT reference previous questions, and do NOT explain why you\'re answering a certain way. Just answer the question.'
+
+      if (autoContext.context) {
+        systemPrompt += '\n\nYou have access to the user\'s knowledge base. When answering questions about their documents/vault, reference specific information from the context provided.'
+      } else if (isLikelyVaultQuestion) {
+        // They asked about vault but we didn't find anything
+        systemPrompt += '\n\nThe user is asking about their vault/documents. If you don\'t have specific information from their knowledge base, let them know you searched but didn\'t find relevant matches, and suggest they check what\'s been indexed.'
+      }
+
+      // Build messages with context
+      const messages: { role: 'system' | 'user'; content: string }[] = [
+        {
+          role: 'system',
+          content: systemPrompt
+        },
+      ]
+
+      // Add vault context if available
+      if (autoContext.context) {
+        messages.push({
+          role: 'system',
+          content: `User's Knowledge Base Context:\n${autoContext.context}`,
+        })
+      }
+
+      messages.push({ role: 'user', content: message })
+
       const answer = await provider.generate({
-        messages: [
-          { role: 'system', content: 'You are OSQR. Answer directly and concisely. Do NOT add commentary about patterns you notice, do NOT reference previous questions, and do NOT explain why you\'re answering a certain way. Just answer the question.' },
-          { role: 'user', content: message },
-        ],
+        messages,
         temperature: 0.3,
       })
 
@@ -150,7 +202,11 @@ export async function POST(req: NextRequest) {
             role: 'assistant',
             provider: 'anthropic',
             content: answer,
-            metadata: { fastPath: true },
+            metadata: {
+              fastPath: true,
+              usedKnowledge: !!autoContext.context,
+              contextSources: autoContext.sources,
+            },
           },
         }),
       ])
@@ -166,6 +222,7 @@ export async function POST(req: NextRequest) {
           fastPath: true,
           complexity,
         },
+        contextSources: autoContext.sources,
       })
     }
 
@@ -205,22 +262,9 @@ export async function POST(req: NextRequest) {
       console.log(`[OSQR] Auto-routed: ${mode} → ${effectiveMode} (${questionType}, complexity: ${complexity})`)
     }
 
-    // Auto-upgrade conditions:
-    // 1. User selected quick but question is high-stakes or very complex
-    const shouldUpgrade = (
-      mode === 'quick' &&
-      (questionType === 'high_stakes' || complexity >= 4)
-    )
-
-    if (shouldUpgrade) {
-      effectiveMode = complexity >= 4 && questionType === 'high_stakes' ? 'contemplate' : 'thoughtful'
-      autoRouted = true
-      autoRoutedReason = questionType === 'high_stakes'
-        ? "This seems like an important decision, so I'm consulting my full panel to give you better perspectives."
-        : "This question has some complexity to it, so I'm bringing in my panel for a more thorough answer."
-
-      console.log(`[OSQR] Auto-routed: ${mode} → ${effectiveMode} (${questionType}, complexity: ${complexity})`)
-    }
+    // NOTE: Auto-upgrade for quick mode is now handled in the FAST PATH above.
+    // Quick mode requests always go through the fast path, so this code path
+    // only handles 'thoughtful' and 'contemplate' modes.
 
     // ==========================================================================
     // SAFETY CHECK: Detect crisis signals BEFORE any processing
