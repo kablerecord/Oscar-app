@@ -2249,10 +2249,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                       </Button>
                     )
                   } else {
+                    // Send/Ask button for unrefined questions
+                    // Note: chatStage can't be 'refined' here since that's handled by showFireButton
                     return (
                       <Button
                         onClick={handleGatekeeper}
-                        disabled={isLoading || !input.trim() || chatStage === 'refined' || chatStage === 'gatekeeper-prompt'}
+                        disabled={isLoading || !input.trim() || chatStage === 'gatekeeper-prompt'}
                         size="lg"
                         className="flex-1 sm:flex-initial px-4 sm:px-6"
                       >
