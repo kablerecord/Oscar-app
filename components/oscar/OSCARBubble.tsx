@@ -232,9 +232,9 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
   const currentMessage = OSCAR_MESSAGES[onboardingState.stage]
   const isIntro = isIntroPhase(onboardingState)
 
-  // Auto-open for onboarding stages that need attention
+  // Auto-open for onboarding stages OR as the primary greeting (post-onboarding)
   useEffect(() => {
-    // All active onboarding stages should auto-open
+    // During onboarding - auto-open for stages that need attention
     if (isOnboarding) {
       const timer = setTimeout(() => {
         setIsOpen(true)
@@ -242,7 +242,16 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
       }, 300)
       return () => clearTimeout(timer)
     }
-  }, [onboardingState.stage, isOnboarding])
+    // Post-onboarding - OSQR bubble IS the greeting, auto-open it
+    // Only auto-open once on mount (when alwaysVisible is true)
+    if (alwaysVisible && !isOnboarding) {
+      const timer = setTimeout(() => {
+        setIsOpen(true)
+        setIsMinimized(false)
+      }, 500)
+      return () => clearTimeout(timer)
+    }
+  }, [onboardingState.stage, isOnboarding, alwaysVisible])
 
   // Auto-advance for stages with autoAdvanceDelay
   useEffect(() => {
@@ -888,9 +897,8 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
     )
   }
 
-  // Normal corner bubble mode (after onboarding)
+  // Normal corner bubble mode - OSQR's primary greeting and conversation UI
   // Positioned higher on mobile to avoid browser navigation bars
-  // When isGreetingCentered is true, slide the bubble off to the right (it's displayed in center instead)
   // Supports drag-to-reposition (session only, resets on refresh/logout)
   return (
     <div

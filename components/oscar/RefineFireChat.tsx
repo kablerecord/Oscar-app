@@ -319,8 +319,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showSupremeLockedModal, setShowSupremeLockedModal] = useState(false)
 
-  // OSQR centered greeting state - starts in center, slides to corner on input focus
-  const [osqrCentered, setOsqrCentered] = useState(true)
+  // OSQR bubble is now the primary greeting - no centered state needed
 
   // Client-side time greeting (instant, no API needed)
   const getTimeGreeting = (): { greeting: string; emoji: string } => {
@@ -607,11 +606,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     fetchGreeting()
   }, [workspaceId])
 
-  // Handle input focus - triggers OSQR to slide to corner
+  // Handle input focus (OSQR greeting is now in the bubble, not centered)
   const handleInputFocus = () => {
-    if (osqrCentered) {
-      setOsqrCentered(false)
-    }
+    // OSQR bubble handles its own state now
   }
 
   // PERSISTENCE: Load draft from localStorage on mount
@@ -1164,67 +1161,24 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           <div className="absolute inset-0 bg-radial-gradient pointer-events-none" />
 
           {messages.length === 0 && chatStage === 'input' && (
-            <div className={`relative flex h-full flex-col items-center justify-center text-center transition-all duration-700 ease-out ${
-              osqrCentered ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
-            }`}>
+            <div className="relative flex h-full flex-col items-center justify-center text-center">
               {/* Animated background blobs */}
               <div className="absolute -top-20 -right-20 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl animate-pulse" />
               <div className="absolute -bottom-20 -left-20 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
 
-              {/* OSQR Avatar */}
-              <div className="relative mb-6">
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-500/10 ring-1 ring-blue-500/20 animate-pulse-glow">
-                  <Brain className="h-10 w-10 text-blue-400" />
+              {/* Empty state - OSQR greeting is in the bubble */}
+              <div className="relative">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-700/50 ring-1 ring-slate-600/50 mb-4">
+                  <Target className="h-8 w-8 text-slate-500" />
                 </div>
-                <Sparkles className="absolute -right-2 -top-2 h-6 w-6 text-blue-400" />
               </div>
 
-              {/* Personalized Greeting - Always shown instantly */}
-              <>
-                {/* Time-based greeting with user's name */}
-                <h3 className="mb-3 text-3xl font-bold text-white transition-all duration-300">
-                  {greetingData.timeGreeting?.emoji} {greetingData.timeGreeting?.greeting}, <span className="shimmer-text" data-text={greetingData.firstName || 'there'}>{greetingData.firstName || 'there'}</span>
-                </h3>
-
-                {/* Contextual messages */}
-                <div className="max-w-lg space-y-2 mb-6">
-                  {greetingData.contextualMessages?.map((msg, idx) => (
-                    <p key={idx} className="text-base text-slate-300 leading-relaxed transition-all duration-300">
-                      {msg}
-                    </p>
-                  ))}
-                </div>
-
-                {/* Stats pills - only show if we have meaningful data */}
-                {greetingData.stats && !greetingData.isNewUser && (
-                  <div className="flex flex-wrap justify-center gap-3 mb-6">
-                    {greetingData.stats.currentStreak > 0 && (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 ring-1 ring-amber-500/30 text-xs font-medium text-amber-300">
-                        <Zap className="h-3 w-3" />
-                        <span>{greetingData.stats.currentStreak} day streak</span>
-                      </div>
-                    )}
-                    {greetingData.stats.vaultDocuments > 0 && (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/15 ring-1 ring-purple-500/30 text-xs font-medium text-purple-300">
-                        <Brain className="h-3 w-3" />
-                        <span>{greetingData.stats.vaultDocuments} docs in vault</span>
-                      </div>
-                    )}
-                    {greetingData.stats.totalQuestions > 0 && (
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-xs font-medium text-blue-300">
-                        <MessageSquare className="h-3 w-3" />
-                        <span>{greetingData.stats.totalQuestions} questions asked</span>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* CTA */}
-                <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
-                  <Target className="h-4 w-4" />
-                  <span>{greetingData.isNewUser ? "Refine → Fire: Better questions, better answers" : "What's on your mind?"}</span>
-                </div>
-              </>
+              <h3 className="text-lg font-medium text-slate-400 mb-2">
+                Your workspace is ready
+              </h3>
+              <p className="text-sm text-slate-500 max-w-sm">
+                Ask OSQR anything below, or click the OSQR bubble to continue your conversation.
+              </p>
             </div>
           )}
 
@@ -2209,7 +2163,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         workspaceId={workspaceId}
         isFocusMode={responseMode === 'contemplate'}
         onStartConversation={handleInsightConversation}
-        isGreetingCentered={osqrCentered && messages.length === 0 && chatStage === 'input'}
+        isGreetingCentered={false}
       />
 
       {/* Upgrade Modal for Contemplate Mode */}
