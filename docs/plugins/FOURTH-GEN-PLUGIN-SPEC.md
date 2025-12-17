@@ -4,6 +4,9 @@
 **Owner:** Kable Record
 **Created:** December 2024
 **For:** VS Code OSQR Plugin Development
+**Related Docs:**
+- [OSQR-IDENTITY-SURFACES.md](../architecture/OSQR-IDENTITY-SURFACES.md) - Identity architecture
+- [PLUGIN-TONE-CONSTRAINTS.md](./PLUGIN-TONE-CONSTRAINTS.md) - Tone rules for all plugins
 
 ---
 
@@ -367,6 +370,49 @@ Structure:
 
 ---
 
+## Tone Configuration
+
+This plugin adheres to [OSQR Plugin Tone Constraints](./PLUGIN-TONE-CONSTRAINTS.md).
+
+### Fourth Gen Tone Settings
+
+```yaml
+tone:
+  proactivity: informed        # Not laid_back, not forceful
+  structure: semi_structured   # Guided but not rigid
+  rhythm:
+    max_prompts_per_day: 3
+    prompt_windows: [morning, afternoon]
+    respect_quiet_mode: true
+  terminology:
+    - "Builder's Principles"
+    - "Transfer systems"
+    - "Legacy journal"
+    - "Vision capture"
+    - "Architecture Decision Record"
+```
+
+### Why "Informed" Proactivity
+
+Fourth Gen is a coaching methodology, but OSQR is not a drill sergeant. The plugin surfaces context and asks questions—it doesn't demand action.
+
+**The Fourth Gen Voice:**
+
+```
+# Good (Informed)
+"You haven't reviewed your Builder's Principles this week. Want to spend 5 minutes on that?"
+
+# Too forceful
+"You MUST review your Builder's Principles. Open it now."
+
+# Too laid back
+"What would you like to do?"
+```
+
+The plugin suggests based on methodology. The user decides.
+
+---
+
 ## Plugin Configuration Options
 
 ```yaml
@@ -391,6 +437,9 @@ fourth-gen:
   # Learning mode (for new users)
   explain_prompts: false
   show_methodology_tips: false
+
+  # Tone overrides (within constraints)
+  proactivity_override: null  # null uses default, or: laid_back | informed | forceful
 ```
 
 ### Mode Descriptions
