@@ -2,7 +2,7 @@
 
 **Status:** Specification Complete | Implementation: Not Started
 **Last Updated:** 2025-12-10
-**Related:** [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md)
+**Related:** [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md)
 
 ---
 
@@ -394,5 +394,5 @@ All events are sanitized before storage:
 
 ## Related Documents
 
-- [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md)
+- [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md)
 - [PRIVACY_TIERS.md](./PRIVACY_TIERS.md)

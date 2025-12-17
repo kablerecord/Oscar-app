@@ -1,7 +1,7 @@
 # OSQR Implementation Roadmap
 
 **Generated from:** OSQR Master Plan (175K characters, 25K words)
-**Last updated:** 2025-12-14
+**Last updated:** 2025-12-16
 **Owner:** Kable Record
 
 This roadmap extracts actionable implementation items from the OSQR Master Plan document, organized by development phase. Each item maps back to specific sections in the master plan.
@@ -82,6 +82,43 @@ OSQR is not an AI tool. OSQR is a **capability operating system**.
 …it does not belong.
 
 **The Insight:** A tool is something ready to do work. If we define too heavily how that tool should work, we limit what people can do with it. OSQR provides the capability infrastructure; users and plugin creators define the applications.
+
+### The Intelligence Layer Vision
+
+OSQR is headed toward becoming **the intelligence layer that sits between humans and every application they use**.
+
+**The Problem:**
+Every app you use generates context. Your email conversations, your code commits, your Slack messages, your calendar decisions, your browser research — all of it creates understanding that could inform better decisions elsewhere.
+
+Currently, that context dies in each app. Your email doesn't know what you're building in VS Code. Your calendar doesn't know what projects are urgent. Your browser research doesn't connect to your strategic planning.
+
+**The Solution:**
+OSQR becomes the persistent memory and judgment layer that makes all your tools smarter *together*.
+
+| Application | Without OSQR | With OSQR Intelligence Layer |
+|------------|--------------|------------------------------|
+| **VS Code** | AI assists with code | OSQR knows your architecture, decisions, and principles — applies them automatically |
+| **Email** | You read, you reply | OSQR surfaces what matters, drafts in your voice, knows your relationships |
+| **Calendar** | You schedule manually | OSQR protects your time, suggests delegation, optimizes for energy patterns |
+| **Slack/Teams** | You react to everything | OSQR filters noise, escalates what matters, maintains cross-channel context |
+| **Browser** | You search, you read | OSQR indexes what you consume, connects to what you know, surfaces relevance |
+
+**Why PKV and MSC Are Foundational:**
+They're not just features — they're the foundation of persistent intelligence that spans applications:
+- **PKV** stores the context from every application
+- **MSC** stores the principles that should guide decisions everywhere
+- Together, they create continuity across your entire digital life
+
+**The Marketplace Expansion:**
+Plugins aren't just "author methodologies" — they're **application connectors**:
+- A Gmail plugin that understands your communication patterns
+- A Notion plugin that connects your knowledge base to OSQR
+- A Figma plugin that applies your design principles
+- A Slack plugin that filters and prioritizes based on your context
+
+Each plugin extends where OSQR's intelligence can reach. The more connectors, the more valuable the intelligence layer becomes.
+
+**This is the "Operating System" in OSQR's name becoming literal.**
 
 ---
 
@@ -515,13 +552,27 @@ This roadmap defines **WHAT** to build. The Development Philosophy document defi
 - [ ] Safety System (crisis detection, response playbooks) — [docs/SAFETY_SYSTEM.md](docs/SAFETY_SYSTEM.md)
 - [ ] Global Knowledge Index (GKVI) — [docs/KNOWLEDGE_ARCHITECTURE.md](docs/KNOWLEDGE_ARCHITECTURE.md)
 
-### Phase 1: Foundation (Current → Month 2)
-### Phase 2: Core Experience (Months 2-4)
-### Phase 3: Intelligence Layer (Months 4-6)
-### Phase 4: Advanced Features (Months 6-9)
-### Phase 5: OS-Level Features (Months 9-12+)
-### Phase 6: Meta-OSQR Mode (Post Intelligence Layer)
-### Phase X: VS Code Dev Companion Extension (Future)
+### Version Roadmap Summary
+
+| Version | Focus | Key Deliverables |
+|---------|-------|------------------|
+| **V1.0** | Core OSQR | Web app, PKV, multi-model routing, Refine→Fire |
+| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction |
+| **V2.0** | Creator Marketplace | Marketplace launch, creator onboarding, plugin ecosystem |
+| **V3.0** | VS Code OSQR | Full VS Code extension, Builder Plugin, Queue System |
+| **V4.0** | Privacy Phone | OSQR-native phone, intelligence utility model, US manufacturing |
+| **V5.0** | Robotics Integration | OSQR intelligence layer for robotics/automation |
+
+### Phase 1: Foundation (V1.0)
+### Phase 2: Core Experience (V1.0 → V1.5)
+### Phase 3: Intelligence Layer (V1.5)
+### Phase 4: Advanced Features (V1.5)
+### Phase 5: OS-Level Features (V1.5)
+### Phase 6: Meta-OSQR Mode (V1.5)
+### Phase 7: Creator Marketplace (V2.0)
+### Phase 8: VS Code OSQR (V3.0)
+### Phase 9: Privacy Phone (V4.0)
+### Phase 10: Robotics Integration (V5.0)
 
 ---
 
@@ -1822,9 +1873,40 @@ QuestionScore {
 
 ---
 
-## Phase X: OSQR VS Code Dev Companion (Future)
+## Phase 7: Creator Marketplace (V2.0)
 
-> **Status:** Vision documented. Do not begin until Phase 3 Intelligence Layer is stable.
+> **Status:** Vision documented. Implementation follows V1.5 Intelligence Layer completion.
+> **Prerequisites:** Core OSQR app launched, TIL/Proactive systems stable, PKV/MSC battle-tested
+
+### Vision
+
+The Creator Marketplace enables thought leaders to package their methodologies as "Judgment Profiles" — portable intelligence frameworks that change how OSQR thinks for users who install them.
+
+### Key Documents
+
+- **[docs/vision/CREATOR_MARKETPLACE.md](docs/vision/CREATOR_MARKETPLACE.md)** — Full marketplace architecture
+- **[docs/vision/CREATOR_MARKETPLACE_GTM.md](docs/vision/CREATOR_MARKETPLACE_GTM.md)** — Go-to-market strategy
+
+### Business Model
+
+- 80/20 revenue split (creator keeps 80%)
+- No platform favoritism — plugins compete on merit
+- Fairness as competitive moat
+
+### Creator Tiers
+
+| Tier | Requirements |
+|------|--------------|
+| Creator Mode | Private plugins, testing |
+| Marketplace Candidate | 60-90 day account age, can submit |
+| Verified Creator | Premium placement, proven results |
+
+---
+
+## Phase 8: VS Code OSQR (V3.0)
+
+> **Status:** Vision documented. Implementation follows V2.0 Creator Marketplace launch.
+> **Prerequisites:** Core OSQR app launched, Creator Marketplace stable, PKV/MSC battle-tested
 
 ### Vision
 
@@ -1863,6 +1945,83 @@ Full specifications preserved in vision documents:
 - **[docs/vision/AUTONOMOUS-APP-BUILDER.md](docs/vision/AUTONOMOUS-APP-BUILDER.md)** – App Builder blueprint
 
 *Detailed implementation planning begins when prerequisites are met.*
+
+---
+
+## Phase 9: Privacy Phone (V4.0)
+
+> **Status:** Strategic vision — long-term initiative
+> **Target:** 2026-2027
+> **Prerequisites:** V1-V3 complete, OSQR momentum established, resources secured
+
+### Vision
+
+**OSQR-the-phone isn't a phone with OSQR on it—it's OSQR manifested as a phone.**
+
+The phone is one physical interface for the intelligence layer, the same way VS Code, web chat, and voice are interfaces. The insight: Everyone asking for a "freedom phone" is asking for hardware, but the actual moat is the OS. OSQR solves the hard part.
+
+### The Intelligence Utility Model
+
+OSQR isn't a phone company. Not even a software company. It's an **intelligence utility**—like electricity or internet, but for cognitive augmentation. Users subscribe to a *relationship* with an intelligence that knows them and improves over time. The phone is the first always-on container for that relationship.
+
+### Market Opportunity
+
+| Metric | Value |
+|--------|-------|
+| Ultra-secure smartphone market (2024) | $4.15 billion |
+| Projected (2033) | $20.43 billion |
+| CAGR | 18.42% |
+| Consumer privacy segment | Underserved |
+
+### Business Model: The Tesla Model Inverted
+
+**The phone isn't the product—OSQR is the product.**
+
+The phone is an acquisition channel and hardware interface. Can price phone aggressively because capturing **lifetime subscription value**.
+
+| Phase | Revenue Model |
+|-------|---------------|
+| Months 0-24 | ~$70/month bundled (~$50 hardware + ~$20 OSQR) |
+| Month 25+ | Hardware paid off, OSQR subscription continues ($20-30/month) |
+
+By month 24: 2 years of context and memory in OSQR. Switching cost is enormous—not because trapped, but because value is non-transferable.
+
+### Data & Lapse Policy ("Florida Homestead" Philosophy)
+
+**User data belongs to user. Never deleted.**
+
+- If subscription lapses: OSQR intelligence **disabled, not deleted**
+- User data persists indefinitely
+- Base phone functions always work
+- Creates trust and frictionless re-activation
+
+### Implementation Phases
+
+1. **Foundation (Pre-V4.0):** Complete V1-V3, establish OSQR momentum, research hardware partnerships
+2. **Design (V4.0 Planning):** Hardware partner selection, OS customization, carrier exploration
+3. **Development (V4.0 Build):** Mobile OS integration, prototyping, security certification, beta testing
+4. **Launch (V4.0 Release):** Limited release to power users, iterate, scale manufacturing
+
+### Detailed Specs
+
+Full specifications preserved in vision document:
+- **[docs/vision/PRIVACY-PHONE.md](docs/vision/PRIVACY-PHONE.md)** – Complete V4.0 strategic vision
+
+*This is a post-V3.0 initiative. Execution begins after VS Code OSQR stability.*
+
+---
+
+## Phase 10: Robotics Integration (V5.0)
+
+> **Status:** Placeholder — strategic vision not yet defined
+> **Target:** TBD
+> **Prerequisites:** V1-V4 complete, Privacy Phone launched
+
+### Vision
+
+OSQR intelligence layer extended to robotics and automation systems. Strategic direction and detailed specifications to be developed.
+
+> **Note:** This is a future vision placeholder. Documentation will be created when strategic direction is defined.
 
 ---
 

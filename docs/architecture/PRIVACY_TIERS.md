@@ -2,7 +2,7 @@
 
 **Status:** Specification Complete | Implementation: Partial (existing A/B/C concept)
 **Last Updated:** 2025-12-10
-**Related:** [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md)
+**Related:** [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md)
 
 ---
 
@@ -405,7 +405,7 @@ This is achieved through:
 
 ## Related Documents
 
-- [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md)
+- [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md)
 - [TELEMETRY_SPEC.md](./TELEMETRY_SPEC.md)
-- [OSQR_CONSTITUTION.md](./OSQR_CONSTITUTION.md) — Privacy principles (Part 2.4)
-- [USER_INTELLIGENCE_ARTIFACTS.md](./USER_INTELLIGENCE_ARTIFACTS.md) — What OSQR infers (invisibly)
+- [OSQR_CONSTITUTION.md](../governance/OSQR_CONSTITUTION.md) — Privacy principles (Part 2.4)
+- [USER_INTELLIGENCE_ARTIFACTS.md](../features/USER_INTELLIGENCE_ARTIFACTS.md) — What OSQR infers (invisibly)

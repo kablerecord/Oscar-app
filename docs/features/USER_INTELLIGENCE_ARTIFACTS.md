@@ -307,4 +307,4 @@ These artifacts are invisible infrastructure. Users experience the effects witho
 - [OSQR_CONSTITUTION.md](OSQR_CONSTITUTION.md) — Privacy guarantees, agency principles
 - [OSQR_PHILOSOPHY.md](OSQR_PHILOSOPHY.md) — Meeting users where they are
 - [PRIVACY_TIERS.md](PRIVACY_TIERS.md) — How privacy tiers affect artifact collection
-- [KNOWLEDGE_ARCHITECTURE.md](KNOWLEDGE_ARCHITECTURE.md) — PKV specification
+- [KNOWLEDGE_ARCHITECTURE.md](../architecture/KNOWLEDGE_ARCHITECTURE.md) — PKV specification

@@ -4,13 +4,17 @@
  * Automatic Knowledge Indexer (Non-Interactive)
  *
  * Indexes files without prompting for user input
+ * NOW WITH EMBEDDING GENERATION!
+ *
  * Usage: tsx scripts/auto-index.ts <directory>
  */
 
+import 'dotenv/config'  // Load .env file FIRST
 import { FileScanner } from '../lib/knowledge/file-scanner'
 import { TextExtractor } from '../lib/knowledge/text-extractor'
 import { TextChunker } from '../lib/knowledge/chunker'
 import { prisma } from '../lib/db/prisma'
+import { generateEmbedding, formatEmbeddingForPostgres } from '../lib/ai/embeddings'
 
 async function main() {
   const targetDir = process.argv[2]
@@ -20,6 +24,14 @@ async function main() {
     console.log('\nUsage: tsx scripts/auto-index.ts <directory>')
     process.exit(1)
   }
+
+  // Verify OpenAI API key is available
+  if (!process.env.OPENAI_API_KEY) {
+    console.error('❌ OPENAI_API_KEY not found in environment')
+    console.log('   Make sure .env file exists with OPENAI_API_KEY=sk-...')
+    process.exit(1)
+  }
+  console.log('✅ OpenAI API key loaded')
 
   console.log('\n🧠 OSQR Knowledge Indexer (Auto Mode)\n')
   console.log(`📂 Target directory: ${targetDir}\n`)
@@ -63,12 +75,29 @@ async function main() {
   console.log('📥 Starting indexing...\n')
 
   let indexed = 0
+  let skipped = 0
   let failed = 0
   const errors: Array<{ file: string; error: string }> = []
 
   for (const file of files) {
     try {
       console.log(`   Processing: ${file.filename}...`)
+
+      // Check if already indexed by hash
+      const existing = await prisma.document.findFirst({
+        where: {
+          metadata: {
+            path: ['hash'],
+            equals: file.hash,
+          },
+        },
+      })
+
+      if (existing) {
+        console.log(`      ⏭️  Already indexed (skipping)`)
+        skipped++
+        continue
+      }
 
       // Extract text
       const text = await TextExtractor.extract(file)
@@ -104,18 +133,42 @@ async function main() {
         overlapSize: 200,
       })
 
-      // Store chunks
+      // Store chunks WITH embeddings
+      let embeddedCount = 0
       for (const chunk of chunks) {
-        await prisma.documentChunk.create({
-          data: {
-            documentId: document.id,
-            content: chunk.content,
-            chunkIndex: chunk.index,
-          },
-        })
+        try {
+          // Generate embedding for this chunk
+          const embedding = await generateEmbedding(chunk.content)
+          const vectorString = formatEmbeddingForPostgres(embedding)
+
+          // Insert with embedding using raw SQL (Prisma doesn't support vector type)
+          await prisma.$executeRawUnsafe(`
+            INSERT INTO "DocumentChunk" (id, "documentId", content, embedding, "chunkIndex", "createdAt")
+            VALUES (
+              gen_random_uuid()::text,
+              $1,
+              $2,
+              $3::vector,
+              $4,
+              NOW()
+            )
+          `, document.id, chunk.content, vectorString, chunk.index)
+
+          embeddedCount++
+        } catch (embeddingError) {
+          // Fallback: store without embedding if embedding fails
+          console.log(`      ⚠️  Embedding failed for chunk ${chunk.index}, storing without embedding`)
+          await prisma.documentChunk.create({
+            data: {
+              documentId: document.id,
+              content: chunk.content,
+              chunkIndex: chunk.index,
+            },
+          })
+        }
       }
 
-      console.log(`      ✅ Indexed with ${chunks.length} chunks (${cleanText.length} chars)`)
+      console.log(`      ✅ Indexed with ${chunks.length} chunks (${embeddedCount} embedded, ${cleanText.length} chars)`)
       indexed++
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error)
@@ -127,6 +180,7 @@ async function main() {
 
   console.log(`\n🎉 Indexing complete!`)
   console.log(`   ✅ Indexed: ${indexed} files`)
+  console.log(`   ⏭️  Skipped: ${skipped} files (already indexed)`)
   console.log(`   ❌ Failed: ${failed} files`)
 
   if (errors.length > 0 && errors.length <= 10) {

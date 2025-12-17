@@ -45,18 +45,8 @@ export default async function VaultPage() {
     )
   }
 
-  // Get stats
-  const [totalDocuments, totalChunks, sourceBreakdown] = await Promise.all([
-    prisma.document.count({ where: { workspaceId: workspace.id } }),
-    prisma.documentChunk.count({
-      where: { document: { workspaceId: workspace.id } },
-    }),
-    prisma.document.groupBy({
-      by: ['sourceType'],
-      _count: { _all: true },
-      where: { workspaceId: workspace.id },
-    }),
-  ])
+  // Get document count
+  const totalDocuments = await prisma.document.count({ where: { workspaceId: workspace.id } })
 
   // Get initial documents
   const documents = await prisma.document.findMany({
@@ -84,18 +74,11 @@ export default async function VaultPage() {
     <MainLayout user={user} workspaceName={workspace.name}>
       <VaultPageClient workspaceId={workspace.id}>
         {/* Stats overview */}
-        <VaultStats
-          totalDocuments={totalDocuments}
-          totalChunks={totalChunks}
-          sourceBreakdown={sourceBreakdown.map((s) => ({
-            type: s.sourceType,
-            count: s._count._all,
-          }))}
-        />
+        <VaultStats totalDocuments={totalDocuments} />
 
         {/* Document list */}
         <div className="pt-4">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+          <h2 className="text-lg font-semibold text-white mb-4">
             All Documents
           </h2>
           <DocumentList
@@ -114,12 +97,6 @@ export default async function VaultPage() {
               limit: 20,
               total: totalDocuments,
               totalPages: Math.ceil(totalDocuments / 20),
-            }}
-            filters={{
-              sourceTypes: sourceBreakdown.map((s) => ({
-                type: s.sourceType,
-                count: s._count._all,
-              })),
             }}
             workspaceId={workspace.id}
           />

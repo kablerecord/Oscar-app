@@ -329,5 +329,5 @@ OSQR is a capability operating system that multiplies people at whatever level t
 
 - [OSQR_PHILOSOPHY.md](OSQR_PHILOSOPHY.md) — Detailed beliefs about growth, effort, imagination
 - [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md) — Core vs Plugin separation
-- [ROADMAP.md](../ROADMAP.md) — Implementation phases
+- [ROADMAP.md](../../ROADMAP.md) — Implementation phases
 - [SYSTEM_INVENTORY.md](SYSTEM_INVENTORY.md) — Full system map

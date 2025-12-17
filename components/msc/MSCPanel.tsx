@@ -475,9 +475,12 @@ export function MSCPanel({ workspaceId, isExpanded = true, onToggle, onAskOSQR }
             return (
               <div key={category.id} className="rounded-xl bg-slate-800/30 border border-slate-700/50 overflow-hidden">
                 {/* Category Header */}
-                <button
+                <div
                   onClick={() => toggleCategory(category.id)}
-                  className="flex items-center justify-between w-full px-3 py-2.5 group hover:bg-slate-700/30 transition-colors"
+                  className="flex items-center justify-between w-full px-3 py-2.5 group hover:bg-slate-700/30 transition-colors cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && toggleCategory(category.id)}
                 >
                   <div className="flex items-center gap-2.5">
                     <div className={`p-1.5 rounded-lg ${
@@ -512,7 +515,7 @@ export function MSCPanel({ workspaceId, isExpanded = true, onToggle, onAskOSQR }
                       <ChevronRight className="h-3.5 w-3.5 text-slate-500" />
                     )}
                   </div>
-                </button>
+                </div>
 
                 {/* Category Items */}
                 {isCategoryExpanded && (
@@ -747,16 +750,21 @@ export function MSCPanel({ workspaceId, isExpanded = true, onToggle, onAskOSQR }
                       </div>
                     )}
 
-                    {/* Empty state */}
+                    {/* Empty state - Ask OSQR button when no items */}
                     {categoryItems.length === 0 && editingCategory !== category.id && (
                       <button
                         onClick={() => {
-                          setEditingCategory(category.id)
-                          setNewItemContent('')
+                          if (onAskOSQR) {
+                            const categoryName = category.label.toLowerCase()
+                            onAskOSQR(`Help me think about my ${categoryName}. What questions should I be asking myself to clarify my ${categoryName}?`)
+                          }
                         }}
-                        className="w-full p-3 text-xs text-slate-400 hover:text-slate-200 border border-dashed border-slate-600 rounded-lg hover:border-slate-500 hover:bg-slate-800/30 transition-all"
+                        className="w-full flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-blue-600/10 to-purple-600/10 hover:from-blue-600/20 hover:to-purple-600/20 border border-dashed border-blue-500/30 rounded-lg transition-all group"
                       >
-                        + Add your first {category.label.toLowerCase().slice(0, -1)}
+                        <Sparkles className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300" />
+                        <span className="text-xs text-slate-400 group-hover:text-slate-200">
+                          Ask OSQR about your {category.label.toLowerCase()}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -765,19 +773,7 @@ export function MSCPanel({ workspaceId, isExpanded = true, onToggle, onAskOSQR }
             )
           })
         )}
-      </div>
 
-      {/* Footer */}
-      <div className="px-4 py-3 border-t border-slate-700/50 bg-slate-900/50">
-        <button
-          onClick={handleLearnMore}
-          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gradient-to-r from-blue-600/20 to-purple-600/20 hover:from-blue-600/30 hover:to-purple-600/30 border border-blue-500/30 rounded-lg transition-all group"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-blue-400 group-hover:text-blue-300" />
-          <span className="text-xs font-medium text-slate-300 group-hover:text-white">
-            Ask OSQR about your goals
-          </span>
-        </button>
       </div>
     </div>
   )

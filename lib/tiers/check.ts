@@ -150,3 +150,61 @@ export async function getWorkspaceTierInfo(workspaceId: string) {
     },
   }
 }
+
+// Enterprise threshold - uploads above this trigger enterprise contact modal
+export const ENTERPRISE_FILE_THRESHOLD = 1500
+
+/**
+ * Check if a bulk upload requires enterprise tier
+ * Returns enterprise info if the upload exceeds even Master tier limits
+ */
+export interface EnterpriseCheckResult {
+  requiresEnterprise: boolean
+  filesAttempted: number
+  maxAllowed: number
+  tier: TierName
+  suggestion?: 'upgrade_to_master' | 'contact_enterprise'
+}
+
+export async function checkBulkUploadEnterprise(
+  workspaceId: string,
+  newFileCount: number
+): Promise<EnterpriseCheckResult> {
+  const tier = await getWorkspaceTier(workspaceId)
+  const config = getTierConfig(tier)
+
+  const currentDocumentCount = await prisma.document.count({
+    where: { workspaceId },
+  })
+
+  const totalAfterUpload = currentDocumentCount + newFileCount
+
+  // Check if it exceeds even Master tier limits (enterprise territory)
+  if (totalAfterUpload > ENTERPRISE_FILE_THRESHOLD) {
+    return {
+      requiresEnterprise: true,
+      filesAttempted: newFileCount,
+      maxAllowed: ENTERPRISE_FILE_THRESHOLD,
+      tier,
+      suggestion: 'contact_enterprise',
+    }
+  }
+
+  // Check if it exceeds current tier but fits in Master
+  if (totalAfterUpload > config.limits.maxDocuments && tier === 'pro') {
+    return {
+      requiresEnterprise: false,
+      filesAttempted: newFileCount,
+      maxAllowed: config.limits.maxDocuments,
+      tier,
+      suggestion: 'upgrade_to_master',
+    }
+  }
+
+  return {
+    requiresEnterprise: false,
+    filesAttempted: newFileCount,
+    maxAllowed: config.limits.maxDocuments,
+    tier,
+  }
+}

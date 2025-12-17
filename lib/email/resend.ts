@@ -1,6 +1,13 @@
 import { Resend } from 'resend'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Lazy initialization to avoid build-time errors when RESEND_API_KEY isn't set
+let resend: Resend | null = null
+function getResend() {
+  if (!resend) {
+    resend = new Resend(process.env.RESEND_API_KEY)
+  }
+  return resend
+}
 
 const FROM_EMAIL = process.env.FROM_EMAIL || 'OSQR <noreply@osqr.ai>'
 const APP_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000'
@@ -8,7 +15,7 @@ const APP_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000'
 export async function sendPasswordResetEmail(email: string, token: string) {
   const resetUrl = `${APP_URL}/reset-password?token=${token}`
 
-  const { data, error } = await resend.emails.send({
+  const { data, error } = await getResend().emails.send({
     from: FROM_EMAIL,
     to: email,
     subject: 'Reset your OSQR password',

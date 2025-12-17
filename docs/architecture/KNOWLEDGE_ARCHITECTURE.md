@@ -213,7 +213,7 @@ This requires updating GKVI, not reading user data.
 
 ### Method 2: Behavioral Patterns (Tier B/C Only)
 
-From [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md):
+From [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md):
 
 OSQR tracks patterns like:
 - "Most users ask about discipline on Mondays"
@@ -376,10 +376,10 @@ If needed for support:
 
 ## Related Documentation
 
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — System architecture
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture
 - [PRIVACY_TIERS.md](./PRIVACY_TIERS.md) — Privacy tier details
-- [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md) — How OSQR learns
-- [ROADMAP.md](../ROADMAP.md) — Implementation timeline
+- [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md) — How OSQR learns
+- [ROADMAP.md](../../ROADMAP.md) — Implementation timeline
 
 ---
 

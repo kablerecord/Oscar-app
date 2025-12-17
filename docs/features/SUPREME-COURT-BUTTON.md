@@ -420,7 +420,7 @@ POST-VISIT
 ## Related Documents
 
 - [COUNCIL-MODE.md](COUNCIL-MODE.md) - Visible multi-model panel (different purpose)
-- [MULTI-MODEL-ARCHITECTURE.md](MULTI-MODEL-ARCHITECTURE.md) - Core routing infrastructure
+- [MULTI-MODEL-ARCHITECTURE.md](../architecture/MULTI-MODEL-ARCHITECTURE.md) - Core routing infrastructure
 - [ROADMAP.md](../../ROADMAP.md) - Phase 3 planning
 - [lib/ai/model-router.ts](../../lib/ai/model-router.ts) - Model selection
 - [lib/ai/oscar.ts](../../lib/ai/oscar.ts) - OSQR class

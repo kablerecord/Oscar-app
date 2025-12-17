@@ -1,7 +1,7 @@
 # OSQR System Inventory
 
 **Status:** Living Document
-**Last Updated:** 2025-12-14
+**Last Updated:** 2025-12-16
 **Purpose:** Master index of all OSQR systems, features, and concepts
 
 This document exists because OSQR evolves faster than internalization. Use it to:
@@ -20,7 +20,7 @@ This document exists because OSQR evolves faster than internalization. Use it to
 | [OSQR_PHILOSOPHY.md](OSQR_PHILOSOPHY.md) | Layer 1: Beliefs about growth, effort, imagination | **Foundational** |
 | [UX_PHILOSOPHY.md](UX_PHILOSOPHY.md) | Layer 2: Focus Mode, progressive reveal, UI states | **Foundational** |
 | [USER_INTELLIGENCE_ARTIFACTS.md](USER_INTELLIGENCE_ARTIFACTS.md) | Internal user models (invisible to users) | Complete |
-| [ROADMAP.md](../ROADMAP.md) | Implementation phases + Section 0 strategic vision | Active |
+| [ROADMAP.md](../../ROADMAP.md) | Implementation phases + Section 0 strategic vision | Active |
 | [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md) | Core/Plugin separation, safety, platform values | Complete |
 | [CREATOR_MARKETPLACE.md](CREATOR_MARKETPLACE.md) | Plugin operations, creator tiers, marketplace | Complete |
 | [KNOWLEDGE_ARCHITECTURE.md](KNOWLEDGE_ARCHITECTURE.md) | PKV vs GKVI, knowledge separation | Complete |
@@ -33,11 +33,13 @@ This document exists because OSQR evolves faster than internalization. Use it to
 | [features/MULTI-MODEL-ARCHITECTURE.md](features/MULTI-MODEL-ARCHITECTURE.md) | Model routing, personalities | Complete |
 | [vision/VSCODE-DEV-COMPANION.md](vision/VSCODE-DEV-COMPANION.md) | VS Code extension vision | Vision |
 | [vision/AUTONOMOUS-APP-BUILDER.md](vision/AUTONOMOUS-APP-BUILDER.md) | App generation vision | Vision |
+| [vision/PRIVACY-PHONE.md](vision/PRIVACY-PHONE.md) | V4.0 Privacy Phone strategy | Vision |
+| [vision/CREATOR_MARKETPLACE_GTM.md](vision/CREATOR_MARKETPLACE_GTM.md) | Marketplace go-to-market strategy | Complete |
 | [marketing/PODCAST_SEEDING_PLAYBOOK.md](marketing/PODCAST_SEEDING_PLAYBOOK.md) | Experience-first podcast outreach strategy | Complete |
 
 ---
 
-## Full System Inventory (37 Systems, 9 Layers)
+## Full System Inventory (39 Systems, 9 Layers)
 
 ### Layer 0: Foundational Documents
 
@@ -190,9 +192,13 @@ This document exists because OSQR evolves faster than internalization. Use it to
 | # | System | Description | Status | Doc |
 |---|--------|-------------|--------|-----|
 | 32 | **Media Vault** | Photos, videos, timeline, memory linking | Vision | — |
-| 33 | **VS Code Dev Companion** | Real OSQR backend in VS Code, PKV+MSC integration | Vision | [VSCODE-DEV-COMPANION.md](vision/VSCODE-DEV-COMPANION.md) |
+| 33 | **VS Code Dev Companion (V3.0)** | Real OSQR backend in VS Code, PKV+MSC integration | Vision | [VSCODE-DEV-COMPANION.md](vision/VSCODE-DEV-COMPANION.md) |
 | 34 | **Autonomous Mode** | Task execution, assumption tracking, safe autonomy | Partial | ROADMAP Appendix D |
 | 35 | **Autonomous App Builder** | Blueprint generation, dependency graphs, scaffolding | Vision | [AUTONOMOUS-APP-BUILDER.md](vision/AUTONOMOUS-APP-BUILDER.md) |
+| 36 | **Privacy Phone (V4.0)** | OSQR-native phone, intelligence utility model, US manufacturing | Vision | [PRIVACY-PHONE.md](vision/PRIVACY-PHONE.md) |
+| 37 | **Robotics Integration (V5.0)** | OSQR intelligence layer for robotics/automation | Placeholder | — |
+
+> **Note:** Robotics Integration is a future vision placeholder. Documentation will be created when strategic direction is defined.
 
 ---
 
@@ -298,6 +304,7 @@ When adding a new system/feature, document:
 | 2025-12-14 | Initial inventory created (34 systems, 9 layers) |
 | 2025-12-14 | Added Layer 0 (Constitution + Philosophy), User Intelligence Artifacts (37 systems, 10 layers) |
 | 2025-12-14 | Added UX_PHILOSOPHY.md (Focus Mode, Three UI States, Progressive Reveal) |
+| 2025-12-16 | Added Privacy Phone (V4.0) and Robotics Integration (V5.0 placeholder) to Layer 9; updated version references (V2.0=Marketplace, V3.0=VS Code, V4.0=Privacy Phone, V5.0=Robotics) |
 
 ---
 

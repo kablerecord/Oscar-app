@@ -995,10 +995,10 @@ All early access users implicitly agree to:
 
 ## Related Documentation
 
-- [ROADMAP.md](../ROADMAP.md) — Product development phases
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — Technical architecture
+- [ROADMAP.md](../../ROADMAP.md) — Product development phases
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) — Technical architecture
 - [PRICING_STRATEGY.md](./PRICING_STRATEGY.md) — Monetization details (if exists)
-- [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md) — Telemetry for learning
+- [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md) — Telemetry for learning
 
 ---
 

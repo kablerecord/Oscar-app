@@ -21,7 +21,7 @@ export function FocusModeToggle() {
             variant="ghost"
             size="icon"
             onClick={toggleFocusMode}
-            className={`rounded-full transition-all duration-300 ${
+            className={`rounded-full transition-all duration-300 cursor-pointer ${
               focusMode
                 ? 'bg-blue-500/20 text-blue-400 ring-1 ring-blue-500/30 hover:bg-blue-500/30'
                 : 'text-slate-400 hover:text-white hover:bg-slate-800'

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { TIERS, type TierName } from '@/lib/tiers/config'
-import { Check, Crown, Star, ArrowLeft } from 'lucide-react'
+import { Check, Crown, Star, ArrowLeft, Building2, X, Loader2 } from 'lucide-react'
 
 // Founder Pricing metadata
 const FOUNDER_PRICING = {
@@ -24,6 +24,7 @@ const FOUNDER_PRICING = {
 export default function PricingPage() {
   const tiers = Object.values(TIERS)
   const [isYearly, setIsYearly] = useState(false)
+  const [showEnterpriseModal, setShowEnterpriseModal] = useState(false)
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] py-12 px-4">
@@ -92,11 +93,90 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {tiers.map((tier) => (
             <PricingCard key={tier.name} tier={tier} isYearly={isYearly} />
           ))}
+
+          {/* Enterprise Card */}
+          <div className="relative rounded-2xl p-6 bg-gradient-to-b from-amber-950/40 to-orange-950/40 border-2 border-amber-500/50 shadow-lg shadow-amber-500/10">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+              <span className="text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-500">
+                <Building2 className="h-3 w-3" />
+                ENTERPRISE
+              </span>
+            </div>
+
+            <div className="mb-6 mt-2">
+              <div className="flex items-center gap-2 mb-2">
+                <Building2 className="h-5 w-5 text-amber-400" />
+                <h3 className="text-xl font-bold text-white">OSQR Enterprise</h3>
+              </div>
+              <p className="text-sm text-neutral-400">
+                For teams and organizations with large-scale knowledge needs
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-bold text-white">Custom</span>
+              </div>
+              <p className="text-xs text-neutral-500 mt-1">
+                Tailored pricing based on your needs
+              </p>
+              <p className="text-xs font-medium text-amber-400 mt-1">
+                Volume discounts available
+              </p>
+            </div>
+
+            <ul className="space-y-3 mb-6">
+              {[
+                'Everything in Master',
+                'Unlimited documents',
+                'Unlimited queries',
+                'Dedicated support',
+                'Custom model access',
+                'API access for integrations',
+                'Team collaboration (coming)',
+                'SSO & advanced security',
+              ].map((feature, i) => (
+                <li key={i} className="flex items-start gap-2">
+                  <Check className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-400" />
+                  <span className="text-sm text-neutral-300">{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={() => setShowEnterpriseModal(true)}
+              className="w-full py-3 px-4 rounded-lg font-semibold transition-all bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg"
+            >
+              Contact Us
+            </button>
+
+            <div className="mt-4 pt-4 border-t border-neutral-700">
+              <div className="grid grid-cols-2 gap-2 text-xs text-neutral-400">
+                <div>
+                  <span className="font-medium text-neutral-300">Unlimited</span> docs
+                </div>
+                <div>
+                  <span className="font-medium text-neutral-300">Unlimited</span> queries
+                </div>
+                <div>
+                  <span className="font-medium text-neutral-300">100MB</span> max file
+                </div>
+                <div>
+                  <span className="font-medium text-neutral-300">All</span> AI models
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Enterprise Modal */}
+        {showEnterpriseModal && (
+          <EnterpriseModal onClose={() => setShowEnterpriseModal(false)} />
+        )}
 
         {/* Guarantee Section */}
         <div className="mt-16 text-center">
@@ -238,6 +318,181 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
             <span className="font-medium text-neutral-300">{tier.limits.hasFullPanel ? '4+' : '2'}</span> AI models
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function EnterpriseModal({ onClose }: { onClose: () => void }) {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    company: '',
+    teamSize: '',
+    message: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+
+    try {
+      const res = await fetch('/api/enterprise-inquiry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData),
+      })
+
+      if (res.ok) {
+        setSubmitted(true)
+      }
+    } catch (error) {
+      console.error('Failed to submit:', error)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onClose}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-neutral-900 border border-neutral-700 rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-neutral-400 hover:text-white transition-colors"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        {submitted ? (
+          <div className="text-center py-8">
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Check className="h-8 w-8 text-green-400" />
+            </div>
+            <h3 className="text-xl font-bold text-white mb-2">Message Sent!</h3>
+            <p className="text-neutral-400 mb-6">
+              Thanks for reaching out. I&apos;ll get back to you within 24 hours.
+            </p>
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 bg-amber-500/20 rounded-lg">
+                <Building2 className="h-6 w-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Enterprise Inquiry</h3>
+                <p className="text-sm text-neutral-400">Tell me about your needs</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-1">
+                    Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    placeholder="Your name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-1">
+                    Email *
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={formData.email}
+                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    placeholder="you@company.com"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-1">
+                    Company
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.company}
+                    onChange={(e) => setFormData({ ...formData, company: e.target.value })}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                    placeholder="Company name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-1">
+                    Team Size
+                  </label>
+                  <select
+                    value={formData.teamSize}
+                    onChange={(e) => setFormData({ ...formData, teamSize: e.target.value })}
+                    className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-amber-500/50"
+                  >
+                    <option value="">Select...</option>
+                    <option value="1-5">1-5 people</option>
+                    <option value="6-20">6-20 people</option>
+                    <option value="21-50">21-50 people</option>
+                    <option value="51-200">51-200 people</option>
+                    <option value="200+">200+ people</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-1">
+                  What are you looking for? *
+                </label>
+                <textarea
+                  required
+                  rows={4}
+                  value={formData.message}
+                  onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                  className="w-full px-3 py-2 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 resize-none"
+                  placeholder="Tell me about your use case, team needs, and any specific requirements..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full py-3 px-4 rounded-lg font-semibold transition-all bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Send Message'
+                )}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </div>
   )

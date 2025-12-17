@@ -32,6 +32,7 @@ export type OnboardingStage =
   | 'thoughtful_discovery' // First time using Thoughtful
   | 'contemplate_discovery' // First time using Contemplate
   | 'upload_discovery'     // First time they could upload
+  | 'chat_history_discovery' // Suggest importing AI chat history
   | 'completed'            // Full onboarding done
 
 // Contextual tips that can appear at any time
@@ -40,6 +41,7 @@ export type ContextualTip =
   | 'knowledge_base_tip'
   | 'mode_upgrade_prompt'
   | 'profile_prompt'
+  | 'chat_history_tip'
 
 export interface OnboardingState {
   stage: OnboardingStage
@@ -50,6 +52,7 @@ export interface OnboardingState {
   hasTriedThoughtful: boolean
   hasTriedContemplate: boolean
   hasSeenUploadTip: boolean
+  hasSeenChatHistoryTip: boolean
   questionsAsked: number
   lastTipShown?: ContextualTip
   completedStages: OnboardingStage[]
@@ -187,6 +190,15 @@ export const OSCAR_MESSAGES: Record<OnboardingStage, {
     nextStage: 'idle',
   },
 
+  chat_history_discovery: {
+    greeting: "Quick tip!",
+    message: "Power users upload their ChatGPT and Claude conversation exports. It gives me years of context about how you think and what you're working on.",
+    subMessage: "For best practices, ask me any questions about what and how to upload in the Vault.",
+    inputType: 'none',
+    autoAdvanceDelay: 7000,
+    nextStage: 'idle',
+  },
+
   completed: {
     message: "I know you pretty well now. Ready when you are!",
     inputType: 'none',
@@ -219,6 +231,7 @@ export function getInitialOnboardingState(): OnboardingState {
     hasTriedThoughtful: false,
     hasTriedContemplate: false,
     hasSeenUploadTip: false,
+    hasSeenChatHistoryTip: false,
     questionsAsked: 0,
     completedStages: [],
   }
@@ -232,7 +245,7 @@ export function shouldShowOnboarding(state: OnboardingState): boolean {
     'get_name', 'get_working_on', 'get_challenge',
     'explain_modes', 'invite_first_question',
     'post_first_answer', 'thoughtful_discovery', 'contemplate_discovery',
-    'upload_discovery'
+    'upload_discovery', 'chat_history_discovery'
   ]
   return activeStages.includes(state.stage)
 }
@@ -375,6 +388,11 @@ export function getContextualTip(state: OnboardingState): ContextualTip | null {
   // After first answer, suggest uploading documents
   if (state.hasAskedFirstQuestion && !state.hasSeenUploadTip && state.questionsAsked >= 2) {
     return 'knowledge_base_tip'
+  }
+
+  // After 5 questions, suggest importing chat history from other AIs
+  if (state.questionsAsked >= 5 && !state.hasSeenChatHistoryTip && state.hasSeenUploadTip) {
+    return 'chat_history_tip'
   }
 
   return null

@@ -457,6 +457,6 @@ lib/safety/
 
 ## Related Documentation
 
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — System architecture
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture
 - [PRIVACY_TIERS.md](./PRIVACY_TIERS.md) — Privacy tier definitions
-- [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md) — Telemetry (respects safety flags)
+- [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md) — Telemetry (respects safety flags)

@@ -115,8 +115,82 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    // Simple streak calculation (days with activity in the past week)
-    const currentStreak = 0 // Simplified for now
+    // Get total questions ever asked
+    const totalQuestions = await prisma.usageRecord.count({
+      where: {
+        userId: session.user.id,
+      },
+    })
+
+    // Get weekly activity breakdown (for the bar chart)
+    const weeklyBreakdown: { [key: string]: number } = {
+      mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0
+    }
+    const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+    // Get daily counts for the past 7 days
+    const weeklyUsage = await prisma.usageRecord.groupBy({
+      by: ['date'],
+      where: {
+        userId: session.user.id,
+        date: {
+          gte: sevenDaysAgo,
+        },
+      },
+      _count: {
+        id: true,
+      },
+    })
+
+    // Map the results to day names
+    weeklyUsage.forEach((day) => {
+      const dayOfWeek = new Date(day.date).getDay()
+      const dayName = dayNames[dayOfWeek]
+      weeklyBreakdown[dayName] = (weeklyBreakdown[dayName] || 0) + day._count.id
+    })
+
+    // Calculate streak - count consecutive days with activity going backwards from today
+    let currentStreak = 0
+    const checkDate = new Date()
+    checkDate.setHours(0, 0, 0, 0)
+
+    // Check up to 365 days back
+    for (let i = 0; i < 365; i++) {
+      const dayStart = new Date(checkDate)
+      dayStart.setDate(dayStart.getDate() - i)
+      const dayEnd = new Date(dayStart)
+      dayEnd.setDate(dayEnd.getDate() + 1)
+
+      const hadActivity = await prisma.usageRecord.count({
+        where: {
+          userId: session.user.id,
+          date: {
+            gte: dayStart,
+            lt: dayEnd,
+          },
+        },
+      })
+
+      if (hadActivity > 0) {
+        currentStreak++
+      } else if (i > 0) {
+        // If no activity and not today, break the streak
+        break
+      }
+      // If today has no activity, keep checking yesterday
+    }
+
+    // Get longest streak (simplified: just use current for now, would need historical tracking)
+    const longestStreak = currentStreak
+
+    // Get member since date
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { createdAt: true },
+    })
+    const memberSince = user?.createdAt
+      ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+      : 'Unknown'
 
     return NextResponse.json({
       quickStats: {
@@ -145,6 +219,11 @@ export async function GET(req: NextRequest) {
         currentStreak,
         questionsThisWeek,
         insightsGenerated: Math.min(insightsGenerated, 999), // Cap display at 999
+        // Additional data for all views
+        weeklyBreakdown,
+        totalQuestions,
+        longestStreak,
+        memberSince,
       },
     })
   } catch (error) {

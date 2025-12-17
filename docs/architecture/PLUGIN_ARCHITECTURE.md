@@ -474,9 +474,9 @@ OSQR Core exposes controlled insertion points:
 
 ## Related Documents
 
-- [ROADMAP.md](../ROADMAP.md) — Section 0: Strategic Vision
+- [ROADMAP.md](../../ROADMAP.md) — Section 0: Strategic Vision
 - [SAFETY_SYSTEM.md](SAFETY_SYSTEM.md) — Crisis detection, response playbooks
-- [KNOWLEDGE_ARCHITECTURE.md](KNOWLEDGE_ARCHITECTURE.md) — PKV vs GKVI separation
+- [KNOWLEDGE_ARCHITECTURE.md](./KNOWLEDGE_ARCHITECTURE.md) — PKV vs GKVI separation
 
 ---
 

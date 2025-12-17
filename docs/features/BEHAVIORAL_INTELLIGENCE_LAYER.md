@@ -148,7 +148,7 @@ interface UserBehaviorModel {
 
 **Implementation:** `lib/telemetry/PrivacyTierManager.ts`
 
-See [PRIVACY_TIERS.md](./PRIVACY_TIERS.md) for full specification.
+See [PRIVACY_TIERS.md](../architecture/PRIVACY_TIERS.md) for full specification.
 
 ---
 
@@ -235,7 +235,7 @@ See [PRIVACY_TIERS.md](./PRIVACY_TIERS.md) for full specification.
 
 ## Related Documents
 
-- [TELEMETRY_SPEC.md](./TELEMETRY_SPEC.md) - Detailed event specifications
-- [PRIVACY_TIERS.md](./PRIVACY_TIERS.md) - Privacy tier implementation
-- [ARCHITECTURE.md](../ARCHITECTURE.md) - Overall system architecture
-- [ROADMAP.md](../ROADMAP.md) - Implementation timeline
+- [TELEMETRY_SPEC.md](../architecture/TELEMETRY_SPEC.md) - Detailed event specifications
+- [PRIVACY_TIERS.md](../architecture/PRIVACY_TIERS.md) - Privacy tier implementation
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) - Overall system architecture
+- [ROADMAP.md](../../ROADMAP.md) - Implementation timeline

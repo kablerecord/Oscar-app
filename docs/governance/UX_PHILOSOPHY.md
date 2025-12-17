@@ -332,7 +332,7 @@ If OSQR holds this line:
 - [OSQR_CONSTITUTION.md](OSQR_CONSTITUTION.md) — Immutable principles
 - [OSQR_PHILOSOPHY.md](OSQR_PHILOSOPHY.md) — Beliefs about growth and capability
 - [USER_INTELLIGENCE_ARTIFACTS.md](USER_INTELLIGENCE_ARTIFACTS.md) — How OSQR understands users
-- [ROADMAP.md](../ROADMAP.md) — Implementation phases
+- [ROADMAP.md](../../ROADMAP.md) — Implementation phases
 
 ---
 

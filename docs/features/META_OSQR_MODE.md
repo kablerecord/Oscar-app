@@ -280,18 +280,18 @@ export class QuestionIntelligence {
 
 ```prisma
 model ComplexityReport {
-  id                      String   @id @default(cuid())
-  generatedAt             DateTime @default(now())
+  id                      String   @id @default(cuid(./BEHAVIORAL_INTELLIGENCE_LAYER.md)
+  generatedAt             DateTime @default(now(./BEHAVIORAL_INTELLIGENCE_LAYER.md)
   overallScore            Float
   componentScores         Json     // { "memory": 7.2, "routing": 6.5, ... }
   simplificationProposals Json     // Array of proposals
   lowUsageFeatures        String[] // Feature names
   codeMetrics             Json     // LOC, cyclomatic complexity, etc.
-  createdAt               DateTime @default(now())
+  createdAt               DateTime @default(now(./BEHAVIORAL_INTELLIGENCE_LAYER.md)
 }
 
 model QuestionScore {
-  id               String   @id @default(cuid())
+  id               String   @id @default(cuid(./BEHAVIORAL_INTELLIGENCE_LAYER.md)
   workspaceId      String
   questionHash     String   // SHA-256 of question (privacy)
   clarityScore     Float
@@ -299,7 +299,7 @@ model QuestionScore {
   tractabilityScore Float
   improvedVersion  String?
   feedback         String?  // User feedback on suggestion
-  createdAt        DateTime @default(now())
+  createdAt        DateTime @default(now(./BEHAVIORAL_INTELLIGENCE_LAYER.md)
 
   workspace        Workspace @relation(fields: [workspaceId], references: [id])
 
@@ -307,14 +307,14 @@ model QuestionScore {
 }
 
 model PowerQuestion {
-  id           String   @id @default(cuid())
+  id           String   @id @default(cuid(./BEHAVIORAL_INTELLIGENCE_LAYER.md)
   workspaceId  String
   question     String
   context      String   // Why this question was generated
   relatedTo    String[] // PKV/MSC references
   wasUsed      Boolean  @default(false)
   rating       Int?     // User rating 1-5
-  generatedAt  DateTime @default(now())
+  generatedAt  DateTime @default(now(./BEHAVIORAL_INTELLIGENCE_LAYER.md)
 
   workspace    Workspace @relation(fields: [workspaceId], references: [id])
 
@@ -450,11 +450,11 @@ POST /api/oscar/meta/power-question/feedback
 
 ## Related Documentation
 
-- [ROADMAP.md](../ROADMAP.md) — Phase 6 roadmap section
-- [ARCHITECTURE.md](../ARCHITECTURE.md) — System architecture
+- [ROADMAP.md](../../ROADMAP.md) — Phase 6 roadmap section
+- [ARCHITECTURE.md](../../ARCHITECTURE.md) — System architecture
 - [BEHAVIORAL_INTELLIGENCE_LAYER.md](./BEHAVIORAL_INTELLIGENCE_LAYER.md) — Telemetry foundation
-- [TELEMETRY_SPEC.md](./TELEMETRY_SPEC.md) — Event schemas
-- [PRIVACY_TIERS.md](./PRIVACY_TIERS.md) — Privacy tier details
+- [TELEMETRY_SPEC.md](../architecture/TELEMETRY_SPEC.md) — Event schemas
+- [PRIVACY_TIERS.md](../architecture/PRIVACY_TIERS.md) — Privacy tier details
 
 ---
 

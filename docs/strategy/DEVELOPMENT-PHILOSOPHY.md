@@ -91,7 +91,48 @@ OSQR competes on:
 
 ---
 
-## 3. The VoiceQuote Demonstration Strategy
+## 3. Software That Understands Itself
+
+### The Paradigm Shift
+
+OSQR is fully indexed on its own codebase, documentation, and architecture. This creates a level jump:
+
+**What Full Self-Indexing Enables:**
+
+| Capability | Description |
+|------------|-------------|
+| **No Context-Setting** | OSQR already knows itself — every document, every decision, every pattern |
+| **Cross-Domain Synthesis** | Connects philosophy docs to code to roadmap to user feedback in real-time |
+| **Institutional Memory** | Nothing gets forgotten or lost in conversation transitions |
+| **Proactive Prompting** | OSQR surfaces relevant context before you ask |
+| **Thinking Speed Multiplier** | OSQR catches up to your thought speed instead of you waiting for it |
+
+### The Level Jump
+
+Traditional AI coding tools require you to explain your project every session. OSQR already knows:
+- The governance stack (Constitution → Philosophy → Architecture → Features)
+- The strategic positioning and competitive landscape
+- The technical implementation patterns
+- The roadmap priorities and dependencies
+- The vision documents and their relationships
+
+This is not "context" — this is **native understanding**.
+
+### Demo Opportunity: OSQR Improving OSQR
+
+The ultimate proof of concept: OSQR developing itself in real-time.
+
+When building new features, OSQR can:
+1. Reference its own architecture docs to maintain consistency
+2. Check the roadmap to ensure alignment
+3. Pull from philosophy docs to guide decisions
+4. Update documentation as it builds
+
+This is the demo that writes itself — literally.
+
+---
+
+## 4. The VoiceQuote Demonstration Strategy (+ OSQR-on-OSQR)
 
 ### The Insight
 
@@ -120,9 +161,17 @@ This creates a case study library that markets itself.
 
 ---
 
-## 4. The Vision Cascade
+## 5. The Vision Cascade & User Experience Progression
 
 Understanding the full picture helps prioritize near-term work.
+
+### User Experience by Version
+
+| Version | User Experience |
+|---------|-----------------|
+| **V1.0** | "OSQR knows this codebase." — Project context, file awareness, embedded assistance |
+| **V2.0** | "OSQR knows every project I've ever worked on." — Cross-project synthesis, pattern recognition |
+| **V3.0+** | "OSQR knows how I think." — Anticipates needs, proactive suggestions, thinking partner |
 
 ### Level 1: Core OSQR (v1.0)
 
@@ -339,13 +388,13 @@ This is not overhead. This is **building the moat while building the product**.
 
 - [SUPREME-COURT-BUTTON.md](../features/SUPREME-COURT-BUTTON.md) - Adversarial deliberation
 - [COUNCIL-MODE.md](../features/COUNCIL-MODE.md) - Visible multi-model
-- [MULTI-MODEL-ARCHITECTURE.md](../features/MULTI-MODEL-ARCHITECTURE.md) - Model routing
+- [MULTI-MODEL-ARCHITECTURE.md](../architecture/MULTI-MODEL-ARCHITECTURE.md) - Model routing
 
 ### Governance Documents
 
 - [ROADMAP.md](../../ROADMAP.md) - Full implementation roadmap
-- [OSQR_CONSTITUTION.md](../OSQR_CONSTITUTION.md) - Immutable principles
-- [OSQR_PHILOSOPHY.md](../OSQR_PHILOSOPHY.md) - Detailed beliefs
+- [OSQR_CONSTITUTION.md](../governance/OSQR_CONSTITUTION.md) - Immutable principles
+- [OSQR_PHILOSOPHY.md](../governance/OSQR_PHILOSOPHY.md) - Detailed beliefs
 
 ---
 

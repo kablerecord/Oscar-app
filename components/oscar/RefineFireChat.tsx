@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
@@ -27,8 +27,11 @@ import {
   Shuffle,
   AlertCircle,
   HelpCircle,
+  Lock,
+  Crown,
+  Scale, // Supreme Court icon
 } from 'lucide-react'
-import { OSCARBubble, type PendingInsight } from '@/components/oscar/OSCARBubble'
+import { OSCARBubble, type PendingInsight, type OSCARBubbleHandle } from '@/components/oscar/OSCARBubble'
 import { ShareActions } from '@/components/share/ShareActions'
 import { ResponseActions } from '@/components/chat/ResponseActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
@@ -40,6 +43,12 @@ import {
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
 import { CouncilPanel, CouncilBadge, type PanelMemberResponse } from '@/components/council/CouncilPanel'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 interface AltOpinion {
   answer: string
@@ -100,9 +109,10 @@ interface RefineResult {
 interface RefineFireChatProps {
   workspaceId: string
   onboardingCompleted?: boolean
+  userTier?: 'free' | 'pro' | 'master'
 }
 
-type ResponseMode = 'quick' | 'thoughtful' | 'contemplate'
+type ResponseMode = 'quick' | 'thoughtful' | 'contemplate' | 'supreme'
 type ChatStage = 'input' | 'gating' | 'gatekeeper-prompt' | 'refining' | 'refined' | 'firing' | 'complete'
 
 // Gatekeeper classification result
@@ -290,7 +300,14 @@ function analyzeQuestionComplexity(question: string): ComplexityAnalysis {
 const DRAFT_KEY = (workspaceId: string) => `osqr-draft-${workspaceId}`
 const PENDING_REQUEST_KEY = (workspaceId: string) => `osqr-pending-${workspaceId}`
 
-export function RefineFireChat({ workspaceId, onboardingCompleted = false }: RefineFireChatProps) {
+// Ref handle type for external control
+export interface RefineFireChatHandle {
+  setInputAndFocus: (text: string) => void
+  askAndShowInBubble: (prompt: string) => Promise<void>
+}
+
+export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatProps>(
+  function RefineFireChat({ workspaceId, onboardingCompleted = false, userTier = 'free' }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [chatStage, setChatStage] = useState<ChatStage>('input')
@@ -298,6 +315,75 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
   const [isLoading, setIsLoading] = useState(false)
   const [useKnowledge, setUseKnowledge] = useState(true)
   const [showDebug, setShowDebug] = useState(false)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false)
+  const [showSupremeLockedModal, setShowSupremeLockedModal] = useState(false)
+
+  // OSQR centered greeting state - starts in center, slides to corner on input focus
+  const [osqrCentered, setOsqrCentered] = useState(true)
+  const [greetingData, setGreetingData] = useState<{
+    timeGreeting?: { greeting: string; emoji: string }
+    firstName?: string
+    contextualMessages?: string[]
+    stats?: {
+      vaultDocuments: number
+      currentStreak: number
+      todayQuestions: number
+      totalQuestions: number
+      capabilityLevel: number
+    }
+    isNewUser?: boolean
+  } | null>(null)
+  const [greetingLoading, setGreetingLoading] = useState(true)
+
+  // Check if user can access Contemplate mode (master tier only)
+  const canUseContemplate = userTier === 'master'
+
+  // Supreme Court is earned through usage patterns, not purchased
+  // For now, always false until we implement the earning system
+  // TODO: Check workspace.hasEarnedSupreme or similar flag from backend
+  const hasEarnedSupreme = false
+
+  // Load useKnowledge from localStorage (synced with Settings page)
+  useEffect(() => {
+    const stored = localStorage.getItem('osqr-use-knowledge-base')
+    if (stored !== null) {
+      setUseKnowledge(stored === 'true')
+    }
+    // Listen for storage changes from Settings page
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'osqr-use-knowledge-base' && e.newValue !== null) {
+        setUseKnowledge(e.newValue === 'true')
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
+  // Load refinement hints preference from localStorage (synced with Settings page)
+  useEffect(() => {
+    const stored = localStorage.getItem('osqr-show-refinement-hints')
+    if (stored !== null) {
+      setShowRefinementHints(stored === 'true')
+    }
+    // Listen for storage changes from Settings page
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'osqr-show-refinement-hints' && e.newValue !== null) {
+        setShowRefinementHints(e.newValue === 'true')
+      }
+    }
+    window.addEventListener('storage', handleStorageChange)
+    return () => window.removeEventListener('storage', handleStorageChange)
+  }, [])
+
+  // Handler for dismissing refinement hints
+  const handleDismissRefinementHints = () => {
+    setShowRefinementHints(false)
+    setJustDismissedHints(true)
+    localStorage.setItem('osqr-show-refinement-hints', 'false')
+    // Clear the "just dismissed" message after 5 seconds
+    setTimeout(() => setJustDismissedHints(false), 5000)
+  }
+
   const [expandedDebug, setExpandedDebug] = useState<number | null>(null)
   const [responseMode, setResponseMode] = useState<ResponseMode>('quick')
 
@@ -326,6 +412,8 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
 
   // Refinement suggestion state
   const [refinementSuggestion, setRefinementSuggestion] = useState<RefinementSuggestion | null>(null)
+  const [showRefinementHints, setShowRefinementHints] = useState(true)
+  const [justDismissedHints, setJustDismissedHints] = useState(false)
 
   // Gatekeeper state
   const [gatekeeperResult, setGatekeeperResult] = useState<GatekeeperResult | null>(null)
@@ -362,6 +450,57 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
   // Ref for auto-scrolling
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const refineCardRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const oscarBubbleRef = useRef<OSCARBubbleHandle>(null)
+
+  // Expose methods to parent components via ref
+  useImperativeHandle(ref, () => ({
+    setInputAndFocus: (text: string) => {
+      setInput(text)
+      setOsqrCentered(false)
+      setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 100)
+    },
+    askAndShowInBubble: async (prompt: string) => {
+      // Open the bubble first
+      if (oscarBubbleRef.current) {
+        oscarBubbleRef.current.openBubble()
+        // Show a "thinking" message
+        oscarBubbleRef.current.addMessage("Thinking...", 'tip')
+      }
+
+      try {
+        // Call the quick answer API
+        const response = await fetch('/api/osqr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            question: prompt,
+            mode: 'quick',
+            useKnowledge: false,
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Failed to get response')
+        }
+
+        const data = await response.json()
+        const answer = data.answer || data.response || "I couldn't generate a response. Try asking in a different way."
+
+        // Remove the "thinking" message and add the real response
+        if (oscarBubbleRef.current) {
+          oscarBubbleRef.current.addMessage(answer, 'tip')
+        }
+      } catch (error) {
+        console.error('Error asking OSQR:', error)
+        if (oscarBubbleRef.current) {
+          oscarBubbleRef.current.addMessage("Sorry, I had trouble with that. Try asking in the main chat.", 'tip')
+        }
+      }
+    }
+  }), [])
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -418,6 +557,31 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
     }
     loadAnsweredQuestions()
   }, [workspaceId])
+
+  // Fetch personalized greeting data
+  useEffect(() => {
+    async function fetchGreeting() {
+      try {
+        const response = await fetch(`/api/greeting?workspaceId=${workspaceId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setGreetingData(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch greeting:', error)
+      } finally {
+        setGreetingLoading(false)
+      }
+    }
+    fetchGreeting()
+  }, [workspaceId])
+
+  // Handle input focus - triggers OSQR to slide to corner
+  const handleInputFocus = () => {
+    if (osqrCentered) {
+      setOsqrCentered(false)
+    }
+  }
 
   // PERSISTENCE: Load draft from localStorage on mount
   useEffect(() => {
@@ -957,27 +1121,88 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
           <div className="absolute inset-0 bg-radial-gradient pointer-events-none" />
 
           {messages.length === 0 && chatStage === 'input' && (
-            <div className="relative flex h-full flex-col items-center justify-center text-center">
+            <div className={`relative flex h-full flex-col items-center justify-center text-center transition-all duration-700 ease-out ${
+              osqrCentered ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'
+            }`}>
               {/* Animated background blobs */}
               <div className="absolute -top-20 -right-20 w-40 h-40 bg-blue-500/5 rounded-full blur-3xl animate-pulse" />
               <div className="absolute -bottom-20 -left-20 w-32 h-32 bg-purple-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
 
+              {/* OSQR Avatar */}
               <div className="relative mb-6">
                 <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-500/10 ring-1 ring-blue-500/20 animate-pulse-glow">
                   <Brain className="h-10 w-10 text-blue-400" />
                 </div>
                 <Sparkles className="absolute -right-2 -top-2 h-6 w-6 text-blue-400" />
               </div>
-              <h3 className="mb-3 text-3xl font-bold text-white">
-                Hello, I'm <span className="shimmer-text">OSQR</span>
-              </h3>
-              <p className="max-w-lg text-base text-slate-300 mb-6 leading-relaxed">
-                Your personal AI operating system. I'll help you sharpen your question first, then consult a panel of AI experts for the best possible answer.
-              </p>
-              <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
-                <Target className="h-4 w-4" />
-                <span>Refine → Fire: Better questions, better answers</span>
-              </div>
+
+              {/* Personalized Greeting */}
+              {greetingLoading ? (
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <span>Loading your personalized experience...</span>
+                </div>
+              ) : greetingData ? (
+                <>
+                  {/* Time-based greeting with user's name */}
+                  <h3 className="mb-3 text-3xl font-bold text-white">
+                    {greetingData.timeGreeting?.emoji} {greetingData.timeGreeting?.greeting}, <span className="shimmer-text">{greetingData.firstName || 'there'}</span>
+                  </h3>
+
+                  {/* Contextual messages */}
+                  <div className="max-w-lg space-y-2 mb-6">
+                    {greetingData.contextualMessages?.map((msg, idx) => (
+                      <p key={idx} className="text-base text-slate-300 leading-relaxed">
+                        {msg}
+                      </p>
+                    ))}
+                  </div>
+
+                  {/* Stats pills - only show if we have meaningful data */}
+                  {greetingData.stats && !greetingData.isNewUser && (
+                    <div className="flex flex-wrap justify-center gap-3 mb-6">
+                      {greetingData.stats.currentStreak > 0 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 ring-1 ring-amber-500/30 text-xs font-medium text-amber-300">
+                          <Zap className="h-3 w-3" />
+                          <span>{greetingData.stats.currentStreak} day streak</span>
+                        </div>
+                      )}
+                      {greetingData.stats.vaultDocuments > 0 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-purple-500/15 ring-1 ring-purple-500/30 text-xs font-medium text-purple-300">
+                          <Brain className="h-3 w-3" />
+                          <span>{greetingData.stats.vaultDocuments} docs in vault</span>
+                        </div>
+                      )}
+                      {greetingData.stats.totalQuestions > 0 && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-xs font-medium text-blue-300">
+                          <MessageSquare className="h-3 w-3" />
+                          <span>{greetingData.stats.totalQuestions} questions asked</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* CTA */}
+                  <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
+                    <Target className="h-4 w-4" />
+                    <span>{greetingData.isNewUser ? "Refine → Fire: Better questions, better answers" : "What's on your mind?"}</span>
+                  </div>
+                </>
+              ) : (
+                // Fallback if greeting data failed to load
+                <>
+                  <h3 className="mb-3 text-3xl font-bold text-white">
+                    Hello, I'm <span className="shimmer-text">OSQR</span>
+                  </h3>
+                  <p className="max-w-lg text-base text-slate-300 mb-6 leading-relaxed">
+                    Your personal AI operating system. I'll help you sharpen your question first, then consult a panel of AI experts for the best possible answer.
+                  </p>
+                  <div className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500/15 ring-1 ring-blue-500/30 text-sm font-medium text-blue-300">
+                    <Target className="h-4 w-4" />
+                    <span>Refine → Fire: Better questions, better answers</span>
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -1599,89 +1824,210 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
           {/* Response Mode Buttons with visual state indicators */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <span className="hidden sm:block text-sm font-medium text-slate-400">Mode:</span>
-            <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
-              <button
-                onClick={() => {
-                  setResponseMode('quick')
-                  setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'quick' }))
-                }}
-                disabled={isLoading}
-                className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
-                  responseMode === 'quick'
-                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Zap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'quick' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                <span className="hidden sm:inline">Quick</span>
-                {responseMode === 'quick' && (
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-300"></span>
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setResponseMode('thoughtful')
-                  setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'thoughtful' }))
-                }}
-                disabled={isLoading}
-                className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
-                  responseMode === 'thoughtful'
-                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <Lightbulb className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'thoughtful' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                <span className="hidden sm:inline">Thoughtful</span>
-                {responseMode === 'thoughtful' && (
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-300"></span>
-                  </span>
-                )}
-              </button>
-              <button
-                onClick={() => {
-                  setResponseMode('contemplate')
-                  setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'contemplate' }))
-                }}
-                disabled={isLoading}
-                className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
-                  responseMode === 'contemplate'
-                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <GraduationCap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'contemplate' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                <span className="hidden sm:inline">Contemplate</span>
-                {responseMode === 'contemplate' && (
-                  <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-300"></span>
-                  </span>
-                )}
-              </button>
-            </div>
+            <TooltipProvider delayDuration={200}>
+              <div className="flex items-center gap-2">
+                {/* Group 1: Quick / Thoughtful / Contemplate */}
+                <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
+                  {/* Quick Mode */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          setResponseMode('quick')
+                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'quick' }))
+                        }}
+                        disabled={isLoading}
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                          responseMode === 'quick'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Zap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'quick' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                        <span className="hidden sm:inline">Quick</span>
+                        {responseMode === 'quick' && (
+                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-300"></span>
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
+                      <p className="font-medium text-amber-400">Quick Mode</p>
+                      <p className="text-xs text-slate-400">~5-10s • Direct answer without refinement</p>
+                    </TooltipContent>
+                  </Tooltip>
 
-            {/* Mode description with visual indicator - hidden on smallest screens */}
-            <div className={`hidden sm:flex items-center space-x-2 px-3 py-1.5 rounded-lg transition-all duration-300 ${
-              responseMode === 'quick' ? 'bg-amber-500/10 text-amber-400' :
-              responseMode === 'thoughtful' ? 'bg-blue-500/10 text-blue-400' :
-              'bg-purple-500/10 text-purple-400'
-            }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                responseMode === 'quick' ? 'bg-amber-400' :
-                responseMode === 'thoughtful' ? 'bg-blue-400' :
-                'bg-purple-400'
-              }`} />
-              <span className="text-xs font-medium">
-                {responseMode === 'quick' && '~5-10s • Direct answer'}
-                {responseMode === 'thoughtful' && '~30-60s • Refine → Fire'}
-                {responseMode === 'contemplate' && '~60-90s • Deep analysis'}
-              </span>
-            </div>
+                  {/* Thoughtful Mode */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          setResponseMode('thoughtful')
+                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'thoughtful' }))
+                        }}
+                        disabled={isLoading}
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                          responseMode === 'thoughtful'
+                            ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Lightbulb className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'thoughtful' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                        <span className="hidden sm:inline">Thoughtful</span>
+                        {responseMode === 'thoughtful' && (
+                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-300"></span>
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
+                      <p className="font-medium text-blue-400">Thoughtful Mode</p>
+                      <p className="text-xs text-slate-400">~30-60s • Refine → Fire for better answers</p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  {/* Contemplate Mode - Master tier only */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          if (!canUseContemplate) {
+                            setShowUpgradeModal(true)
+                            return
+                          }
+                          setResponseMode('contemplate')
+                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'contemplate' }))
+                        }}
+                        disabled={isLoading}
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                          !canUseContemplate
+                            ? 'text-slate-500 opacity-60 cursor-pointer'
+                            : responseMode === 'contemplate'
+                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
+                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {canUseContemplate ? (
+                          <GraduationCap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'contemplate' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                        ) : (
+                          <Lock className="h-4 w-4" />
+                        )}
+                        <span className="hidden sm:inline">Contemplate</span>
+                        {!canUseContemplate && (
+                          <Crown className="h-3 w-3 text-amber-400 ml-1" />
+                        )}
+                        {responseMode === 'contemplate' && canUseContemplate && (
+                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-300"></span>
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[220px]">
+                      <p className="font-medium text-purple-400">Contemplate Mode</p>
+                      <p className="text-xs text-slate-400">~60-90s • Deep analysis with multiple perspectives</p>
+                      {!canUseContemplate && (
+                        <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
+                          <Crown className="h-3 w-3" /> Master tier only
+                        </p>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+
+                {/* Group 2: Panel (standalone) */}
+                <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setShowDebug(!showDebug)}
+                        disabled={isLoading}
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                          showDebug
+                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.02]'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <PanelRight className={`h-4 w-4 transition-transform duration-300 ${showDebug ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                        <span className="hidden sm:inline">Panel</span>
+                        {showDebug && (
+                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-300"></span>
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
+                      <p className="font-medium text-emerald-400">Debug Panel</p>
+                      <p className="text-xs text-slate-400">Show the thinking process and refinement steps</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+
+                {/* Group 3: Supreme Court (standalone) - Earned through usage, not purchased */}
+                <div className={`flex p-1 rounded-xl ring-1 transition-all duration-300 ${
+                  hasEarnedSupreme && responseMode === 'supreme'
+                    ? 'bg-slate-800 ring-slate-700/50'
+                    : hasEarnedSupreme
+                      ? 'bg-gradient-to-r from-rose-950/50 to-red-950/50 ring-rose-500/30 shadow-sm shadow-rose-500/10'
+                      : 'bg-slate-800/50 ring-slate-700/30'
+                }`}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => {
+                          // Supreme Court is earned through usage patterns, not purchased
+                          if (!hasEarnedSupreme) {
+                            setShowSupremeLockedModal(true)
+                            return
+                          }
+                          setResponseMode('supreme')
+                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'supreme' }))
+                        }}
+                        disabled={isLoading}
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                          !hasEarnedSupreme
+                            ? 'text-slate-500/70 cursor-pointer hover:text-slate-400'
+                            : responseMode === 'supreme'
+                              ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-lg shadow-rose-500/30 scale-[1.02]'
+                              : 'text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        {hasEarnedSupreme ? (
+                          <Scale className={`h-4 w-4 transition-all duration-300 ${responseMode === 'supreme' ? 'animate-pulse' : 'group-hover:scale-110 group-hover:rotate-3'}`} />
+                        ) : (
+                          <Scale className="h-4 w-4 opacity-50" />
+                        )}
+                        <span className="hidden sm:inline">Supreme</span>
+                        {!hasEarnedSupreme && (
+                          <Lock className="h-3 w-3 text-slate-500 ml-1" />
+                        )}
+                        {responseMode === 'supreme' && hasEarnedSupreme && (
+                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-300"></span>
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[240px]">
+                      <p className="font-medium text-rose-400">Supreme Court Mode</p>
+                      {hasEarnedSupreme ? (
+                        <p className="text-xs text-slate-400">~2-3 min • AI justices deliberate with majority, concurring & dissenting opinions</p>
+                      ) : (
+                        <p className="text-xs text-slate-400">This mode is earned through mastery. Keep asking great questions.</p>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </div>
+            </TooltipProvider>
           </div>
 
           {/* Mode Suggestion Banner */}
@@ -1714,7 +2060,7 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
           )}
 
           {/* Refinement Suggestion - Real-time question improvement hints */}
-          {refinementSuggestion && refinementSuggestion.type !== 'good' && input.trim().length > 0 && (
+          {showRefinementHints && refinementSuggestion && refinementSuggestion.type !== 'good' && input.trim().length > 0 && (
             <div className="flex items-start gap-3 px-3 py-2.5 bg-amber-500/10 border border-amber-500/20 rounded-lg animate-fade-in">
               <HelpCircle className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
@@ -1727,6 +2073,19 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
                   </p>
                 )}
               </div>
+              <button
+                onClick={handleDismissRefinementHints}
+                className="text-xs text-amber-400/60 hover:text-amber-300 whitespace-nowrap flex-shrink-0"
+              >
+                See less
+              </button>
+            </div>
+          )}
+
+          {/* Dismissal message */}
+          {justDismissedHints && (
+            <div className="flex items-center gap-2 px-3 py-2 text-xs text-slate-400 animate-fade-in">
+              <span>Hints hidden. You can turn them back on in Settings.</span>
             </div>
           )}
 
@@ -1738,36 +2097,11 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
             </div>
           )}
 
-          {/* Options - hidden on mobile to reduce clutter */}
-          <div className="hidden sm:flex items-center justify-between text-sm">
-            <div className="flex items-center space-x-4">
-              <label className="flex items-center space-x-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={useKnowledge}
-                  onChange={(e) => setUseKnowledge(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-slate-900"
-                  disabled={isLoading}
-                />
-                <span className="text-slate-400 group-hover:text-slate-300">Use Knowledge Base</span>
-              </label>
-
-              <label className="flex items-center space-x-2 cursor-pointer group">
-                <input
-                  type="checkbox"
-                  checked={showDebug}
-                  onChange={(e) => setShowDebug(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-blue-500 focus:ring-blue-500/50 focus:ring-offset-slate-900"
-                  disabled={isLoading}
-                />
-                <span className="text-slate-400 group-hover:text-slate-300">Show Panel</span>
-              </label>
-            </div>
-          </div>
 
           {/* Input */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Textarea
+              ref={textareaRef}
               placeholder={
                 chatStage === 'refined'
                   ? 'Edit your refined question above, or type a new one...'
@@ -1776,6 +2110,7 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={handleInputFocus}
               rows={2}
               disabled={isLoading || (chatStage === 'refined' && !refineResult?.readyToFire)}
               className="flex-1 min-h-[60px] sm:min-h-[80px]"
@@ -1828,6 +2163,7 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
 
       {/* OSCAR Bubble - Handles onboarding + profile questions */}
       <OSCARBubble
+        ref={oscarBubbleRef}
         onboardingState={onboardingState}
         onOnboardingProgress={setOnboardingState}
         profileQuestion={currentQuestion}
@@ -1851,7 +2187,111 @@ export function RefineFireChat({ workspaceId, onboardingCompleted = false }: Ref
         workspaceId={workspaceId}
         isFocusMode={responseMode === 'contemplate'}
         onStartConversation={handleInsightConversation}
+        isGreetingCentered={osqrCentered && messages.length === 0 && chatStage === 'input'}
       />
+
+      {/* Upgrade Modal for Contemplate Mode */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowUpgradeModal(false)}
+          />
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-xl animate-in zoom-in-95 fade-in duration-200">
+            {/* Header */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-3 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl ring-1 ring-purple-500/30">
+                <Crown className="h-6 w-6 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-white">Unlock Contemplate Mode</h3>
+                <p className="text-sm text-slate-400">Master tier exclusive feature</p>
+              </div>
+            </div>
+
+            {/* Description */}
+            <div className="space-y-4 mb-6">
+              <p className="text-slate-300">
+                Contemplate mode provides deep, multi-perspective analysis for complex questions.
+              </p>
+              <div className="bg-slate-800/50 rounded-lg p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <Check className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                  <span>60-90 second deep analysis</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <Check className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                  <span>Multiple AI perspectives on every question</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <Check className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                  <span>Strategic decision-making support</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-slate-300">
+                  <Check className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                  <span>Priority processing and unlimited queries</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Maybe Later
+              </button>
+              <a
+                href="/pricing"
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg font-medium text-center transition-all shadow-lg shadow-purple-500/25"
+              >
+                Upgrade to Master
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Supreme Court Locked Modal - Mysterious, not a purchase prompt */}
+      {showSupremeLockedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowSupremeLockedModal(false)}
+          />
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-700/50 rounded-2xl p-8 shadow-2xl animate-in zoom-in-95 fade-in duration-300">
+            {/* Icon */}
+            <div className="flex justify-center mb-6">
+              <div className="relative">
+                <div className="p-4 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl ring-1 ring-slate-700/50">
+                  <Scale className="h-10 w-10 text-slate-500" />
+                </div>
+                <Lock className="absolute -bottom-1 -right-1 h-5 w-5 text-slate-400 bg-slate-900 rounded-full p-0.5" />
+              </div>
+            </div>
+
+            {/* Message */}
+            <div className="text-center space-y-3 mb-8">
+              <h3 className="text-xl font-semibold text-white">Not Yet</h3>
+              <p className="text-slate-400 leading-relaxed">
+                The Supreme Court is earned, not purchased. Continue asking great questions.
+              </p>
+              <p className="text-sm text-slate-500 italic">
+                When you're ready, it will find you.
+              </p>
+            </div>
+
+            {/* Action */}
+            <button
+              onClick={() => setShowSupremeLockedModal(false)}
+              className="w-full px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
-}
+})

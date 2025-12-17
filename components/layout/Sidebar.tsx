@@ -18,6 +18,7 @@ import {
   User,
   Flame,
   Calendar,
+  ChevronLeft,
   ChevronRight,
   Clock,
   X,
@@ -58,6 +59,154 @@ interface UsageStreak {
   currentStreak: number
   questionsThisWeek: number
   insightsGenerated: number
+  weeklyBreakdown?: { [key: string]: number }
+  totalQuestions?: number
+  longestStreak?: number
+  memberSince?: string
+}
+
+// Usage Carousel Component
+function UsageCarousel({ usageStreak }: { usageStreak: UsageStreak }) {
+  const [currentView, setCurrentView] = useState(0)
+  const views = ['streak', 'weekly', 'allTime'] as const
+
+  const nextView = () => setCurrentView((prev) => (prev + 1) % views.length)
+  const prevView = () => setCurrentView((prev) => (prev - 1 + views.length) % views.length)
+
+  // Use real data from API, with fallback defaults
+  const weeklyData = usageStreak.weeklyBreakdown || {
+    mon: 0, tue: 0, wed: 0, thu: 0, fri: 0, sat: 0, sun: 0
+  }
+  const allTimeStats = {
+    totalQuestions: usageStreak.totalQuestions || 0,
+    totalInsights: usageStreak.insightsGenerated || 0,
+    longestStreak: usageStreak.longestStreak || usageStreak.currentStreak,
+    memberSince: usageStreak.memberSince || 'Unknown'
+  }
+
+  return (
+    <div className="rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 p-3">
+      {/* Header with navigation */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Flame className="h-4 w-4 text-orange-400" />
+          <span className="text-xs font-semibold text-slate-300">
+            {currentView === 0 ? 'Your Streak' : currentView === 1 ? 'This Week' : 'All Time'}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={prevView}
+            className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <ChevronLeft className="h-3 w-3" />
+          </button>
+          <button
+            onClick={nextView}
+            className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <ChevronRight className="h-3 w-3" />
+          </button>
+        </div>
+      </div>
+
+      {/* View: Streak */}
+      {currentView === 0 && (
+        <>
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-400">{usageStreak.currentStreak}</div>
+              <div className="text-[9px] text-slate-500">days</div>
+            </div>
+            <div className="h-10 w-px bg-slate-700" />
+            <div className="text-center">
+              <div className="text-lg font-semibold text-slate-300">{usageStreak.questionsThisWeek}</div>
+              <div className="text-[9px] text-slate-500">questions</div>
+            </div>
+            <div className="h-10 w-px bg-slate-700" />
+            <div className="text-center">
+              <div className="text-lg font-semibold text-slate-300">{usageStreak.insightsGenerated}</div>
+              <div className="text-[9px] text-slate-500">insights</div>
+            </div>
+          </div>
+          {/* Week day indicators with labels */}
+          <div className="flex items-center gap-1 justify-center">
+            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, i) => (
+              <div key={i} className="flex flex-col items-center gap-0.5">
+                <div
+                  className={`h-2 w-2 rounded-sm ${
+                    i < usageStreak.currentStreak % 7
+                      ? 'bg-orange-400'
+                      : 'bg-slate-700'
+                  }`}
+                />
+                <span className="text-[8px] text-slate-600">{day}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* View: Weekly Activity */}
+      {currentView === 1 && (
+        <div className="space-y-2">
+          <div className="flex items-end justify-between h-12 px-1">
+            {Object.entries(weeklyData).map(([day, count]) => (
+              <div key={day} className="flex flex-col items-center gap-1">
+                <div
+                  className="w-4 bg-gradient-to-t from-blue-500 to-cyan-400 rounded-t transition-all"
+                  style={{ height: `${Math.max((count / 6) * 32, 4)}px` }}
+                />
+                <span className="text-[8px] text-slate-500 uppercase">{day.slice(0, 1)}</span>
+              </div>
+            ))}
+          </div>
+          <div className="text-center pt-1">
+            <span className="text-xs text-slate-400">
+              {Object.values(weeklyData).reduce((a, b) => a + b, 0)} questions this week
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* View: All Time Stats */}
+      {currentView === 2 && (
+        <div className="grid grid-cols-2 gap-2">
+          <div className="bg-slate-800/50 rounded-lg p-2 text-center">
+            <div className="text-lg font-bold text-cyan-400">{allTimeStats.totalQuestions}</div>
+            <div className="text-[9px] text-slate-500">total questions</div>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-2 text-center">
+            <div className="text-lg font-bold text-purple-400">{allTimeStats.totalInsights}</div>
+            <div className="text-[9px] text-slate-500">insights</div>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-2 text-center">
+            <div className="text-lg font-bold text-orange-400">{allTimeStats.longestStreak}</div>
+            <div className="text-[9px] text-slate-500">best streak</div>
+          </div>
+          <div className="bg-slate-800/50 rounded-lg p-2 text-center">
+            <div className="text-xs font-semibold text-slate-300">{allTimeStats.memberSince}</div>
+            <div className="text-[9px] text-slate-500">member since</div>
+          </div>
+        </div>
+      )}
+
+      {/* Carousel dots */}
+      <div className="flex items-center justify-center gap-1.5 mt-3">
+        {views.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setCurrentView(i)}
+            className={`h-1.5 rounded-full transition-all cursor-pointer ${
+              i === currentView
+                ? 'w-4 bg-orange-400'
+                : 'w-1.5 bg-slate-600 hover:bg-slate-500'
+            }`}
+          />
+        ))}
+      </div>
+    </div>
+  )
 }
 
 const navigation = [
@@ -324,42 +473,9 @@ export function Sidebar({ workspaceId, onClose }: SidebarProps) {
             </div>
           )}
 
-          {/* Usage & Streak */}
+          {/* Usage & Streak Carousel */}
           {usageStreak && (
-            <div className="rounded-xl bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20 p-3">
-              <div className="flex items-center gap-2 mb-3">
-                <Flame className="h-4 w-4 text-orange-400" />
-                <span className="text-xs font-semibold text-slate-300">Your Streak</span>
-              </div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-orange-400">{usageStreak.currentStreak}</div>
-                  <div className="text-[9px] text-slate-500">days</div>
-                </div>
-                <div className="h-10 w-px bg-slate-700" />
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-slate-300">{usageStreak.questionsThisWeek}</div>
-                  <div className="text-[9px] text-slate-500">questions</div>
-                </div>
-                <div className="h-10 w-px bg-slate-700" />
-                <div className="text-center">
-                  <div className="text-lg font-semibold text-slate-300">{usageStreak.insightsGenerated}</div>
-                  <div className="text-[9px] text-slate-500">insights</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 justify-center">
-                {[...Array(7)].map((_, i) => (
-                  <div
-                    key={i}
-                    className={`h-2 w-2 rounded-sm ${
-                      i < usageStreak.currentStreak % 7
-                        ? 'bg-orange-400'
-                        : 'bg-slate-700'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
+            <UsageCarousel usageStreak={usageStreak} />
           )}
         </div>
 

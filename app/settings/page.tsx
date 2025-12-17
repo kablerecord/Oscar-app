@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2 } from 'lucide-react'
+import { ArrowLeft, User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Database } from 'lucide-react'
 
 interface UserData {
   name: string
@@ -36,6 +36,12 @@ export default function SettingsPage() {
   // Export state
   const [exporting, setExporting] = useState(false)
 
+  // Light mode coming soon state
+  const [showLightModeToast, setShowLightModeToast] = useState(false)
+
+  // Use Knowledge Base state (persisted in localStorage)
+  const [useKnowledgeBase, setUseKnowledgeBase] = useState(true)
+
   useEffect(() => {
     async function fetchUserData() {
       try {
@@ -68,6 +74,21 @@ export default function SettingsPage() {
     }
     fetchInsightPrefs()
   }, [])
+
+  // Load Use Knowledge Base setting from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('osqr-use-knowledge-base')
+    if (stored !== null) {
+      setUseKnowledgeBase(stored === 'true')
+    }
+  }, [])
+
+  // Toggle Use Knowledge Base setting
+  const toggleUseKnowledgeBase = () => {
+    const newValue = !useKnowledgeBase
+    setUseKnowledgeBase(newValue)
+    localStorage.setItem('osqr-use-knowledge-base', String(newValue))
+  }
 
   // Update insight preferences
   const updateInsightPrefs = async (updates: Partial<InsightPreferences>) => {
@@ -157,6 +178,23 @@ export default function SettingsPage() {
       setBurnStep('initial')
       alert('Failed to delete data. Please try again.')
     }
+  }
+
+  const handleLightModeClick = async () => {
+    // Track the click
+    try {
+      await fetch('/api/analytics/feature-interest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ feature: 'light_mode' }),
+      })
+    } catch (e) {
+      // Silent fail - don't block UX for analytics
+    }
+
+    // Show toast
+    setShowLightModeToast(true)
+    setTimeout(() => setShowLightModeToast(false), 3000)
   }
 
   const openBurnModal = () => {
@@ -279,10 +317,18 @@ export default function SettingsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-white font-medium">Theme</p>
-                <p className="text-sm text-neutral-400">Currently using dark mode</p>
+                <p className="text-sm text-neutral-400">Choose your preferred appearance</p>
               </div>
-              <div className="px-3 py-1.5 bg-neutral-800 text-neutral-300 rounded-lg text-sm">
-                Dark
+              <div className="flex gap-2">
+                <div className="px-3 py-1.5 bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/50 rounded-lg text-sm cursor-default">
+                  Dark
+                </div>
+                <button
+                  onClick={handleLightModeClick}
+                  className="px-3 py-1.5 bg-neutral-800 text-neutral-400 hover:bg-neutral-700 rounded-lg text-sm cursor-pointer transition-colors"
+                >
+                  Light
+                </button>
               </div>
             </div>
             <div className="flex items-center justify-between">
@@ -293,6 +339,22 @@ export default function SettingsPage() {
               <div className="px-3 py-1.5 bg-neutral-800 text-neutral-300 rounded-lg text-sm">
                 Thoughtful
               </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white font-medium">Use Knowledge Base</p>
+                <p className="text-sm text-neutral-400">Include your documents when answering questions</p>
+              </div>
+              <button
+                onClick={toggleUseKnowledgeBase}
+                className={`w-12 h-7 rounded-full transition-colors relative cursor-pointer ${
+                  useKnowledgeBase ? 'bg-blue-500' : 'bg-neutral-700'
+                }`}
+              >
+                <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                  useKnowledgeBase ? 'left-6' : 'left-1'
+                }`} />
+              </button>
             </div>
           </div>
         </section>
@@ -391,7 +453,7 @@ export default function SettingsPage() {
                       { id: 'contradiction', label: 'Pattern noticed', icon: '⚠️', desc: 'When OSQR notices inconsistencies' },
                       { id: 'clarify', label: 'Quick thoughts', icon: '💡', desc: 'Helpful suggestions when you seem stuck' },
                       { id: 'next_step', label: 'Next steps', icon: '→', desc: 'Natural momentum opportunities' },
-                      { id: 'recall', label: 'Remember', icon: '💭', desc: 'Relevant past context' },
+                      { id: 'recall', label: 'Remember', icon: '💭', desc: 'Surfaces related past context', tooltip: 'OSQR may remind you of relevant past conversations or documents. For example: "Hey, you mentioned this project last week..."' },
                     ].map((cat) => {
                       const isMuted = insightPrefs.mutedCategories.includes(cat.id)
                       return (
@@ -399,7 +461,8 @@ export default function SettingsPage() {
                           key={cat.id}
                           onClick={() => toggleCategory(cat.id)}
                           disabled={savingInsights}
-                          className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all ${
+                          title={'tooltip' in cat ? cat.tooltip : undefined}
+                          className={`w-full flex items-center justify-between px-4 py-3 rounded-lg transition-all cursor-pointer ${
                             isMuted
                               ? 'bg-neutral-800/50 opacity-50'
                               : 'bg-neutral-800 hover:bg-neutral-700'
@@ -618,6 +681,23 @@ export default function SettingsPage() {
                 <p className="text-neutral-400">Your data has been permanently deleted. Redirecting...</p>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Light Mode Coming Soon Toast */}
+      {showLightModeToast && (
+        <div className="fixed bottom-6 right-6 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+          <div className="bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 shadow-lg flex items-center gap-3">
+            <div className="p-1.5 bg-yellow-500/20 rounded-full">
+              <svg className="h-4 w-4 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-white text-sm font-medium">Light mode coming soon!</p>
+              <p className="text-neutral-400 text-xs">We&apos;ve noted your interest.</p>
+            </div>
           </div>
         </div>
       )}

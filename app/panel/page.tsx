@@ -1,5 +1,5 @@
 import { MainLayout } from '@/components/layout/MainLayout'
-import { RefineFireChat } from '@/components/oscar/RefineFireChat'
+import { PanelClientWrapper } from '@/components/panel/PanelClientWrapper'
 import { prisma } from '@/lib/db/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
@@ -56,19 +56,13 @@ export default async function PanelPage() {
   }
 
   return (
-    <MainLayout user={user} workspaceName={workspace.name} workspaceId={workspace.id} showMSC={true} capabilityLevel={workspace.capabilityLevel}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            Chat with OSQR
-          </h1>
-          <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-            Refine your question, then fire it to a panel of AI experts for the best possible answer.
-          </p>
-        </div>
-
-        <RefineFireChat workspaceId={workspace.id} onboardingCompleted={workspace.onboardingCompleted} />
-      </div>
-    </MainLayout>
+    <PanelClientWrapper
+      user={user}
+      workspaceName={workspace.name}
+      workspaceId={workspace.id}
+      capabilityLevel={workspace.capabilityLevel}
+      onboardingCompleted={workspace.onboardingCompleted}
+      userTier={workspace.tier as 'free' | 'pro' | 'master'}
+    />
   )
 }

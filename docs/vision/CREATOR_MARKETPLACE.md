@@ -6,7 +6,7 @@
 
 This document defines the operational model for the OSQR Creator Plugin system and Marketplace. It covers plugin definition, creator onboarding, marketplace launch strategy, and growth mechanics.
 
-> **Related:** [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md) — Safety, separation, platform values
+> **Related:** [PLUGIN_ARCHITECTURE.md](../architecture/PLUGIN_ARCHITECTURE.md) — Safety, separation, platform values
 
 ---
 
@@ -468,8 +468,8 @@ This three-way separation ensures:
 
 ## Related Documents
 
-- [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md) — Core/Plugin separation, safety, platform values
-- [ROADMAP.md](../ROADMAP.md) — Section 0: Strategic Vision
+- [PLUGIN_ARCHITECTURE.md](../architecture/PLUGIN_ARCHITECTURE.md) — Core/Plugin separation, safety, platform values
+- [ROADMAP.md](../../ROADMAP.md) — Section 0: Strategic Vision
 - [SAFETY_SYSTEM.md](SAFETY_SYSTEM.md) — Crisis detection, response playbooks
 
 ---

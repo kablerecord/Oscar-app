@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { X, Minus, Send, MessageCircle, Brain, Sparkles, Lightbulb, ChevronRight, ArrowRight } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react'
+import { X, Minus, Send, MessageCircle, Brain, Sparkles, Lightbulb, ChevronRight, ArrowRight, Check, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import type { ProfileQuestion } from '@/lib/profile/questions'
@@ -44,6 +44,9 @@ interface OSCARBubbleProps {
 
   // Panel integration - for "Tell me more" flow
   onStartConversation?: (insight: PendingInsight) => void
+
+  // Greeting state - when true, OSQR is displayed in center so bubble should slide in from hidden
+  isGreetingCentered?: boolean
 }
 
 /**
@@ -84,7 +87,13 @@ const CATEGORY_CONFIG: Record<InsightCategory, { icon: string; label: string; co
   recall: { icon: '💭', label: 'Remember', color: 'text-purple-400' },
 }
 
-export function OSCARBubble({
+// Ref handle type for external control
+export interface OSCARBubbleHandle {
+  addMessage: (message: string, type?: 'greeting' | 'insight' | 'discovery' | 'tip' | 'reminder') => void
+  openBubble: () => void
+}
+
+export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(function OSCARBubble({
   onboardingState,
   onOnboardingProgress,
   profileQuestion,
@@ -98,7 +107,8 @@ export function OSCARBubble({
   workspaceId,
   isFocusMode = false,
   onStartConversation,
-}: OSCARBubbleProps) {
+  isGreetingCentered = false,
+}: OSCARBubbleProps, ref) {
   // Legacy state (for onboarding compatibility)
   const [isOpen, setIsOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
@@ -109,6 +119,97 @@ export function OSCARBubble({
   const [bubbleState, setBubbleState] = useState<BubbleState>('idle')
   const [pendingInsight, setPendingInsight] = useState<PendingInsight | null>(null)
   const [insightLoading, setInsightLoading] = useState(false)
+
+  // Chat history for OSQR conversation
+  interface ChatMessage {
+    id: string
+    message: string
+    timestamp: Date
+    type: 'greeting' | 'insight' | 'discovery' | 'tip' | 'reminder'
+    interacted: boolean // Has the user acknowledged/interacted with this message
+    category?: string // For insights
+  }
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const chatScrollRef = useRef<HTMLDivElement>(null)
+
+  // Draggable state - position is stored in session only (resets on page refresh/logout)
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
+  const bubbleRef = useRef<HTMLDivElement>(null)
+
+  // Load chat history from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && workspaceId) {
+      const stored = localStorage.getItem(`osqr-chat-history-${workspaceId}`)
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored)
+          setChatHistory(parsed.map((m: ChatMessage) => ({
+            ...m,
+            timestamp: new Date(m.timestamp)
+          })))
+        } catch (e) {
+          console.error('Failed to parse chat history:', e)
+        }
+      } else {
+        // Initialize with a greeting
+        const greeting: ChatMessage = {
+          id: `greeting-${Date.now()}`,
+          message: getPersonalizedGreeting(onboardingState.userName) + " I'm here when you need me!",
+          timestamp: new Date(),
+          type: 'greeting',
+          interacted: false,
+        }
+        setChatHistory([greeting])
+      }
+    }
+  }, [workspaceId, onboardingState.userName])
+
+  // Save chat history to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && workspaceId && chatHistory.length > 0) {
+      localStorage.setItem(`osqr-chat-history-${workspaceId}`, JSON.stringify(chatHistory))
+    }
+  }, [chatHistory, workspaceId])
+
+  // Scroll to bottom when new messages are added
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+    }
+  }, [chatHistory, isOpen])
+
+  // Add a new message to chat history
+  const addChatMessage = useCallback((message: string, type: ChatMessage['type'], category?: string) => {
+    const newMessage: ChatMessage = {
+      id: `${type}-${Date.now()}`,
+      message,
+      timestamp: new Date(),
+      type,
+      interacted: false,
+      category,
+    }
+    setChatHistory(prev => [...prev, newMessage])
+  }, [])
+
+  // Expose methods to parent components via ref
+  useImperativeHandle(ref, () => ({
+    addMessage: (message: string, type: ChatMessage['type'] = 'tip') => {
+      addChatMessage(message, type)
+    },
+    openBubble: () => {
+      setIsOpen(true)
+      setIsMinimized(false)
+    }
+  }), [addChatMessage])
+
+  // Mark a message as interacted
+  const markAsInteracted = useCallback((messageId: string) => {
+    setChatHistory(prev => prev.map(m =>
+      m.id === messageId ? { ...m, interacted: true } : m
+    ))
+  }, [])
 
   // Engagement tracking
   const lastActivityRef = useRef<number>(Date.now())
@@ -395,6 +496,66 @@ export function OSCARBubble({
   const handleMinimize = () => {
     setIsMinimized(true)
   }
+
+  // Drag handlers for repositionable bubble
+  const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    if (!bubbleRef.current) return
+
+    // Prevent text selection during drag
+    e.preventDefault()
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    const rect = bubbleRef.current.getBoundingClientRect()
+    setDragOffset({
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    })
+    setIsDragging(true)
+  }, [])
+
+  const handleDrag = useCallback((e: MouseEvent | TouchEvent) => {
+    // Prevent scrolling on touch devices
+    e.preventDefault()
+
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY
+
+    // Calculate new position (from top-left corner)
+    const newX = clientX - dragOffset.x
+    const newY = clientY - dragOffset.y
+
+    // Keep within viewport bounds
+    const maxX = window.innerWidth - (bubbleRef.current?.offsetWidth || 380)
+    const maxY = window.innerHeight - (bubbleRef.current?.offsetHeight || 200)
+
+    setPosition({
+      x: Math.max(0, Math.min(newX, maxX)),
+      y: Math.max(0, Math.min(newY, maxY))
+    })
+  }, [dragOffset])
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  // Add and remove drag event listeners
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleDrag)
+      window.addEventListener('mouseup', handleDragEnd)
+      window.addEventListener('touchmove', handleDrag, { passive: false })
+      window.addEventListener('touchend', handleDragEnd)
+    }
+
+    return () => {
+      window.removeEventListener('mousemove', handleDrag)
+      window.removeEventListener('mouseup', handleDragEnd)
+      window.removeEventListener('touchmove', handleDrag)
+      window.removeEventListener('touchend', handleDragEnd)
+    }
+  }, [isDragging, handleDrag, handleDragEnd])
 
   // Handle pill click
   const handlePillClick = () => {
@@ -729,15 +890,45 @@ export function OSCARBubble({
 
   // Normal corner bubble mode (after onboarding)
   // Positioned higher on mobile to avoid browser navigation bars
+  // When isGreetingCentered is true, slide the bubble off to the right (it's displayed in center instead)
+  // Supports drag-to-reposition (session only, resets on refresh/logout)
   return (
-    <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-[380px] max-w-[380px] animate-in slide-in-from-bottom-4 fade-in duration-300">
+    <div
+      ref={bubbleRef}
+      className={`fixed z-50 w-[calc(100vw-2rem)] sm:w-[380px] max-w-[380px] transition-all ${isDragging ? 'cursor-grabbing' : ''} ${
+        isGreetingCentered
+          ? 'translate-x-[120%] opacity-0 duration-700 ease-out'
+          : position
+            ? 'duration-0' // No transition when dragged to custom position
+            : 'bottom-20 sm:bottom-6 right-4 sm:right-6 translate-x-0 opacity-100 animate-in slide-in-from-right-8 fade-in duration-700 ease-out'
+      }`}
+      style={position ? {
+        left: position.x,
+        top: position.y,
+        right: 'auto',
+        bottom: 'auto',
+      } : undefined}
+    >
       <div className="relative overflow-hidden rounded-[28px] bg-slate-900 shadow-xl shadow-blue-500/10 border border-slate-700/50">
         {/* Animated background blobs */}
         <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />
         <div className="absolute -bottom-10 -left-10 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
 
+        {/* Draggable header bar - entire top area is draggable */}
+        <div
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
+          className={`absolute top-0 left-0 right-0 h-12 z-10 flex items-center justify-between px-3 ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          aria-label="Drag to reposition"
+        >
+          {/* Drag handle icon - visual indicator */}
+          <div className="p-1.5 rounded-full text-slate-500 hover:bg-slate-800 hover:text-slate-300 transition-colors">
+            <GripVertical className="h-4 w-4" />
+          </div>
+        </div>
+
         {/* Header buttons - only show minimize during onboarding intro, show close later */}
-        <div className="absolute top-3 right-3 flex items-center gap-0.5 z-10">
+        <div className="absolute top-3 right-3 flex items-center gap-0.5 z-20">
           <button
             onClick={handleMinimize}
             className="rounded-full p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
@@ -809,146 +1000,120 @@ export function OSCARBubble({
               )}
             </div>
           ) : (
-            /* Regular stages - left-aligned conversation style */
-            <>
-              {/* OSQR's message */}
-              <div className="mb-4 animate-in fade-in duration-500">
-                {content.greeting && (
-                  <p className="text-base font-medium text-white mb-1">
-                    {content.greeting}
-                  </p>
-                )}
-                <p className="text-sm text-slate-300 leading-relaxed">
-                  {content.message}
-                </p>
-                {content.subMessage && (
-                  <p className="mt-2 text-xs text-slate-400 leading-relaxed whitespace-pre-line">
-                    {content.subMessage}
-                  </p>
+            /* Chat history mode - scrollable conversation */
+            <div className="flex flex-col">
+              {/* Chat header */}
+              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-700/50">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 ring-1 ring-blue-500/30">
+                  <Brain className="h-4 w-4 text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">OSQR</p>
+                  <p className="text-xs text-slate-500">Your thinking partner</p>
+                </div>
+              </div>
+
+              {/* Scrollable chat history */}
+              <div
+                ref={chatScrollRef}
+                className="max-h-[280px] overflow-y-auto space-y-3 pr-1 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent"
+              >
+                {chatHistory.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`group relative p-3 rounded-xl transition-all duration-300 ${
+                      msg.interacted
+                        ? 'bg-slate-800/30 opacity-60'
+                        : 'bg-slate-800/60 hover:bg-slate-800/80'
+                    }`}
+                  >
+                    {/* Message type indicator */}
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span className="text-xs">
+                        {msg.type === 'greeting' && '👋'}
+                        {msg.type === 'insight' && '💡'}
+                        {msg.type === 'discovery' && '🎉'}
+                        {msg.type === 'tip' && '💬'}
+                        {msg.type === 'reminder' && '🔔'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {msg.interacted && (
+                        <span className="ml-auto flex items-center gap-1 text-[10px] text-slate-500">
+                          <Check className="h-3 w-3" /> Seen
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Message content */}
+                    <p className={`text-sm leading-relaxed ${msg.interacted ? 'text-slate-400' : 'text-slate-200'}`}>
+                      {msg.message}
+                    </p>
+
+                    {/* Mark as read button (only for unread messages) */}
+                    {!msg.interacted && (
+                      <button
+                        onClick={() => markAsInteracted(msg.id)}
+                        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-full bg-slate-700/50 hover:bg-slate-600/50 transition-all"
+                        title="Mark as read"
+                      >
+                        <Check className="h-3 w-3 text-slate-400" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Show pending insight at the bottom if there is one */}
+                {showInsightActions && pendingInsight && (
+                  <div className="p-3 rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 ring-1 ring-amber-500/30">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-base">{CATEGORY_CONFIG[pendingInsight.category].icon}</span>
+                      <span className={`text-xs font-medium ${CATEGORY_CONFIG[pendingInsight.category].color}`}>
+                        {CATEGORY_CONFIG[pendingInsight.category].label}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-200 mb-3">{pendingInsight.message}</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleTellMeMore}
+                        disabled={insightLoading}
+                        className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-50"
+                      >
+                        {insightLoading ? (
+                          <span className="flex space-x-1">
+                            <span className="h-1 w-1 rounded-full bg-white animate-bounce" />
+                            <span className="h-1 w-1 rounded-full bg-white animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="h-1 w-1 rounded-full bg-white animate-bounce" style={{ animationDelay: '300ms' }} />
+                          </span>
+                        ) : (
+                          <>Tell me more <ArrowRight className="h-3 w-3" /></>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleDismissInsight}
+                        className="px-3 py-2 text-xs font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 rounded-lg transition-all"
+                      >
+                        Got it
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {/* Input area */}
-              {showInput && (
-                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-                  {content.inputType === 'choice' && content.choices ? (
-                    // Choice buttons
-                    <div className="space-y-2 mb-3">
-                      {content.choices.map((choice) => (
-                        <button
-                          key={choice}
-                          onClick={() => handleChoiceSelect(choice)}
-                          disabled={isSubmitting}
-                          className={`w-full rounded-xl px-4 py-2.5 text-left text-sm transition-all ${
-                            answer === choice
-                              ? 'bg-blue-500 text-white'
-                              : 'bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-700'
-                          }`}
-                        >
-                          {choice}
-                        </button>
-                      ))}
-                    </div>
-                  ) : (
-                    // Text input
-                    <div className="relative mb-3">
-                      <Textarea
-                        value={answer}
-                        onChange={(e) => setAnswer(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Type your answer..."
-                        rows={2}
-                        disabled={isSubmitting}
-                        className="pr-10 resize-none rounded-xl border-slate-700 bg-slate-800 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:ring-blue-500"
-                        autoFocus
-                      />
-                      {answer.trim() && (
-                        <button
-                          onClick={handleSubmit}
-                          disabled={isSubmitting}
-                          className="absolute bottom-2 right-2 rounded-full bg-blue-500 p-1.5 text-white transition-all hover:bg-blue-600 disabled:opacity-50"
-                        >
-                          <Send className="h-3.5 w-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Skip option (only for certain stages) */}
-                  {['get_name', 'get_working_on', 'get_challenge'].includes(onboardingState.stage) && (
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={handleSkip}
-                        disabled={isSubmitting}
-                        className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                      >
-                        Skip for now
-                      </button>
-                    </div>
-                  )}
+              {/* Empty state */}
+              {chatHistory.length === 0 && !showInsightActions && (
+                <div className="text-center py-6">
+                  <p className="text-sm text-slate-400">No messages yet</p>
                 </div>
               )}
-
-              {/* Insight action buttons */}
-              {showInsightActions && pendingInsight && (
-                <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-3">
-                  {/* Category-aware insight badge */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-base">{CATEGORY_CONFIG[pendingInsight.category].icon}</span>
-                    <span className={`text-xs font-medium ${CATEGORY_CONFIG[pendingInsight.category].color}`}>
-                      {CATEGORY_CONFIG[pendingInsight.category].label}
-                    </span>
-                  </div>
-
-                  {/* Action buttons - "Tell me more" flows to panel */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={handleTellMeMore}
-                      disabled={insightLoading}
-                      className="flex-1 flex items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 transition-all shadow-lg disabled:opacity-50"
-                    >
-                      {insightLoading ? (
-                        <span className="flex space-x-1">
-                          <span className="h-1.5 w-1.5 rounded-full bg-white animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-white animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="h-1.5 w-1.5 rounded-full bg-white animate-bounce" style={{ animationDelay: '300ms' }} />
-                        </span>
-                      ) : (
-                        <>
-                          Tell me more
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </>
-                      )}
-                    </button>
-                    <button
-                      onClick={handleDismissInsight}
-                      className="rounded-xl px-4 py-2.5 text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 ring-1 ring-slate-700 transition-all"
-                    >
-                      Got it
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Auto-advancing indicator */}
-              {currentMessage?.autoAdvanceDelay && !showInput && !showInsightActions && (
-                <div className="flex items-center justify-center pt-2">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <div className="flex space-x-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
+            </div>
           )}
         </div>
       </div>
     </div>
   )
-}
+})
 
 // Conversational question rewrites for profile questions
 function getConversationalQuestion(question: ProfileQuestion): string {

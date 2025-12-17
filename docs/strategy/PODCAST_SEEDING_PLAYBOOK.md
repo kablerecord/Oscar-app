@@ -4,7 +4,7 @@
 **Last Updated:** 2025-12-14
 **Purpose:** Experience-first discovery through select podcast hosts
 
-> **Derives from:** [OSQR_CONSTITUTION.md](../OSQR_CONSTITUTION.md) — "Reveal, Don't Perform"
+> **Derives from:** [OSQR_CONSTITUTION.md](../governance/OSQR_CONSTITUTION.md) — "Reveal, Don't Perform"
 
 ---
 
@@ -251,6 +251,6 @@ This is how durable products enter the world.
 
 ## Related Documents
 
-- [OSQR_CONSTITUTION.md](../OSQR_CONSTITUTION.md) — Core principles
-- [OSQR_PHILOSOPHY.md](../OSQR_PHILOSOPHY.md) — Emergent use philosophy
-- [CREATOR_MARKETPLACE.md](../CREATOR_MARKETPLACE.md) — Creator tier progression
+- [OSQR_CONSTITUTION.md](../governance/OSQR_CONSTITUTION.md) — Core principles
+- [OSQR_PHILOSOPHY.md](../governance/OSQR_PHILOSOPHY.md) — Emergent use philosophy
+- [CREATOR_MARKETPLACE.md](../vision/CREATOR_MARKETPLACE.md) — Creator tier progression
