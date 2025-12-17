@@ -63,11 +63,9 @@ export async function GET(req: NextRequest) {
     })
 
     // Get TIL (Today I Learned) insights - recent insights surfaced
-    // Note: Insight table may not exist yet, so we wrap in try-catch
     let recentInsights: { title: string; category: string; surfacedAt: Date | null }[] = []
     try {
-      // @ts-expect-error - Insight table may not exist in all deployments yet
-      recentInsights = await prisma.insight?.findMany?.({
+      recentInsights = await prisma.insight.findMany({
         where: {
           workspaceId,
           status: 'surfaced'
@@ -79,9 +77,9 @@ export async function GET(req: NextRequest) {
           category: true,
           surfacedAt: true,
         },
-      }) ?? []
+      })
     } catch {
-      // Insight table doesn't exist yet - that's fine
+      // Insight table query failed - that's fine
       recentInsights = []
     }
 
