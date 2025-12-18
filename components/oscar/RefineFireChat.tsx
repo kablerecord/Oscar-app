@@ -914,6 +914,14 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true, mode: responseMode }])
 
     try {
+      // Build conversation history from current messages (excluding the thinking placeholder we just added)
+      const conversationHistory = messages
+        .filter(m => !m.thinking && m.content) // Exclude thinking placeholders and empty messages
+        .map(m => ({
+          role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.content,
+        }))
+
       const response = await fetch('/api/oscar/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -923,6 +931,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           useKnowledge,
           includeDebate: showDebug,
           mode: responseMode,
+          conversationHistory,
         }),
       })
 

@@ -25,6 +25,10 @@ const RequestSchema = z.object({
   includeDebate: z.boolean().default(false), // Debug mode to see panel discussion
   mode: z.enum(['quick', 'thoughtful', 'contemplate']).default('thoughtful'), // Response complexity mode
   systemMode: z.boolean().optional(), // Explicit system mode (restrict to OSQR docs only)
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+  })).optional(), // Previous messages for context continuity
 })
 
 // Helper to get client IP
@@ -91,7 +95,7 @@ export async function POST(req: NextRequest) {
     await recordRequest({ userId, ip, endpoint: 'oscar/ask' })
 
     const body = await req.json()
-    const { message: rawMessage, workspaceId, useKnowledge, includeDebate, mode, systemMode: explicitSystemMode } = RequestSchema.parse(body)
+    const { message: rawMessage, workspaceId, useKnowledge, includeDebate, mode, systemMode: explicitSystemMode, conversationHistory } = RequestSchema.parse(body)
 
     // SYSTEM MODE: Check for /system prefix or explicit toggle
     // This restricts context to OSQR system docs only (architecture, roadmap, etc.)
@@ -201,7 +205,7 @@ Guidelines:
       }
 
       // Build messages with context
-      const messages: { role: 'system' | 'user'; content: string }[] = [
+      const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
         {
           role: 'system',
           content: systemPrompt
@@ -214,6 +218,15 @@ Guidelines:
           role: 'system',
           content: `User's Knowledge Base Context:\n${autoContext.context}`,
         })
+      }
+
+      // Add conversation history for context continuity
+      if (conversationHistory && conversationHistory.length > 0) {
+        // Limit to last 10 messages to avoid token bloat
+        const recentHistory = conversationHistory.slice(-10)
+        for (const msg of recentHistory) {
+          messages.push({ role: msg.role, content: msg.content })
+        }
       }
 
       messages.push({ role: 'user', content: message })
