@@ -376,8 +376,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   }>({
     timeGreeting: getTimeGreeting(),
     contextualMessages: [
-      "Welcome! I'm your personal AI thinking partner.",
-      "Ask me anything - I'll help you sharpen your question first, then get the best answer."
+      "Ask me any questions you have, or we can work together in the panel."
     ],
     isNewUser: true,
   })

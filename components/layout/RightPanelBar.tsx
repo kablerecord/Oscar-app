@@ -266,20 +266,6 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Queries remaining */}
-                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
-                  <div className="flex justify-between text-sm text-slate-300 mb-2">
-                    <span>Queries Today</span>
-                    <span className="font-semibold">{data.quickStats.queriesRemaining}/{data.quickStats.queriesMax}</span>
-                  </div>
-                  <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all"
-                      style={{ width: `${(data.quickStats.queriesRemaining / data.quickStats.queriesMax) * 100}%` }}
-                    />
-                  </div>
-                </div>
-
                 {/* Documents */}
                 <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
                   <div className="flex justify-between text-sm text-slate-300 mb-2">
