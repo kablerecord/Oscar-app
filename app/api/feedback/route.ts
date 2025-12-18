@@ -39,12 +39,12 @@ export async function POST(request: NextRequest) {
         data: {
           workspaceId,
           category: 'feedback',
-          type: type || 'general',
           title: `${type || 'Feedback'}: ${message.slice(0, 50)}${message.length > 50 ? '...' : ''}`,
           message: message,
           priority: 0,
           status: 'new',
-          metadata: {
+          expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year from now
+          context: {
             feedbackType: type,
             userEmail: email || session?.user?.email || null,
             submittedAt: new Date().toISOString(),

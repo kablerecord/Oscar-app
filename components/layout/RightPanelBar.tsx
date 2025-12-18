@@ -916,7 +916,7 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
                 'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
                 'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20',
                 activeSection === 'command' && 'ring-2 ring-blue-400/50 bg-blue-500/20',
-                highlightTarget === 'command-center' && 'ring-4 ring-blue-500 bg-blue-500/30 shadow-lg shadow-blue-500/50'
+                highlightTarget === 'command-center' && 'ring-4 ring-blue-400 bg-blue-500/30 brightness-125 shadow-lg shadow-blue-500/30'
               )}
             >
               <Zap className="h-4 w-4 text-blue-400" />

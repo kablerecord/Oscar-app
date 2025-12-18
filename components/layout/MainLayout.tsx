@@ -32,15 +32,15 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const { focusMode } = useFocusMode()
 
-  // CSS classes for highlight effect
+  // CSS classes for highlight effect - brighten target, blur background
   const getHighlightClass = (target: HighlightTarget) => {
     if (highlightTarget === target) {
-      return 'ring-4 ring-blue-500/60 ring-offset-2 ring-offset-slate-950 rounded-xl z-50 relative'
+      return 'ring-4 ring-blue-400 ring-offset-2 ring-offset-slate-950 rounded-xl z-[60] relative brightness-110 shadow-lg shadow-blue-500/20'
     }
     return ''
   }
 
-  // Overlay class when something is highlighted (dims everything else)
+  // Overlay class when something is highlighted (blur everything else, don't darken)
   const isHighlighting = highlightTarget !== null && highlightTarget !== undefined
 
   // Load collapsed state from localStorage
@@ -86,8 +86,8 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
         ${sidebarCollapsed ? 'w-14' : 'w-64'}
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         ${focusMode ? 'lg:blur-[2px] lg:opacity-50 lg:pointer-events-none' : ''}
-        ${isHighlighting && highlightTarget !== 'sidebar' && highlightTarget !== 'vault' ? 'opacity-30' : ''}
-        ${highlightTarget === 'sidebar' || highlightTarget === 'vault' ? 'ring-4 ring-purple-500/60 ring-inset rounded-r-xl z-[60]' : ''}
+        ${isHighlighting && highlightTarget !== 'sidebar' && highlightTarget !== 'vault' ? 'blur-[2px]' : ''}
+        ${highlightTarget === 'sidebar' || highlightTarget === 'vault' ? 'ring-4 ring-blue-400 ring-inset rounded-r-xl z-[60] brightness-110 shadow-lg shadow-blue-500/20' : ''}
       `}>
         <Sidebar
           workspaceId={workspaceId}
@@ -111,11 +111,11 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
           flex-1 p-4 sm:p-6 transition-all duration-300
           ${showMSC && workspaceId && !focusMode ? 'lg:mr-14' : ''}
           ${highlightTarget === 'panel' ? 'relative z-[60]' : ''}
-          ${isHighlighting && highlightTarget !== 'panel' && highlightTarget !== 'modes' && highlightTarget !== 'keyboard' && highlightTarget !== 'profile' ? 'opacity-30' : ''}
+          ${isHighlighting && highlightTarget !== 'panel' && highlightTarget !== 'modes' && highlightTarget !== 'keyboard' && highlightTarget !== 'profile' ? 'blur-[2px]' : ''}
         `}>
           <div className={`
             mx-auto max-w-7xl transition-all duration-300
-            ${highlightTarget === 'panel' ? 'ring-4 ring-blue-500/60 ring-offset-4 ring-offset-slate-950 rounded-2xl' : ''}
+            ${highlightTarget === 'panel' ? 'ring-4 ring-blue-400 ring-offset-4 ring-offset-slate-950 rounded-2xl brightness-110 shadow-lg shadow-blue-500/20' : ''}
           `}>
             {children}
           </div>
@@ -128,7 +128,8 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
             fixed inset-y-0 right-0 z-50 w-14 transform transition-all duration-300 ease-in-out
             ${rightPanelOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
             ${focusMode ? 'lg:blur-[2px] lg:opacity-50 lg:pointer-events-none' : ''}
-            ${isHighlighting && highlightTarget !== 'command-center' ? '' : ''}
+            ${isHighlighting && highlightTarget !== 'command-center' ? 'blur-[2px]' : ''}
+            ${highlightTarget === 'command-center' ? 'z-[60] brightness-110' : ''}
           `}>
             <RightPanelBar
               workspaceId={workspaceId}
