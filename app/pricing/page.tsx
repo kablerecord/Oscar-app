@@ -2,24 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { TIERS, type TierName } from '@/lib/tiers/config'
-import { Check, Crown, Star, ArrowLeft, Building2, X, Loader2 } from 'lucide-react'
-
-// Founder Pricing metadata
-const FOUNDER_PRICING = {
-  pro: {
-    currentPrice: 49,
-    yearlyPrice: 488,
-    futurePrice: 79,
-    badge: 'FOUNDER PRICING',
-  },
-  master: {
-    currentPrice: 149,
-    yearlyPrice: 1484,
-    futurePrice: 249,
-    badge: 'FOUNDER PRICING',
-  },
-}
+import { TIERS, type TierName, hasYearlyOption } from '@/lib/tiers/config'
+import { Check, Crown, Star, ArrowLeft, Building2, X, Loader2, Zap } from 'lucide-react'
 
 export default function PricingPage() {
   const tiers = Object.values(TIERS)
@@ -29,7 +13,7 @@ export default function PricingPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] py-12 px-4">
       {/* Navigation */}
-      <nav className="max-w-4xl mx-auto mb-8">
+      <nav className="max-w-5xl mx-auto mb-8">
         <Link
           href="/panel"
           className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
@@ -39,7 +23,7 @@ export default function PricingPage() {
         </Link>
       </nav>
 
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-4">
           <h1 className="text-4xl font-bold text-white mb-4">
@@ -93,7 +77,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {tiers.map((tier) => (
             <PricingCard key={tier.name} tier={tier} isYearly={isYearly} />
           ))}
@@ -113,7 +97,7 @@ export default function PricingPage() {
                 <h3 className="text-xl font-bold text-white">OSQR Enterprise</h3>
               </div>
               <p className="text-sm text-neutral-400">
-                For teams and organizations with large-scale knowledge needs
+                For teams and organizations
               </p>
             </div>
 
@@ -133,12 +117,12 @@ export default function PricingPage() {
               {[
                 'Everything in Master',
                 'Unlimited documents',
-                'Unlimited queries',
                 'Dedicated support',
                 'Custom model access',
                 'API access for integrations',
                 'Team collaboration (coming)',
                 'SSO & advanced security',
+                '100MB max file size',
               ].map((feature, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <Check className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-400" />
@@ -154,19 +138,20 @@ export default function PricingPage() {
               Contact Us
             </button>
 
+            {/* Comparison card - no query limits shown */}
             <div className="mt-4 pt-4 border-t border-neutral-700">
               <div className="grid grid-cols-2 gap-2 text-xs text-neutral-400">
                 <div>
                   <span className="font-medium text-neutral-300">Unlimited</span> docs
                 </div>
                 <div>
-                  <span className="font-medium text-neutral-300">Unlimited</span> queries
-                </div>
-                <div>
                   <span className="font-medium text-neutral-300">100MB</span> max file
                 </div>
                 <div>
                   <span className="font-medium text-neutral-300">All</span> AI models
+                </div>
+                <div>
+                  <span className="font-medium text-neutral-300">All</span> modes
                 </div>
               </div>
             </div>
@@ -196,12 +181,16 @@ export default function PricingPage() {
 }
 
 function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearly: boolean }) {
-  const isPro = tier.name === 'pro'
+  const isStarter = tier.name === 'starter'
   const isMaster = tier.name === 'master'
-  const founderInfo = FOUNDER_PRICING[tier.name]
+  const hasYearly = hasYearlyOption(tier.name)
 
-  // Stripe payment links - will need yearly versions too
+  // Stripe payment links
   const paymentLinks: Record<TierName, { monthly: string; yearly: string }> = {
+    starter: {
+      monthly: process.env.NEXT_PUBLIC_STRIPE_STARTER_LINK || '/signup?plan=starter&billing=monthly',
+      yearly: '/signup?plan=starter&billing=monthly', // Starter is monthly only
+    },
     pro: {
       monthly: process.env.NEXT_PUBLIC_STRIPE_PRO_LINK || '/signup?plan=pro&billing=monthly',
       yearly: process.env.NEXT_PUBLIC_STRIPE_PRO_YEARLY_LINK || '/signup?plan=pro&billing=yearly',
@@ -213,33 +202,67 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
   }
 
   const handleSelect = () => {
+    // Starter is always monthly
+    if (isStarter) {
+      window.location.href = paymentLinks.starter.monthly
+      return
+    }
     window.location.href = isYearly ? paymentLinks[tier.name].yearly : paymentLinks[tier.name].monthly
   }
 
+  // Calculate display price
+  const displayPrice = isYearly && hasYearly ? tier.yearlyPrice : tier.price
+  const priceLabel = isYearly && hasYearly ? '/year' : '/month'
+
+  // Style configurations
+  const styleConfig = {
+    starter: {
+      gradient: 'bg-gradient-to-b from-neutral-800/60 to-neutral-900/60',
+      border: 'border-2 border-neutral-600',
+      shadow: '',
+      badgeBg: 'bg-neutral-600',
+      checkColor: 'text-neutral-400',
+      buttonBg: 'bg-neutral-700 hover:bg-neutral-600',
+      icon: <Zap className="h-5 w-5 text-neutral-400" />,
+      iconColor: 'text-neutral-400',
+    },
+    pro: {
+      gradient: 'bg-gradient-to-b from-cyan-950/40 to-blue-950/40',
+      border: 'border-2 border-cyan-500',
+      shadow: 'shadow-lg shadow-cyan-500/20',
+      badgeBg: 'bg-gradient-to-r from-cyan-500 to-blue-500',
+      checkColor: 'text-cyan-400',
+      buttonBg: 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600',
+      icon: <Star className="h-5 w-5 text-cyan-400" />,
+      iconColor: 'text-cyan-400',
+    },
+    master: {
+      gradient: 'bg-gradient-to-b from-purple-950/40 to-pink-950/40',
+      border: 'border-2 border-purple-500',
+      shadow: 'shadow-lg shadow-purple-500/20',
+      badgeBg: 'bg-gradient-to-r from-purple-500 to-pink-500',
+      checkColor: 'text-purple-400',
+      buttonBg: 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600',
+      icon: <Crown className="h-5 w-5 text-purple-400" />,
+      iconColor: 'text-purple-400',
+    },
+  }
+
+  const style = styleConfig[tier.name]
+
   return (
-    <div
-      className={`relative rounded-2xl p-6 ${
-        isPro
-          ? 'bg-gradient-to-b from-cyan-950/40 to-blue-950/40 border-2 border-cyan-500 shadow-lg shadow-cyan-500/20'
-          : 'bg-gradient-to-b from-purple-950/40 to-pink-950/40 border-2 border-purple-500 shadow-lg shadow-purple-500/20'
-      }`}
-    >
+    <div className={`relative rounded-2xl p-6 ${style.gradient} ${style.border} ${style.shadow}`}>
       {/* Badge */}
       <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-        <span className={`text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 ${
-          isPro
-            ? 'bg-gradient-to-r from-cyan-500 to-blue-500'
-            : 'bg-gradient-to-r from-purple-500 to-pink-500'
-        }`}>
+        <span className={`text-white text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 ${style.badgeBg}`}>
           {isMaster && <Crown className="h-3 w-3" />}
-          {founderInfo.badge}
+          {isStarter ? 'TRY IT' : 'FOUNDER PRICING'}
         </span>
       </div>
 
       <div className="mb-6 mt-2">
         <div className="flex items-center gap-2 mb-2">
-          {isPro && <Star className="h-5 w-5 text-cyan-400" />}
-          {isMaster && <Crown className="h-5 w-5 text-purple-400" />}
+          {style.icon}
           <h3 className="text-xl font-bold text-white">
             {tier.displayName}
           </h3>
@@ -249,18 +272,23 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
         </p>
       </div>
 
-      {/* Pricing with future price */}
+      {/* Pricing */}
       <div className="mb-6">
         <div className="flex items-baseline gap-2">
           <span className="text-4xl font-bold text-white">
-            ${isYearly ? founderInfo.yearlyPrice : founderInfo.currentPrice}
+            ${displayPrice}
           </span>
-          <span className="text-neutral-400">/{isYearly ? 'year' : 'month'}</span>
+          <span className="text-neutral-400">{priceLabel}</span>
         </div>
-        {isYearly ? (
+
+        {isStarter ? (
+          <p className="text-xs text-neutral-500 mt-1">
+            Monthly billing only
+          </p>
+        ) : isYearly && hasYearly ? (
           <>
             <p className="text-xs text-neutral-500 mt-1">
-              ${Math.round(founderInfo.yearlyPrice / 12)}/mo effective — Save ${founderInfo.currentPrice * 12 - founderInfo.yearlyPrice}/year
+              ${Math.round(tier.yearlyPrice / 12)}/mo effective — Save ${tier.price * 12 - tier.yearlyPrice}/year
             </p>
             <p className="text-xs font-medium text-green-400 mt-1">
               2 months free + all future upgrades included
@@ -269,11 +297,13 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
         ) : (
           <>
             <p className="text-xs text-neutral-500 mt-1">
-              Early Launch Price — Future price ${founderInfo.futurePrice}/mo
+              {tier.futurePrice > tier.price ? `Early Launch Price — Future price $${tier.futurePrice}/mo` : 'Monthly billing'}
             </p>
-            <p className="text-xs font-medium text-green-400 mt-1">
-              Founder rate locked in for life
-            </p>
+            {tier.futurePrice > tier.price && (
+              <p className="text-xs font-medium text-green-400 mt-1">
+                Founder rate locked in for life
+              </p>
+            )}
           </>
         )}
       </div>
@@ -281,9 +311,7 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
       <ul className="space-y-3 mb-6">
         {tier.features.map((feature, i) => (
           <li key={i} className="flex items-start gap-2">
-            <Check className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-              isPro ? 'text-cyan-400' : 'text-purple-400'
-            }`} />
+            <Check className={`h-5 w-5 mt-0.5 flex-shrink-0 ${style.checkColor}`} />
             <span className="text-sm text-neutral-300">
               {feature}
             </span>
@@ -293,29 +321,27 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
 
       <button
         onClick={handleSelect}
-        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all ${
-          isPro
-            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white shadow-md hover:shadow-lg'
-            : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white shadow-md hover:shadow-lg'
-        }`}
+        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all text-white shadow-md hover:shadow-lg ${style.buttonBg}`}
       >
-        Get {tier.displayName}{isYearly ? ' (Yearly)' : ''}
+        {isStarter ? 'Start Free Trial' : `Get ${tier.displayName}${isYearly && hasYearly ? ' (Yearly)' : ''}`}
       </button>
 
-      {/* Usage limits preview */}
+      {/* Comparison card - NO query limits shown */}
       <div className="mt-4 pt-4 border-t border-neutral-700">
         <div className="grid grid-cols-2 gap-2 text-xs text-neutral-400">
           <div>
             <span className="font-medium text-neutral-300">{tier.limits.maxDocuments}</span> docs
           </div>
           <div>
-            <span className="font-medium text-neutral-300">{tier.limits.panelQueriesPerDay}</span> queries/day
-          </div>
-          <div>
             <span className="font-medium text-neutral-300">{tier.limits.maxFileSizeMB}MB</span> max file
           </div>
           <div>
-            <span className="font-medium text-neutral-300">{tier.limits.hasFullPanel ? '4+' : '2'}</span> AI models
+            <span className="font-medium text-neutral-300">{tier.modelCount}</span> AI model{tier.modelCount > 1 ? 's' : ''}
+          </div>
+          <div>
+            <span className="font-medium text-neutral-300">
+              {tier.limits.hasCouncilMode ? 'All' : tier.limits.hasThoughtfulMode ? '2' : '1'}
+            </span> mode{tier.limits.hasCouncilMode || tier.limits.hasThoughtfulMode ? 's' : ''}
           </div>
         </div>
       </div>

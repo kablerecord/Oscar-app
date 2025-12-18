@@ -246,16 +246,16 @@ This integrates with the existing `model-router.ts` question type detection.
 
 | Tier | Council Access |
 |------|----------------|
-| Free | None |
-| Lite ($19/mo) | None |
+| Starter ($20/mo) | None |
 | Pro ($49/mo) | None |
 | **Master ($149/mo)** | **Full access** |
-| Master Annual | Full access + High Depth unlocked |
+| Master Annual ($119/mo) | Full access + High Depth unlocked |
+| Enterprise | Full access + Custom SLA |
 
-### Rate Limiting
-- Max 10 Council queries per hour (Master)
-- Max 50 Council queries per day (Master)
-- Credits system for heavy users (future)
+### Rate Limiting (Invisible - Don't Advertise)
+- Max 10 Council sessions per day (Master)
+- Custom SLA for Enterprise
+- Overage available: $20 for 10 Council sessions
 
 ---
 

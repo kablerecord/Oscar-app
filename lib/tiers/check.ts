@@ -18,7 +18,7 @@ export async function getWorkspaceTier(workspaceId: string): Promise<TierName> {
     where: { id: workspaceId },
     select: { tier: true },
   })
-  return (workspace?.tier as TierName) || 'pro'
+  return (workspace?.tier as TierName) || 'starter'
 }
 
 /**
@@ -98,17 +98,133 @@ export async function canUsePanelQuery(workspaceId: string, userId: string): Pro
 }
 
 /**
- * Check if full panel (4 models) is available
+ * Check if multi-model panel is available
  */
-export async function hasFullPanel(workspaceId: string): Promise<TierCheckResult> {
+export async function hasMultiModel(workspaceId: string): Promise<TierCheckResult> {
   const tier = await getWorkspaceTier(workspaceId)
   const config = getTierConfig(tier)
 
   return {
     tier,
     config,
-    allowed: config.limits.hasFullPanel,
-    reason: config.limits.hasFullPanel ? undefined : 'Full panel mode requires Pro or Master tier.',
+    allowed: config.limits.hasMultiModel,
+    reason: config.limits.hasMultiModel ? undefined : 'Multi-model panel requires Pro or Master tier.',
+  }
+}
+
+/**
+ * Check if Contemplate mode is available
+ */
+export async function hasContemplateMode(workspaceId: string): Promise<TierCheckResult> {
+  const tier = await getWorkspaceTier(workspaceId)
+  const config = getTierConfig(tier)
+
+  return {
+    tier,
+    config,
+    allowed: config.limits.hasContemplateMode,
+    reason: config.limits.hasContemplateMode ? undefined : 'Contemplate mode requires Master tier.',
+  }
+}
+
+/**
+ * Check if Council mode is available
+ */
+export async function hasCouncilMode(workspaceId: string): Promise<TierCheckResult> {
+  const tier = await getWorkspaceTier(workspaceId)
+  const config = getTierConfig(tier)
+
+  return {
+    tier,
+    config,
+    allowed: config.limits.hasCouncilMode,
+    reason: config.limits.hasCouncilMode ? undefined : 'Council mode requires Master tier.',
+  }
+}
+
+/**
+ * Check daily Contemplate usage (invisible throttle for Master tier)
+ */
+export async function canUseContemplate(workspaceId: string, userId: string): Promise<TierCheckResult> {
+  const tier = await getWorkspaceTier(workspaceId)
+  const config = getTierConfig(tier)
+
+  // Not available for this tier
+  if (!config.limits.hasContemplateMode) {
+    return {
+      tier,
+      config,
+      allowed: false,
+      reason: 'Contemplate mode requires Master tier.',
+    }
+  }
+
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+
+  const todayUsage = await prisma.usageRecord.findUnique({
+    where: {
+      userId_endpoint_date: {
+        userId,
+        endpoint: 'oscar/contemplate',
+        date: startOfDay,
+      },
+    },
+  })
+
+  const currentCount = todayUsage?.requestCount || 0
+  const allowed = currentCount < config.limits.contemplatePerDay
+
+  return {
+    tier,
+    config,
+    allowed,
+    reason: allowed ? undefined : `Daily Contemplate limit reached. Resets at midnight. Or purchase more: $10 for 10 queries.`,
+    currentUsage: currentCount,
+    limit: config.limits.contemplatePerDay,
+  }
+}
+
+/**
+ * Check daily Council usage (invisible throttle for Master tier)
+ */
+export async function canUseCouncil(workspaceId: string, userId: string): Promise<TierCheckResult> {
+  const tier = await getWorkspaceTier(workspaceId)
+  const config = getTierConfig(tier)
+
+  // Not available for this tier
+  if (!config.limits.hasCouncilMode) {
+    return {
+      tier,
+      config,
+      allowed: false,
+      reason: 'Council mode requires Master tier.',
+    }
+  }
+
+  const startOfDay = new Date()
+  startOfDay.setHours(0, 0, 0, 0)
+
+  const todayUsage = await prisma.usageRecord.findUnique({
+    where: {
+      userId_endpoint_date: {
+        userId,
+        endpoint: 'oscar/council',
+        date: startOfDay,
+      },
+    },
+  })
+
+  const currentCount = todayUsage?.requestCount || 0
+  const allowed = currentCount < config.limits.councilPerDay
+
+  return {
+    tier,
+    config,
+    allowed,
+    reason: allowed ? undefined : `Daily Council limit reached. Resets at midnight. Or purchase more: $20 for 10 sessions.`,
+    currentUsage: currentCount,
+    limit: config.limits.councilPerDay,
   }
 }
 
@@ -190,14 +306,27 @@ export async function checkBulkUploadEnterprise(
     }
   }
 
-  // Check if it exceeds current tier but fits in Master
-  if (totalAfterUpload > config.limits.maxDocuments && tier === 'pro') {
-    return {
-      requiresEnterprise: false,
-      filesAttempted: newFileCount,
-      maxAllowed: config.limits.maxDocuments,
-      tier,
-      suggestion: 'upgrade_to_master',
+  // Check if it exceeds current tier but fits in a higher tier
+  if (totalAfterUpload > config.limits.maxDocuments) {
+    // Starter users should upgrade to Pro first
+    if (tier === 'starter') {
+      return {
+        requiresEnterprise: false,
+        filesAttempted: newFileCount,
+        maxAllowed: config.limits.maxDocuments,
+        tier,
+        suggestion: 'upgrade_to_master', // Generic upgrade suggestion
+      }
+    }
+    // Pro users should upgrade to Master
+    if (tier === 'pro') {
+      return {
+        requiresEnterprise: false,
+        filesAttempted: newFileCount,
+        maxAllowed: config.limits.maxDocuments,
+        tier,
+        suggestion: 'upgrade_to_master',
+      }
     }
   }
 

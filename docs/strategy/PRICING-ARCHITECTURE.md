@@ -1,488 +1,283 @@
 # OSQR Pricing Architecture v1.0
 
-**Status:** Strategic Framework
+**Status:** Implementation Ready
 **Owner:** Kable Record
-**Created:** December 2024
-**For:** VS Code OSQR Supporting Documentation
+**Updated:** December 2024
+**For:** OSQR v1 Launch
 
 ---
 
 ## Executive Summary
 
-OSQR delivers $2M+ in value (traditional startup development cost) for under $5,000. The pricing challenge: the better OSQR performs, the faster users finish, the less they pay on traditional subscription models.
+OSQR v1 pricing is designed for simplicity and clear value differentiation. Four tiers serve distinct user needs: Starter for trial users, Pro as the core product, Master for builders, and Enterprise for teams.
 
-Solution: Stop charging for time. Charge for throughput, capacity, and commitment.
-
----
-
-## The Pricing Problem
-
-### Traditional Subscription Fails
-
-| OSQR Performance | Time to V1 | Revenue at $500/mo |
-|------------------|------------|-------------------|
-| Good | 6 months | $3,000 |
-| Great | 3 months | $1,500 |
-| Exceptional | 1 month | $500 |
-| Insane | 2 weeks | $250 |
-
-The better OSQR works, the less revenue per customer. This inverts normal SaaS incentives.
-
-### The Extremes Don't Work
-
-**Premium pricing ($1M - split the savings):**
-- 2 customers
-- No adoption
-- No GPKV learning
-- Competitor undercuts immediately
-
-**Free/cheap ($20/month or free):**
-- Mass adoption
-- Market presence
-- Zero revenue
-- Can't sustain compute costs
-- Training competitors' future dataset for free
-
-### The Anchor Problem
-
-Pricing on "savings vs traditional development" is a trap:
-- Unverifiable (can't prove what they would have spent)
-- Heterogeneous (solo hacker vs funded team)
-- Invites skepticism
-- Makes price feel like a tax, not value
+Key principles:
+- **No visible query limits** - Users shouldn't feel constrained
+- **Mode-based differentiation** - Higher tiers unlock more powerful AI modes
+- **Document vault as value anchor** - Clear, tangible limits users understand
+- **Invisible throttling** - Protect margins without marketing complexity
 
 ---
 
-## The Right Mental Model
+## Tier Structure
 
-### OSQR Is Not Software
+### Mode Availability by Tier
 
-OSQR is:
-- A virtual dev team you allocate across tasks
-- With institutional memory
-- With governance (checkpoints, branches, audit trail)
-- With factory output: shipped increments
-
-**Price it like team capacity, not software subscription.**
-
-### What Users Actually Pay For
-
-People don't pay for time spent. They pay for time removed.
-
-Charge for:
-- Speed + certainty + parallel labor replacement
-- Throughput (how much gets done)
-- Capacity (how much can happen simultaneously)
-- Commitment (the decision to build)
+| Tier | Quick | Thoughtful | Contemplate | Council |
+|------|-------|------------|-------------|---------|
+| Starter | Yes | No | No | No |
+| Pro | Yes | Yes | No | No |
+| Master | Yes | Yes | Yes | Yes |
+| Enterprise | Yes | Yes | Yes | Yes |
 
 ---
 
-## Pricing Components
+## Tier Details
 
-### 1. Subscription (The Relationship)
+### Starter - $20/month
 
-Base access that covers:
-- Always-on platform access
-- Memory continuity (PKV/MSC)
-- Updates and improvements
-- Basic orchestration
-- GPKV access
+**Positioning:** "Try the difference"
 
-This is the cover charge, not the value capture.
+**Includes:**
+- Single model (Claude OR GPT-4o, not both)
+- 5 documents in vault
+- Basic memory
+- Refine → Fire workflow
+- Quick mode only
 
-### 2. Project Activation (The Commitment)
+**Restrictions:**
+- Monthly billing only (no annual option)
+- No multi-model panel
+- No Thoughtful/Contemplate modes
 
-One-time fee when starting a new project:
-- Repository indexing
-- Decision log creation
-- Standards and test setup
-- Autonomy rail configuration
-- Institutional memory establishment
+**Why monthly-only:** Drive upgrades to Pro. The 5-doc limit creates natural friction. Don't let users lock in a year at $20.
 
-**This is where users commit. This is where compute costs spike.**
-
-Captures value at the moment of highest intent, regardless of how fast they build.
-
-### 3. Build Runs (The Output)
-
-Units of completed work:
-- One run = spec → tasks → code → tests → docs → checkpoint
-- Predictable bundles, not token metering
-- Correlates price with impact, not time
-
-Users understand "runs" better than tokens. No bill shock.
-
-### 4. Parallel Lanes (The Speed)
-
-How many agents can work simultaneously:
-- More lanes = faster completion
-- Speed becomes a premium feature
-- Fast builders pay more, not less
-
-### 5. Autonomy Depth (The Trust)
-
-How far OSQR goes without checkpointing:
-- Higher autonomy = faster execution
-- Higher autonomy = more compute
-- Trust is earned and paid for
+**Comparison Card:**
+```
+5 docs
+25MB max file
+1 AI model
+```
 
 ---
 
-## Pricing Tiers
+### Pro - $49/month ($39/month annual)
 
-### Starter (Monthly) - $99/month
-- Single builder
-- 1 parallel lane
-- 5 build runs/month
-- Basic autonomy (frequent checkpoints)
-- PKV storage (limited)
-- No project activations included
+**Positioning:** "The real product"
 
-**For:** Hobbyists, exploration, proof of concept
+**Includes:**
+- Multi-model panel (Claude + GPT-4o)
+- 500 documents in vault
+- Full Personal Knowledge Vault
+- Advanced memory
+- Unlimited Refine → Fire
+- Quick + Thoughtful modes
+- 25MB max file size
+- 90-day transformation guarantee
 
-### Builder (Annual) - $2,400/year ($200/month effective)
-- Single builder
-- 2 parallel lanes
-- 24 build runs/year
-- 2 project activations included
-- Standard autonomy
-- Full PKV storage
+**Founder pricing:** $49/month locked for life (future price $79/month)
 
-**For:** Solo founders building real products
-
-### Studio (Annual) - $6,000/year ($500/month effective)
-- 3 seats
-- 5 parallel lanes
-- 120 build runs/year
-- 6 project activations included
-- Enhanced autonomy
-- Shared team PKV
-- Priority model routing
-
-**For:** Small teams, multiple products
-
-### Scale (Annual) - $18,000/year ($1,500/month effective)
-- 10 seats
-- 10 parallel lanes
-- 500 build runs/year
-- 20 project activations included
-- Maximum autonomy
-- Enterprise PKV controls
-- Priority queue + SLA
-- Audit logging
-
-**For:** Larger teams replacing development capacity
-
-### Enterprise (Custom) - $50,000+/year
-- Unlimited seats
-- Custom lane allocation
-- Unlimited build runs
-- Private GPKV (learnings stay internal)
-- Dedicated infrastructure
-- Compliance features (SOC2, etc.)
-- Custom integrations
-
-**For:** Organizations with security/compliance requirements
+**Comparison Card:**
+```
+500 docs
+25MB max file
+2 AI models
+```
 
 ---
 
-## Overage Pricing
+### Master - $149/month ($119/month annual)
 
-When users exceed included capacity:
+**Positioning:** "Build with OSQR"
 
-| Item | Overage Price |
-|------|---------------|
-| Additional Build Run | $25 each |
-| Build Run Pack (10) | $200 ($20 each) |
-| Build Run Pack (50) | $750 ($15 each) |
-| Additional Project Activation | $1,500 each |
-| Lane upgrade (per lane/month) | $100 |
+**Includes:**
+- Everything in Pro
+- Contemplate mode
+- Council Mode (multi-model deliberation)
+- 1,500 documents in vault
+- 50MB max file size
+- 4+ AI models
+- Priority processing (backend only, don't advertise)
 
-Predictable packs, not per-token chaos.
+**Founder pricing:** $149/month locked for life (future price $249/month)
 
----
-
-## Founding Builder Program
-
-### Purpose
-
-Early users are disproportionately valuable:
-- Their usage trains GPKV
-- Their feedback shapes the product
-- Their success stories sell OSQR
-- They can't be acquired later at any price
-
-### Structure
-
-**Founding Builder Tier** - $5,000 one-time (limited to 100)
-- Lifetime price lock at Builder tier
-- 5 project activations included
-- 100 build runs included
-- Priority feature input
-- "Founding Builder" designation
-- Explicit GPKV contribution agreement
-
-**Founding Studio Tier** - $12,000 one-time (limited to 50)
-- Lifetime price lock at Studio tier
-- 15 project activations included
-- 300 build runs included
-- Direct access to founder
-- Early feature access
-- Explicit GPKV contribution agreement
-
-### The Exchange
-
-Founding members get massive value at locked prices.
-OSQR gets cash, commitment, usage data, and proof.
-
-Not a discount. A partnership.
+**Comparison Card:**
+```
+1500 docs
+50MB max file
+4+ AI models
+```
 
 ---
 
-## Why This Solves "Faster = Less Revenue"
+### Enterprise - Custom
 
-### Old Model (Time-Based)
-- Fast builder: 2 weeks × $500/month = $250
-- Slow builder: 6 months × $500/month = $3,000
-- OSQR penalized for own success
+**Positioning:** "For teams and organizations"
 
-### New Model (Capacity-Based)
-- Fast builder needs: More lanes + higher autonomy + same activation fee
-- Fast builder pays: $1,500 activation + higher tier for lanes = $2,000+
-- Slow builder pays: $1,500 activation + lower tier = $1,700+
-- Revenue correlates with value delivered, not time elapsed
+**Includes:**
+- Everything in Master
+- Unlimited documents
+- Dedicated support
+- Custom model access
+- API access for integrations
+- Team collaboration (coming)
+- SSO & advanced security
+- 100MB max file size
 
-Speed is now a premium feature. Users who want to build fast pay for the capacity to do so.
-
----
-
-## Competitive Positioning
-
-### vs Traditional Development ($2-2.5M)
-- OSQR at any tier: 99%+ savings
-- No comparison shopping possible
-
-### vs Dev Agencies ($50-500k)
-- OSQR Scale tier: 96-99% savings
-- Faster delivery
-- User maintains control
-
-### vs Other AI Dev Tools ($20-200/month)
-- OSQR delivers complete products, not assistance
-- Memory and continuity others lack
-- Multi-agent orchestration others can't match
-- Price premium justified by outcome difference
-
-### vs Technical Co-founder (20-50% equity)
-- OSQR: $5-18k/year
-- Equity retained: 100%
-- No co-founder conflicts
+**Comparison Card:**
+```
+Unlimited docs
+100MB max file
+All AI models
+```
 
 ---
 
-## Revenue Projections
+## What to REMOVE from Marketing
 
-### Year 1: Prove and Position
-- 50 Founding Builders: $250,000
-- 25 Founding Studios: $300,000
-- 200 Builder annual: $480,000
-- 50 Studio annual: $300,000
-- Overage revenue: $100,000
-- **Year 1 Total: ~$1.4M**
+Delete these from tier descriptions - they're either filler or create unnecessary friction:
 
-### Year 2: Scale Adoption
-- 1,000 Builder annual: $2.4M
-- 300 Studio annual: $1.8M
-- 50 Scale annual: $900,000
-- Enterprise (10): $500,000
-- Overage revenue: $400,000
-- **Year 2 Total: ~$6M**
+| Remove | Reason |
+|--------|--------|
+| "100 queries/day" | Makes users feel limited even though <1% hit it. Keep as backend guardrail only. |
+| "300 queries/day" | Same reason |
+| "Weekly automated reviews" | Filler - doesn't drive purchase decisions |
+| "Priority fast-lane processing" | Filler - keep as backend reality, don't advertise |
+| "Early access to new models & features" | Filler - everyone gets updates |
+| Query limits in comparison cards | Remove entirely from UI |
 
-### Year 3: Market Position
-- 3,000 Builder annual: $7.2M
-- 1,000 Studio annual: $6M
-- 200 Scale annual: $3.6M
-- Enterprise (50): $2.5M
-- Marketplace revenue: $1M
-- Overage revenue: $1.2M
-- **Year 3 Total: ~$21.5M**
+---
+
+## Margin Protection: Throttling Strategy
+
+### Philosophy
+
+Price for premium, throttle the outliers, let them buy more. Don't downgrade AI quality—users who max out will pay for more, not accept dumber models.
+
+### Invisible Limits (Don't Advertise)
+
+| Tier | Contemplate/Day | Council/Day | Standard Queries |
+|------|-----------------|-------------|------------------|
+| Starter | N/A | N/A | Unlimited |
+| Pro | N/A | N/A | Unlimited |
+| Master | 20 | 10 | Unlimited |
+| Enterprise | Custom SLA | Custom SLA | Custom SLA |
+
+### When Users Hit Limits
+
+Display three options every time:
+
+1. **Wait** - "Resets at midnight"
+2. **Buy** - "$10 for 10 Contemplate queries" / "$20 for 10 Council sessions"
+3. **Enterprise** - "Using OSQR heavily? Talk to us about Enterprise pricing →"
+
+Show all three options to every user who hits a limit. No conditional logic. Simple code, natural sales filter—users who need Enterprise will self-identify.
+
+### Overage Pricing (Self-Serve in UI)
+
+Priced for 70% guaranteed margin floor, regardless of usage.
+
+| Add-On | Price | Your Max Cost | Guaranteed Margin |
+|--------|-------|---------------|-------------------|
+| 10 Contemplate queries | $10 | ~$3 | 70% |
+| 10 Council sessions | $20 | ~$6 | 70% |
+
+**Why these prices work:**
+- User hitting limits is in flow, wants to keep working—not price shopping
+- $1/Contemplate query is less than a coffee
+- $2/Council session is still impulse-buy territory
+- You're protected even if they burn through every query
+
+---
+
+## Margin Summary
+
+| Tier | Price | Avg Cost | Gross Margin |
+|------|-------|----------|--------------|
+| Starter | $20 | ~$6 | ~70% |
+| Pro | $49 | ~$18 | ~63% |
+| Master | $149 | ~$50-60 | ~65-70% |
+
+Without throttling, Master margin ranged 11-58% due to outliers. Throttling + overages stabilizes at 65-70%.
+
+---
+
+## Billing Rules
+
+| Tier | Monthly | Annual |
+|------|---------|--------|
+| Starter | $20/month | Not available |
+| Pro | $49/month | $39/month (2 months free) |
+| Master | $149/month | $119/month (2 months free) |
+| Enterprise | Custom | Custom |
 
 ---
 
 ## Pricing Psychology
 
-### Why These Numbers Work
+**Why this works:**
 
-**$99/month Starter:**
-- Low enough to try without approval
-- High enough to signal "serious tool"
-- Filters out tire-kickers
+- $20 Starter competes directly with ChatGPT Plus / Claude Pro
+- $20 → $49 upgrade is the real conversion (5-doc limit drives it)
+- $49 Pro = "everything you pay $40 for (ChatGPT + Claude), integrated"
+- $149 Master = builder tools, justified when VS Code ships
+- Query limits invisible = users don't feel constrained
+- Founder pricing creates urgency and loyalty
 
-**$200/month effective Builder:**
-- Less than one contractor hour
-- Less than 0.1% of traditional dev cost
-- Obvious ROI for anyone building
-
-**$500/month effective Studio:**
-- Cost of one mediocre freelancer
-- Delivers team-level output
-- No-brainer for funded startups
-
-**$1,500/month effective Scale:**
-- Cost of one junior developer
-- Delivers senior team output
-- Enterprise procurement friendly
-
-### The Anchor
-
-Never anchor to other dev tools ($20-200/month).
-
-Always anchor to:
-- What a technical co-founder costs (equity)
-- What an agency charges ($50-500k)
-- What a dev team costs ($1-2M/year)
-
-OSQR is always 10-100x cheaper than the real alternative.
+**Anchoring:**
+- Never compare to other AI tools ($20)
+- Compare to: hiring help, saving time, consolidating subscriptions
 
 ---
 
-## Risk Mitigation
+## v2 Pricing Strategy
 
-### "What if users game build runs?"
+When v2 ships (VS Code extension, marketplace):
 
-Build runs are defined units of work with clear scope. Gaming requires breaking work into tiny pieces, which adds overhead that negates the benefit.
+1. **Existing users keep v1 pricing** at their locked founder rate
+2. **v1 tiers do NOT automatically include v2 features**
+3. **v2 features are add-ons:**
+   - VS Code Extension: +$50/month (or included in new v2 Master tier)
+   - Marketplace Access: +$30/month (or included in new v2 tiers)
+4. **New tier structure introduced for v2** - existing users can upgrade or stay on v1
 
-### "What if compute costs spike?"
-
-Pricing tiers include margin. Overage pricing covers burst usage. Annual commitments provide cash buffer.
-
-### "What if competitors undercut?"
-
-GPKV is the moat. Price cuts without the learning dataset deliver inferior results. Early users can't be replicated.
-
-### "What if we underprice?"
-
-Founding tiers are limited quantity. Annual commitments lock in relationships. Overage captures heavy usage regardless of tier.
+This rewards early adopters (locked pricing) while allowing repricing based on learned value.
 
 ---
 
-## Implementation Phases
+## Implementation Checklist
 
-### Phase 1: Founding Program (Months 1-3)
-- Launch Founding Builder and Founding Studio tiers
-- Limited quantity, high touch
-- Validate pricing acceptance
-- Build case studies
+### Pricing Page Updates
+- [ ] Add Starter tier ($20/month, monthly only)
+- [ ] Update Pro features (remove query limit display)
+- [ ] Move Contemplate mode to Master
+- [ ] Update Master features (remove query limit display)
+- [ ] Remove "queries/day" from all comparison cards
+- [ ] Remove filler features from descriptions
 
-### Phase 2: Public Tiers (Months 4-6)
-- Launch Starter, Builder, Studio, Scale
-- Refine based on Founding usage patterns
-- Establish overage pricing
+### Backend
+- [ ] Keep query limits as backend guardrails (don't remove functionality)
+- [ ] Implement soft limit warnings rather than hard blocks
+- [ ] Track usage for <1% who hit limits
 
-### Phase 3: Enterprise (Months 7-12)
-- Custom enterprise tier
-- Compliance features
-- Private GPKV options
-
-### Phase 4: Marketplace Integration (Year 2)
-- Plugin creator revenue share
-- Marketplace as pricing lever
-- Ecosystem lock-in
-
----
-
-## Plugin Creator Economics
-
-### Revenue Split
-
-**Standard split: 70/30 (creator keeps 70%)**
-
-This is the industry standard that signals "we want creators to win":
-- Apple App Store: 70/30
-- Shopify App Store: 70/30 (80/20 after first $1M)
-- Gumroad: 70/30
-
-**Founding Creator Bonus: 80/20**
-
-First 50 plugin creators get 80/20 split locked for life. Incentivizes early ecosystem building.
-
-### What Creators Get
-
-| Benefit | Description |
-|---------|-------------|
-| GPKV namespace | Their own intelligence layer that compounds |
-| 70% revenue | On all subscriptions through their plugin |
-| Distribution | Access to OSQR's user base |
-| Defensible moat | Patterns can't be copied overnight |
-| Analytics | Usage data, retention, conversion |
-
-### What Creators Provide
-
-| Contribution | Description |
-|--------------|-------------|
-| Domain expertise | Deep knowledge in their vertical |
-| Workflow design | How users should work |
-| Ongoing refinement | Updates based on user feedback |
-| Community | Bring their audience to OSQR |
-
-### Example Economics
-
-A React Development plugin with 500 subscribers at $20/month:
-- Monthly revenue: $10,000
-- Creator share (70%): $7,000/month
-- OSQR share (30%): $3,000/month
-
-At scale (2,000 subscribers): $28,000/month creator income.
-
-### Why This Works
-
-1. **Creators have skin in the game** - More usage = more revenue
-2. **OSQR gets ecosystem** - Plugins bring users who wouldn't otherwise come
-3. **Users get specialization** - Better experience in their domain
-4. **Network effects compound** - Plugin GPKV patterns make OSQR smarter for everyone
-
-### Split Governance
-
-Revenue split is revisable after marketplace proves out, but:
-- Existing creators keep their locked rate
-- Any changes apply only to new creators
-- 60 days notice before any policy change
-- Founder commits to never going below 60/40
-
----
-
-## Key Principles
-
-1. **Never price on time.** Price on capacity, output, and commitment.
-
-2. **Speed is premium.** More lanes and higher autonomy cost more.
-
-3. **Activation captures intent.** The decision to build is worth paying for.
-
-4. **Annual locks relationships.** Monthly is for exploration only.
-
-5. **Founders are partners.** Early users get lifetime value for lifetime contribution.
-
-6. **Overage is predictable.** Packs, not tokens. No bill shock.
-
-7. **Anchor to alternatives.** Compare to teams and agencies, never to tools.
+### Billing
+- [ ] Starter tier: monthly only, no annual option
+- [ ] Pro tier: monthly + annual (2 months free)
+- [ ] Master tier: monthly + annual (2 months free)
 
 ---
 
 ## Summary
 
-| Problem | Solution |
-|---------|----------|
-| Faster = less revenue | Charge for capacity, not time |
-| Value hard to capture | Project activation fees |
-| Speed penalized | Parallel lanes as premium |
-| Subscription misprices | Build runs as output units |
-| Early users undervalued | Founding program with lifetime lock |
-| Competitors could undercut | GPKV moat from early usage |
-
-OSQR pricing aligns incentives: users pay for what they get (capacity and output), OSQR earns more when it delivers more, and speed becomes a feature to pay for rather than a revenue leak.
+| Tier | Price | Docs | Models | Modes |
+|------|-------|------|--------|-------|
+| Starter | $20/mo | 5 | 1 | Quick |
+| Pro | $49/mo | 500 | 2 | Quick, Thoughtful |
+| Master | $149/mo | 1,500 | 4+ | All modes |
+| Enterprise | Custom | Unlimited | All | All modes |
 
 ---
 
-*Document Version: 1.0*
-*For: VS Code OSQR Supporting Documentation*
+*Document Version: 1.1*
+*Updated: December 2024*
+*For: OSQR v1 Launch*

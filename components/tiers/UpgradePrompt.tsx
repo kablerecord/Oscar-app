@@ -20,8 +20,9 @@ export function UpgradePrompt({
   onClose,
   onUpgrade,
 }: UpgradePromptProps) {
-  // Determine which tier to recommend (Pro users upgrade to Master)
-  const recommendedTier: TierName = currentTier === 'pro' ? 'master' : 'master'
+  // Determine which tier to recommend based on current tier
+  // Starter → Pro, Pro → Master
+  const recommendedTier: TierName = currentTier === 'starter' ? 'pro' : 'master'
   const recommended = TIERS[recommendedTier]
 
   const handleUpgradeClick = () => {
@@ -104,7 +105,8 @@ interface InlineUpgradeProps {
 }
 
 export function InlineUpgrade({ feature, currentTier }: InlineUpgradeProps) {
-  const recommendedTier: TierName = currentTier === 'pro' ? 'master' : 'master'
+  // Starter → Pro, Pro → Master
+  const recommendedTier: TierName = currentTier === 'starter' ? 'pro' : 'master'
 
   return (
     <div className="flex items-center gap-2 rounded-md bg-amber-50 px-3 py-2 text-sm dark:bg-amber-950/30">
