@@ -162,7 +162,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
         // Initialize with a greeting
         const greeting: ChatMessage = {
           id: `greeting-${Date.now()}`,
-          message: getPersonalizedGreeting(onboardingState.userName) + " I'm here when you need me!",
+          message: "Ask me any questions you have, or we can work together in the panel.",
           timestamp: new Date(),
           type: 'greeting',
           interacted: false,
@@ -685,7 +685,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
     // Idle/holding state
     return {
       greeting: getPersonalizedGreeting(onboardingState.userName),
-      message: "I'm here when you need me!",
+      message: "Ask me any questions you have, or we can work together in the panel.",
       inputType: 'none' as const,
     }
   }

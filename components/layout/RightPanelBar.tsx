@@ -47,7 +47,7 @@ interface SidebarData {
   } | null
 }
 
-type PanelSection = 'command' | 'stats' | 'knowledge' | 'streak' | null
+type PanelSection = 'command' | 'stats' | 'knowledge' | 'streak' | 'tips' | null
 
 // Track what the user has seen
 const LAST_SEEN_KEY = 'osqr_panel_last_seen'
@@ -465,10 +465,113 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
               </div>
             </div>
           )}
+
+          {/* Tips Panel */}
+          {activeSection === 'tips' && (
+            <div className="h-full flex flex-col">
+              <div className="px-4 py-4 border-b border-slate-700/50 bg-gradient-to-r from-yellow-950/50 to-amber-950/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-yellow-500 to-amber-500 shadow-lg shadow-yellow-500/25">
+                      <Lightbulb className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="font-bold text-sm text-white">Tips & Walkthrough</h3>
+                  </div>
+                  <button
+                    onClick={() => setActiveSection(null)}
+                    className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                  >
+                    <X className="h-4 w-4 text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Getting Started */}
+                <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="h-4 w-4 text-blue-400" />
+                    <h4 className="font-semibold text-sm text-white">The Panel</h4>
+                  </div>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    This is where you chat with OSQR. Ask any question and it gets refined before being sent to a panel of AI experts. The better your question, the better the answer.
+                  </p>
+                </div>
+
+                {/* Command Center Tip */}
+                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="h-4 w-4 text-blue-400" />
+                    <h4 className="font-semibold text-sm text-white">Command Center</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Your goals, tasks, and action items live here. OSQR will suggest items based on your conversations. Pin the important ones to keep them front and center.
+                  </p>
+                </div>
+
+                {/* Memory Vault Tip */}
+                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FolderKanban className="h-4 w-4 text-purple-400" />
+                    <h4 className="font-semibold text-sm text-white">Memory Vault</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Upload documents, notes, or any files you want OSQR to remember. When you enable "Use Knowledge," OSQR references your vault to give personalized answers.
+                  </p>
+                </div>
+
+                {/* Profile Questions Tip */}
+                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Brain className="h-4 w-4 text-purple-400" />
+                    <h4 className="font-semibold text-sm text-white">Profile Questions</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    The more OSQR knows about you, the better it can help. Answer profile questions over time—they appear naturally in conversation when relevant.
+                  </p>
+                </div>
+
+                {/* Modes Tip */}
+                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-green-400" />
+                    <h4 className="font-semibold text-sm text-white">Response Modes</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    <span className="text-cyan-400 font-medium">Quick</span> for fast answers. <span className="text-amber-400 font-medium">Thoughtful</span> for deeper analysis. OSQR auto-selects the best mode, but you can override it.
+                  </p>
+                </div>
+
+                {/* Keyboard Shortcut */}
+                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-slate-400 font-mono text-xs">⌘K</span>
+                    <h4 className="font-semibold text-sm text-white">Quick Access</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Press <span className="font-mono bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-300">⌘K</span> (or <span className="font-mono bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-300">Ctrl+K</span>) anywhere to quickly start a new conversation.
+                  </p>
+                </div>
+
+                {/* Focus Mode Tip */}
+                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-orange-400" />
+                    <h4 className="font-semibold text-sm text-white">Focus Mode</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Need to concentrate? Toggle Focus Mode from settings to dim the sidebars and minimize distractions while you work.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Icon bar */}
         <div className="w-14 h-full border-l border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center py-4 gap-2">
+          {/* Panel label */}
+          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-1">Panel</span>
+
           {/* Command Center - shows item count */}
           <button
             onClick={() => openSection('command')}
@@ -542,6 +645,23 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
             <span className="text-[9px] font-bold text-orange-300">
               {data?.usageStreak?.currentStreak || 0}d
             </span>
+          </button>
+
+          {/* Spacer to push tips to bottom */}
+          <div className="flex-1" />
+
+          {/* Tips - at the bottom */}
+          <button
+            onClick={() => openSection('tips')}
+            className={cn(
+              'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+              'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20',
+              activeSection === 'tips' && 'ring-2 ring-yellow-400/50 bg-yellow-500/20'
+            )}
+            title="Tips & Walkthrough"
+          >
+            <Lightbulb className="h-4 w-4 text-yellow-400" />
+            <span className="text-[9px] font-bold text-yellow-300">Tips</span>
           </button>
         </div>
       </div>

@@ -45,11 +45,11 @@ export function PanelClientWrapper({
     >
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            Chat with OSQR
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            The Panel
           </h1>
-          <p className="mt-2 text-neutral-600 dark:text-neutral-400">
-            Refine your question, then fire it to a panel of AI experts for the best possible answer.
+          <p className="mt-2 text-slate-300">
+            Ask OSQR anything. Your question gets refined, then sent to a panel of AI experts for the best answer.
           </p>
         </div>
 
