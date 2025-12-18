@@ -270,7 +270,7 @@ export function DocumentList({
               </Button>
             </>
           ) : (
-            <span className="text-sm text-neutral-400">
+            <span className="text-sm text-slate-400">
               Select documents to delete
             </span>
           )}
@@ -321,10 +321,10 @@ export function DocumentList({
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                      <h3 className="font-medium text-slate-100 truncate">
                         {doc.title}
                       </h3>
-                      <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                      <span className="text-sm text-slate-400">
                         {formatDate(doc.createdAt)}
                       </span>
                     </div>
@@ -357,7 +357,7 @@ export function DocumentList({
       {/* Pagination */}
       {pagination.totalPages > 1 && (
         <div className="flex items-center justify-between border-t pt-4">
-          <p className="text-sm text-neutral-600 dark:text-neutral-300">
+          <p className="text-sm text-slate-300">
             Showing {(pagination.page - 1) * pagination.limit + 1} -{' '}
             {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
             {pagination.total} documents

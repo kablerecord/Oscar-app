@@ -47,6 +47,9 @@ interface OSCARBubbleProps {
 
   // Greeting state - when true, OSQR is displayed in center so bubble should slide in from hidden
   isGreetingCentered?: boolean
+
+  // Chat callback - when user sends a message from the bubble
+  onBubbleChat?: (message: string) => void
 }
 
 /**
@@ -108,6 +111,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
   isFocusMode = false,
   onStartConversation,
   isGreetingCentered = false,
+  onBubbleChat,
 }: OSCARBubbleProps, ref) {
   // Legacy state (for onboarding compatibility)
   const [isOpen, setIsOpen] = useState(false)
@@ -125,11 +129,13 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
     id: string
     message: string
     timestamp: Date
-    type: 'greeting' | 'insight' | 'discovery' | 'tip' | 'reminder'
+    type: 'greeting' | 'insight' | 'discovery' | 'tip' | 'reminder' | 'user' | 'osqr'
     interacted: boolean // Has the user acknowledged/interacted with this message
     category?: string // For insights
   }
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [bubbleChatInput, setBubbleChatInput] = useState('')
+  const [bubbleChatLoading, setBubbleChatLoading] = useState(false)
   const chatScrollRef = useRef<HTMLDivElement>(null)
 
   // Draggable state - position is stored in session only (resets on page refresh/logout)
@@ -493,6 +499,54 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
       )
     } else if (onProfileSkip) {
       onProfileSkip()
+    }
+  }
+
+  // Handle bubble chat submission (user talking directly to OSQR in the bubble)
+  const handleBubbleChatSubmit = useCallback(async () => {
+    if (!bubbleChatInput.trim() || bubbleChatLoading) return
+
+    const userMessage = bubbleChatInput.trim()
+    setBubbleChatInput('')
+    setBubbleChatLoading(true)
+
+    // Add user message to chat history
+    addChatMessage(userMessage, 'user')
+
+    try {
+      // If parent provided a handler, use it
+      if (onBubbleChat) {
+        onBubbleChat(userMessage)
+      } else {
+        // Default: Call the quick chat API for a fast response
+        const res = await fetch('/api/chat/quick', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: userMessage }),
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          if (data.response) {
+            addChatMessage(data.response, 'osqr')
+          }
+        } else {
+          addChatMessage("Sorry, I couldn't process that. Try again?", 'osqr')
+        }
+      }
+    } catch (error) {
+      console.error('[OSCARBubble] Chat error:', error)
+      addChatMessage("Something went wrong. Let's try that again.", 'osqr')
+    } finally {
+      setBubbleChatLoading(false)
+    }
+  }, [bubbleChatInput, bubbleChatLoading, onBubbleChat, addChatMessage])
+
+  // Handle bubble chat key down
+  const handleBubbleChatKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleBubbleChatSubmit()
     }
   }
 
@@ -1030,9 +1084,11 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                   <div
                     key={msg.id}
                     className={`group relative p-3 rounded-xl transition-all duration-300 ${
-                      msg.interacted
-                        ? 'bg-slate-800/30 opacity-60'
-                        : 'bg-slate-800/60 hover:bg-slate-800/80'
+                      msg.type === 'user'
+                        ? 'bg-blue-600/20 ml-6'
+                        : msg.interacted
+                          ? 'bg-slate-800/30 opacity-60'
+                          : 'bg-slate-800/60 hover:bg-slate-800/80'
                     }`}
                   >
                     {/* Message type indicator */}
@@ -1043,11 +1099,15 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                         {msg.type === 'discovery' && '🎉'}
                         {msg.type === 'tip' && '💬'}
                         {msg.type === 'reminder' && '🔔'}
+                        {msg.type === 'user' && '👤'}
+                        {msg.type === 'osqr' && '🧠'}
                       </span>
                       <span className="text-[10px] text-slate-500">
+                        {msg.type === 'user' ? 'You' : msg.type === 'osqr' ? 'OSQR' : ''}
+                        {' • '}
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
-                      {msg.interacted && (
+                      {msg.interacted && msg.type !== 'user' && msg.type !== 'osqr' && (
                         <span className="ml-auto flex items-center gap-1 text-[10px] text-slate-500">
                           <Check className="h-3 w-3" /> Seen
                         </span>
@@ -1055,12 +1115,18 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                     </div>
 
                     {/* Message content */}
-                    <p className={`text-sm leading-relaxed ${msg.interacted ? 'text-slate-400' : 'text-slate-200'}`}>
+                    <p className={`text-sm leading-relaxed ${
+                      msg.type === 'user'
+                        ? 'text-blue-200'
+                        : msg.interacted
+                          ? 'text-slate-400'
+                          : 'text-slate-200'
+                    }`}>
                       {msg.message}
                     </p>
 
-                    {/* Mark as read button (only for unread messages) */}
-                    {!msg.interacted && (
+                    {/* Mark as read button (only for unread messages that aren't user/osqr) */}
+                    {!msg.interacted && msg.type !== 'user' && msg.type !== 'osqr' && (
                       <button
                         onClick={() => markAsInteracted(msg.id)}
                         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1 rounded-full bg-slate-700/50 hover:bg-slate-600/50 transition-all"
@@ -1115,6 +1181,32 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                   <p className="text-sm text-slate-400">No messages yet</p>
                 </div>
               )}
+
+              {/* Chat input - always visible for user to talk to OSQR */}
+              <div className="mt-3 pt-3 border-t border-slate-700/50">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={bubbleChatInput}
+                    onChange={(e) => setBubbleChatInput(e.target.value)}
+                    onKeyDown={handleBubbleChatKeyDown}
+                    placeholder="Ask OSQR something..."
+                    disabled={bubbleChatLoading}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-800/60 px-4 py-2.5 pr-10 text-sm text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+                  />
+                  <button
+                    onClick={handleBubbleChatSubmit}
+                    disabled={!bubbleChatInput.trim() || bubbleChatLoading}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-400 transition-colors hover:bg-slate-700 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                  >
+                    {bubbleChatLoading ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-slate-500 border-t-blue-400" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
