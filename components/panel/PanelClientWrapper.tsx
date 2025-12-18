@@ -85,6 +85,7 @@ export function PanelClientWrapper({
             workspaceId={workspaceId}
             onboardingCompleted={onboardingCompleted}
             userTier={userTier}
+            onHighlightElement={handleHighlightElement}
           />
         </div>
       </MainLayout>

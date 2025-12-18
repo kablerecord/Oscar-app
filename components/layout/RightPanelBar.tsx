@@ -33,6 +33,7 @@ export type HighlightTarget =
   | 'keyboard' // Keyboard shortcut area
   | 'focus-mode' // Focus mode toggle
   | 'sidebar' // Left sidebar
+  | 'tips' // Tips icon in right panel
   | null
 
 interface RightPanelBarProps {
@@ -697,9 +698,11 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
             </div>
           )}
 
-          {/* OSQR Panel */}
+          {/* OSQR Panel - with tail connecting to icon */}
           {activeSection === 'osqr' && (
-            <div className="h-full flex flex-col">
+            <div className="h-full flex flex-col relative">
+              {/* Tail/connector pointing to OSQR icon at bottom */}
+              <div className="absolute -right-2 bottom-8 w-4 h-4 rotate-45 bg-gradient-to-br from-blue-950/90 to-purple-950/90 border-r border-t border-blue-500/30 z-10" />
               <div className="px-4 py-4 border-b border-slate-700/50 bg-gradient-to-r from-blue-950/50 to-purple-950/50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -1153,22 +1156,26 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
             </div>
           )}
 
-          {/* OSQR - shows pulse when has pending insight */}
-          <div className="relative group">
+          {/* Divider before OSQR */}
+          <div className="w-8 h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent my-2" />
+
+          {/* OSQR - The main AI assistant, in his own space */}
+          <div className="relative group" data-osqr-icon>
             <button
               onClick={() => openSection('osqr')}
               className={cn(
-                'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                'relative flex items-center justify-center rounded-full border-2 transition-all cursor-pointer',
+                'w-11 h-11',
                 pendingInsight
-                  ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-amber-500/30 hover:from-amber-500/30 hover:to-orange-500/30'
-                  : 'bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-purple-500/20',
-                activeSection === 'osqr' && 'ring-2 ring-blue-400/50'
+                  ? 'bg-gradient-to-br from-amber-500/30 to-orange-500/30 border-amber-400/50 hover:from-amber-500/40 hover:to-orange-500/40 shadow-lg shadow-amber-500/20'
+                  : 'bg-gradient-to-br from-blue-500/20 to-purple-500/20 border-blue-400/30 hover:from-blue-500/30 hover:to-purple-500/30 shadow-md shadow-blue-500/15',
+                activeSection === 'osqr' && 'ring-2 ring-blue-400 ring-offset-1 ring-offset-slate-950'
               )}
             >
               <div className="relative">
                 <Brain className={cn(
-                  'h-4 w-4',
-                  pendingInsight ? 'text-amber-400' : 'text-blue-400'
+                  'h-5 w-5',
+                  pendingInsight ? 'text-amber-300' : 'text-blue-300'
                 )} />
                 {pendingInsight && (
                   <span className="absolute -top-1 -right-1 h-2.5 w-2.5">
@@ -1177,12 +1184,6 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
                   </span>
                 )}
               </div>
-              <span className={cn(
-                'text-[9px] font-bold',
-                pendingInsight ? 'text-amber-300' : 'text-blue-300'
-              )}>
-                {pendingInsight ? '!' : 'OSQR'}
-              </span>
             </button>
             {/* Tooltip */}
             <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
@@ -1211,10 +1212,10 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
             </div>
           </div>
 
-          {/* Spacer to push tips to bottom */}
+          {/* Spacer to push Tips to bottom */}
           <div className="flex-1" />
 
-          {/* Tips - at the bottom (always visible) */}
+          {/* Tips - at the bottom */}
           <div className="relative group">
             <button
               onClick={() => openSection('tips')}
@@ -1239,6 +1240,7 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
               <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
             </div>
           </div>
+
         </div>
       </div>
     </>

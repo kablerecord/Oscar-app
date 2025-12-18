@@ -58,7 +58,7 @@ const navigation = [
   {
     name: 'Panel',
     href: '/panel',
-    icon: Brain,
+    icon: MessageSquare,
     description: 'Multi-model AI panel discussion',
   },
   {
@@ -283,7 +283,7 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
     return `${diffDays}d ago`
   }
 
-  // Collapsed mode - icon-only sidebar
+  // Collapsed mode - icon-only sidebar with hover tooltips
   if (isCollapsed) {
     return (
       <aside data-highlight-id="sidebar" className="h-full w-full border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
@@ -304,7 +304,7 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
               <button
                 onClick={handleNewChat}
                 disabled={isCreatingChat || !workspaceId}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all disabled:opacity-50"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all disabled:opacity-50 cursor-pointer"
               >
                 <Plus className="h-5 w-5" />
               </button>
@@ -325,7 +325,7 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
             <div className="relative group">
               <button
                 onClick={() => router.push('/panel?search=true')}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all cursor-pointer"
               >
                 <Search className="h-5 w-5" />
               </button>
@@ -347,7 +347,7 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
             {navigation.map((item) => {
               const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
               const Icon = item.icon
-              const iconColor = item.name === 'Panel' ? 'text-blue-400' : item.name === 'Memory Vault' ? 'text-purple-400' : 'text-slate-400'
+              const iconColor = item.name === 'Panel' ? 'text-cyan-400' : item.name === 'Memory Vault' ? 'text-purple-400' : 'text-slate-400'
 
               return (
                 <div key={item.name} className="relative group">
@@ -387,7 +387,7 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
             <div className="relative group mb-4">
               <button
                 onClick={onToggleCollapse}
-                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all"
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all cursor-pointer"
               >
                 <PanelLeftOpen className="h-5 w-5" />
               </button>

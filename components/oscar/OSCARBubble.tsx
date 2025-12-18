@@ -14,8 +14,10 @@ import {
   getPersonalizedGreeting,
   shouldShowOnboarding,
   isIntroPhase,
+  isDiscoveryPhase,
 } from '@/lib/onboarding/oscar-onboarding'
 import type { InsightCategory } from '@/lib/til/insight-queue'
+import type { HighlightTarget } from '@/components/layout/RightPanelBar'
 
 interface OSCARBubbleProps {
   // Onboarding state
@@ -50,6 +52,9 @@ interface OSCARBubbleProps {
 
   // Chat callback - when user sends a message from the bubble
   onBubbleChat?: (message: string) => void
+
+  // Highlight callback - for progressive discovery
+  onHighlightElement?: (target: HighlightTarget) => void
 }
 
 /**
@@ -112,6 +117,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
   onStartConversation,
   isGreetingCentered = false,
   onBubbleChat,
+  onHighlightElement,
 }: OSCARBubbleProps, ref) {
   // Legacy state (for onboarding compatibility)
   const [isOpen, setIsOpen] = useState(false)
@@ -237,6 +243,16 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
   const isOnboarding = shouldShowOnboarding(onboardingState)
   const currentMessage = OSCAR_MESSAGES[onboardingState.stage]
   const isIntro = isIntroPhase(onboardingState)
+  const isDiscovery = isDiscoveryPhase(onboardingState)
+
+  // Trigger highlights based on current stage
+  useEffect(() => {
+    if (onHighlightElement && currentMessage?.highlightTarget) {
+      onHighlightElement(currentMessage.highlightTarget)
+    } else if (onHighlightElement) {
+      onHighlightElement(null)
+    }
+  }, [onboardingState.stage, currentMessage?.highlightTarget, onHighlightElement])
 
   // Auto-open for onboarding stages OR as the primary greeting (post-onboarding)
   useEffect(() => {
@@ -695,11 +711,12 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
   const showInsightActions = content.inputType === 'insight'
   const hasUnansweredQuestions = answeredCount < totalQuestions
 
-  // Check if this is a "hero" stage (welcome, explain_purpose, explain_how)
-  const isHeroStage = ['welcome', 'explain_purpose', 'explain_how'].includes(onboardingState.stage)
+  // Check if this is a "hero" stage (welcome with brain icon)
+  const isHeroStage = onboardingState.stage === 'welcome'
 
   // Determine if we should show the full-screen onboarding takeover
-  const isOnboardingTakeover = isOnboarding && ['welcome', 'explain_purpose', 'explain_how', 'ask_ready', 'get_name', 'get_working_on', 'get_challenge', 'explain_modes', 'invite_first_question'].includes(onboardingState.stage)
+  // Only for intro phase (welcome, got_name) - discovery stages show as corner bubble
+  const isOnboardingTakeover = isOnboarding && isIntro
 
   // Hidden state - don't render anything (focus mode)
   if (bubbleState === 'hidden' && !isOnboarding) {
@@ -707,11 +724,14 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
   }
 
   // Show minimized pill when closed or minimized (but NEVER during onboarding takeover)
+  // Only show for: discovery phases OR when holding an insight - NOT for idle state
   if ((!isOpen || isMinimized) && !isOnboardingTakeover) {
-    if (!alwaysVisible && !isOnboarding) return null
-
-    // State-based pill rendering
+    // Only show pill for discovery phases or pending insights
     const isHolding = bubbleState === 'holding'
+    const shouldShowPill = isDiscovery || isHolding
+
+    if (!shouldShowPill) return null
+
     const categoryConfig = pendingInsight ? CATEGORY_CONFIG[pendingInsight.category] : null
 
     // Get category-specific pill message
@@ -731,10 +751,25 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
       }
     }
 
+    // Get discovery message based on stage
+    const getDiscoveryMessage = () => {
+      switch (onboardingState.stage) {
+        case 'vault_discovery':
+        case 'vault_highlight':
+          return "Quick tip!"
+        case 'mode_discovery':
+          return "Pro tip!"
+        case 'first_upload':
+          return "Nice!"
+        default:
+          return "Hey!"
+      }
+    }
+
     return (
       <button
         onClick={isHolding ? handleShowInsight : handlePillClick}
-        className={`fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-50 flex items-center gap-2 rounded-full px-4 py-2.5 text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl ${
+        className={`fixed bottom-32 sm:bottom-28 right-16 sm:right-20 z-50 flex items-center gap-2 rounded-full px-4 py-2.5 text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl ${
           isHolding
             ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse-glow-amber'
             : 'bg-gradient-to-r from-blue-500 to-purple-500 animate-subtle-pulse'
@@ -749,12 +784,8 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
         ) : (
           <>
             <MessageCircle className="h-4 w-4" />
-            <span className="text-sm font-medium">
-              {isOnboarding ? "Hey there!" : "Chat with OSQR"}
-            </span>
-            {(isOnboarding || hasUnansweredQuestions) && (
-              <span className="flex h-2 w-2 rounded-full bg-white animate-pulse" />
-            )}
+            <span className="text-sm font-medium">{getDiscoveryMessage()}</span>
+            <span className="flex h-2 w-2 rounded-full bg-white animate-pulse" />
           </>
         )}
       </button>
@@ -802,32 +833,43 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                   {/* Main message */}
                   <h3 className="mb-3 text-2xl font-bold text-white leading-tight">
                     {onboardingState.stage === 'welcome' ? (
-                      <>I'm <span className="shimmer-text" data-text="OSQR">OSQR</span> — your AI thinking partner.</>
+                      <>I'm <span className="shimmer-text" data-text="OSQR">OSQR</span>.</>
                     ) : (
                       content.message
                     )}
                   </h3>
 
-                  {/* Sub message */}
+                  {/* Sub message - now a prompt to type */}
                   {content.subMessage && (
-                    <p className="text-base text-slate-400 leading-relaxed mb-6 max-w-sm">
+                    <p className="text-lg text-slate-300 leading-relaxed mb-6 max-w-sm">
                       {content.subMessage}
                     </p>
                   )}
 
-                  {/* Choice buttons */}
-                  {content.choices && content.choices.length > 0 && (
-                    <div className="w-full space-y-3 max-w-xs">
-                      {content.choices.map((choice) => (
-                        <button
-                          key={choice}
-                          onClick={() => handleChoiceSelect(choice)}
+                  {/* Text input for name */}
+                  {content.inputType === 'text' && (
+                    <div className="w-full max-w-xs">
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={answer}
+                          onChange={(e) => setAnswer(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Your name"
                           disabled={isSubmitting}
-                          className="w-full rounded-xl px-6 py-4 text-base font-medium bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] cursor-pointer disabled:cursor-not-allowed"
+                          className="w-full rounded-xl border border-slate-700 bg-slate-800/80 px-4 py-3 text-base text-white placeholder:text-slate-500 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          autoFocus
+                        />
+                      </div>
+                      {answer.trim() && (
+                        <button
+                          onClick={handleSubmit}
+                          disabled={isSubmitting}
+                          className="mt-4 w-full rounded-xl bg-gradient-to-r from-blue-500 to-purple-500 px-6 py-3 text-base font-medium text-white transition-all hover:from-blue-600 hover:to-purple-600 shadow-lg shadow-blue-500/25 disabled:opacity-50"
                         >
-                          {choice}
+                          Continue
                         </button>
-                      ))}
+                      )}
                     </div>
                   )}
                 </div>
@@ -897,8 +939,8 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
                         </div>
                       )}
 
-                      {/* Skip option (only for certain stages) */}
-                      {['get_name', 'get_working_on', 'get_challenge'].includes(onboardingState.stage) && (
+                      {/* Skip option (only for welcome stage - skip name entry) */}
+                      {onboardingState.stage === 'welcome' && (
                         <div className="flex items-center justify-center">
                           <button
                             onClick={handleSkip}
@@ -929,13 +971,12 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
             </div>
           </div>
 
-          {/* Progress indicator */}
+          {/* Progress indicator - just 2 dots now */}
           <div className="flex justify-center mt-6 gap-2">
-            {['welcome', 'explain_purpose', 'explain_how', 'ask_ready', 'get_name', 'explain_modes', 'invite_first_question'].map((stage, index) => {
+            {['welcome', 'got_name'].map((stage) => {
               const completedStages = onboardingState.completedStages || []
               const isCompleted = completedStages.includes(stage as OnboardingStage)
-              const isCurrent = onboardingState.stage === stage ||
-                (stage === 'get_name' && ['get_name', 'get_working_on', 'get_challenge'].includes(onboardingState.stage))
+              const isCurrent = onboardingState.stage === stage
               return (
                 <div
                   key={stage}

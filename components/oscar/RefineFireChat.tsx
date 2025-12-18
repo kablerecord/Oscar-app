@@ -34,6 +34,8 @@ import {
   MicOff,
 } from 'lucide-react'
 import { RoutingNotification } from '@/components/oscar/RoutingNotification'
+import { OSCARBubble } from '@/components/oscar/OSCARBubble'
+import { shouldShowOnboarding } from '@/lib/onboarding/oscar-onboarding'
 import { ShareActions } from '@/components/share/ShareActions'
 import { ResponseActions } from '@/components/chat/ResponseActions'
 import {
@@ -107,10 +109,13 @@ interface RefineResult {
   readyToFire: boolean
 }
 
+import type { HighlightTarget } from '@/components/layout/RightPanelBar'
+
 interface RefineFireChatProps {
   workspaceId: string
   onboardingCompleted?: boolean
   userTier?: 'free' | 'pro' | 'master'
+  onHighlightElement?: (target: HighlightTarget) => void
 }
 
 type ResponseMode = 'quick' | 'thoughtful' | 'contemplate' | 'supreme'
@@ -333,7 +338,7 @@ export interface RefineFireChatHandle {
 }
 
 export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatProps>(
-  function RefineFireChat({ workspaceId, onboardingCompleted = false, userTier = 'free' }, ref) {
+  function RefineFireChat({ workspaceId, onboardingCompleted = false, userTier = 'free', onHighlightElement }, ref) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [chatStage, setChatStage] = useState<ChatStage>('input')
@@ -537,7 +542,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         ...getInitialOnboardingState(),
         stage: 'idle',
         hasAskedFirstQuestion: true,
-        completedStages: ['welcome', 'explain_purpose', 'explain_how', 'ask_ready', 'explain_modes', 'invite_first_question', 'post_first_answer'],
+        completedStages: ['welcome', 'got_name'],
       }
     }
     return getInitialOnboardingState()
@@ -547,7 +552,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   useEffect(() => {
     // Check if we just transitioned to 'idle' from an onboarding stage
     // This means the user completed the onboarding flow
-    if (onboardingState.stage === 'idle' && !onboardingCompleted && onboardingState.completedStages.includes('invite_first_question')) {
+    if (onboardingState.stage === 'idle' && !onboardingCompleted && onboardingState.completedStages.includes('got_name')) {
       // Mark onboarding as completed in the database
       fetch('/api/workspace/onboarding', {
         method: 'POST',
@@ -989,8 +994,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         })
       }
 
-      // Trigger onboarding progress for first question asked (will show post_first_answer stage)
-      setOnboardingState(prev => progressOnboarding(prev, { type: 'asked_question' }))
+      // Trigger onboarding progress for question asked AND answer received
+      // Must be done in single update to avoid race condition with batched state updates
+      setOnboardingState(prev => {
+        const afterQuestion = progressOnboarding(prev, { type: 'asked_question' })
+        return progressOnboarding(afterQuestion, { type: 'answer_received' })
+      })
     } catch (error) {
       console.error('Error asking OSQR:', error)
       setMessages((prev) => {
@@ -2308,6 +2317,19 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         routing={routingNotification}
         onDismiss={() => setRoutingNotification(null)}
       />
+
+      {/* OSQR Onboarding Bubble - shows during onboarding stages */}
+      {shouldShowOnboarding(onboardingState) && (
+        <OSCARBubble
+          onboardingState={onboardingState}
+          onOnboardingProgress={setOnboardingState}
+          workspaceId={workspaceId}
+          onBubbleChat={(message) => {
+            handleDirectFire(message)
+          }}
+          onHighlightElement={onHighlightElement}
+        />
+      )}
     </div>
   )
 })

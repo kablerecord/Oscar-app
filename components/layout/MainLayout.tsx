@@ -115,7 +115,7 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
         style={{ gridArea: 'sidebar' }}
         data-grid-cell="sidebar"
         className={`
-          hidden sm:block overflow-hidden transition-all duration-300
+          hidden sm:block overflow-visible transition-all duration-300
           ${focusMode ? 'blur-[2px] opacity-50 pointer-events-none' : ''}
           ${highlightTarget === 'sidebar' || highlightTarget === 'vault' ? 'ring-4 ring-amber-400 ring-inset rounded-r-xl brightness-110 shadow-lg shadow-amber-400/30 z-[60]' : ''}
         `}
