@@ -17,6 +17,7 @@ import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib
 import { routeQuestion } from '@/lib/ai/model-router'
 import { getCachedContext, getVaultStats } from '@/lib/context/prefetch'
 import { isDevWorkspace, createTimer, analyzeQuestion, logAnalytics, type AnalyticsEvent } from '@/lib/analytics/dev-analytics'
+import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary } from '@/lib/oscar/cross-session-memory'
 
 const RequestSchema = z.object({
   message: z.string().min(1),
@@ -184,6 +185,10 @@ export async function POST(req: NextRequest) {
         model: 'claude-sonnet-4-20250514',
       })
 
+      // Fetch cross-session memory (past conversations)
+      const crossSessionMemory = await getCrossSessionMemory(workspaceId, 5)
+      const memoryContext = formatMemoryForPrompt(crossSessionMemory)
+
       // Build system prompt based on whether we have vault context
       let systemPrompt = `You are OSQR, a friendly and thoughtful AI assistant. Be warm and personable while still being helpful and direct.
 
@@ -193,7 +198,13 @@ Guidelines:
 - If the question is ambiguous, make a reasonable interpretation and answer (don't just ask for clarification unless truly needed)
 - Show genuine interest in helping
 - Avoid robotic or overly formal language
-- Don't explain your reasoning process or why you're answering a certain way`
+- Don't explain your reasoning process or why you're answering a certain way
+- When you know things about the user from past conversations, naturally reference that knowledge when relevant (but don't be creepy about it)`
+
+      // Add cross-session memory context
+      if (memoryContext) {
+        systemPrompt += `\n\n${memoryContext}`
+      }
 
       if (vaultStats) {
         systemPrompt += `\n\nVault Statistics for this user:\n- Documents: ${vaultStats.documentCount}\n- Chunks (searchable pieces): ${vaultStats.chunkCount}\n\nUse these numbers to answer the user's question about their vault.`
@@ -266,6 +277,22 @@ Guidelines:
           },
         }),
       ])
+
+      // Save conversation summary for cross-session memory (async, don't wait)
+      // Build the full conversation including this exchange
+      const fullConversation = [
+        ...(conversationHistory || []),
+        { role: 'user' as const, content: message },
+        { role: 'assistant' as const, content: answer },
+      ]
+      // Only summarize if conversation is substantial (3+ messages)
+      if (fullConversation.length >= 3) {
+        saveConversationSummary({
+          workspaceId,
+          threadId: thread.id,
+          messages: fullConversation,
+        }).catch(err => console.error('[Cross-Session Memory] Save error:', err))
+      }
 
       // Log analytics for dev workspaces (Joe's account)
       // This collects data to optimize the prefetch system
@@ -564,9 +591,17 @@ Guidelines:
 
     // J-1 TIL: Add temporal intelligence insights to context
     const tilContext = await getTILContext(workspaceId, message)
+
+    // Cross-session memory: Add context from past conversations
+    const crossSessionMemory = await getCrossSessionMemory(workspaceId, 5)
+    const memoryContext = formatMemoryForPrompt(crossSessionMemory)
+
     const contextParts = [autoContext.context]
     if (tilContext) {
       contextParts.push(tilContext)
+    }
+    if (memoryContext) {
+      contextParts.push(memoryContext)
     }
     const context = contextParts.filter(Boolean).join('\n\n---\n\n') || undefined
 
@@ -719,6 +754,25 @@ Guidelines:
         })
       } catch (error) {
         console.error('[TIL] Session tracking error:', error)
+      }
+
+      // Cross-session memory: Save conversation summary for future recall
+      try {
+        const fullConversation = [
+          ...(conversationHistory || []),
+          { role: 'user' as const, content: message },
+          { role: 'assistant' as const, content: cleanAnswer },
+        ]
+        // Only summarize if conversation is substantial (3+ messages)
+        if (fullConversation.length >= 3) {
+          await saveConversationSummary({
+            workspaceId,
+            threadId: thread.id,
+            messages: fullConversation,
+          })
+        }
+      } catch (error) {
+        console.error('[Cross-Session Memory] Save error:', error)
       }
     })
 

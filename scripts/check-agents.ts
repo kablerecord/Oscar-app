@@ -1,17 +1,18 @@
-#!/usr/bin/env tsx
-
 import { prisma } from '../lib/db/prisma'
 
 async function main() {
-  const agents = await prisma.agent.findMany({
-    where: { workspaceId: 'default-workspace' },
-    select: { name: true, provider: true, modelName: true, isActive: true }
+  const workspace = await prisma.workspace.findFirst({
+    where: { owner: { email: 'kable-test@osqr.app' } },
+    include: { owner: true }
   })
-
-  console.log('Current agents:')
-  console.table(agents)
-
-  await prisma.$disconnect()
+  console.log('Workspace:', workspace?.id, workspace?.name)
+  
+  if (workspace) {
+    const agents = await prisma.agent.findMany({
+      where: { workspaceId: workspace.id, isActive: true }
+    })
+    console.log('Active agents:', agents.length)
+    agents.forEach(a => console.log(' -', a.name, a.provider))
+  }
 }
-
-main()
+main().finally(() => prisma.$disconnect())

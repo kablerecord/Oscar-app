@@ -53,7 +53,7 @@ async function main() {
     try {
       // Generate embeddings for batch
       const response = await openai.embeddings.create({
-        model: 'text-embedding-3-small', // Cheapest, 1536 dimensions
+        model: 'text-embedding-ada-002', // Same as main app for consistency
         input: batch.map(c => c.content.slice(0, 8000)), // Truncate to avoid token limit
       })
 

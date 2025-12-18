@@ -423,3 +423,23 @@ model UserInsightPreferences {
 
   @@index([userId])
 }
+
+// ============================================
+// Cross-Session Memory for OSQR
+// ============================================
+
+// Stores summaries of conversations for long-term memory
+model ConversationSummary {
+  id          String   @id @default(cuid())
+  workspaceId String
+  threadId    String?  // Optional link to source thread
+  summary     String   // AI-generated summary of the conversation
+  topics      String[] // Key topics discussed (for retrieval)
+  keyFacts    Json?    // Extracted facts: { userName, workingOn, preferences, etc. }
+  messageCount Int     @default(0) // How many messages were summarized
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([workspaceId, createdAt])
+}
