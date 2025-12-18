@@ -777,42 +777,50 @@ Guidelines:
     })
 
     // Optionally save panel discussion for transparency/debugging
+    // Only save if we have real agents (not quick mode's synthetic 'osqr-quick' agent)
     if (includeDebate && response.panelDiscussion) {
       await Promise.all(
-        response.panelDiscussion.map((panelResponse) =>
-          prisma.chatMessage.create({
+        response.panelDiscussion.map((panelResponse) => {
+          // Only include agentId if it's a real agent from the database
+          const realAgent = agents.find((a) => a.id === panelResponse.agentId)
+          return prisma.chatMessage.create({
             data: {
               threadId: thread.id,
               role: 'assistant',
-              agentId: panelResponse.agentId,
-              provider: agents.find((a) => a.id === panelResponse.agentId)?.provider,
+              // Only set agentId if it's a real database agent (not 'osqr-quick' etc)
+              agentId: realAgent ? panelResponse.agentId : undefined,
+              provider: realAgent?.provider,
               content: panelResponse.content || `Error: ${panelResponse.error}`,
               metadata: {
                 isPanelMember: true,
                 phase: 'initial',
+                // Store synthetic agent info in metadata for display purposes
+                syntheticAgentId: realAgent ? undefined : panelResponse.agentId,
               },
             },
           })
-        )
+        })
       )
 
       if (response.roundtableDiscussion) {
         await Promise.all(
-          response.roundtableDiscussion.map((panelResponse) =>
-            prisma.chatMessage.create({
+          response.roundtableDiscussion.map((panelResponse) => {
+            const realAgent = agents.find((a) => a.id === panelResponse.agentId)
+            return prisma.chatMessage.create({
               data: {
                 threadId: thread.id,
                 role: 'assistant',
-                agentId: panelResponse.agentId,
-                provider: agents.find((a) => a.id === panelResponse.agentId)?.provider,
+                agentId: realAgent ? panelResponse.agentId : undefined,
+                provider: realAgent?.provider,
                 content: panelResponse.content || `Error: ${panelResponse.error}`,
                 metadata: {
                   isPanelMember: true,
                   phase: 'roundtable',
+                  syntheticAgentId: realAgent ? undefined : panelResponse.agentId,
                 },
               },
             })
-          )
+          })
         )
       }
     }

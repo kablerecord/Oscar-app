@@ -119,26 +119,7 @@ interface RefineFireChatProps {
 }
 
 type ResponseMode = 'quick' | 'thoughtful' | 'contemplate' | 'supreme'
-type ChatStage = 'input' | 'gating' | 'gatekeeper-prompt' | 'refining' | 'refined' | 'firing' | 'complete'
-
-// Gatekeeper classification result
-interface GatekeeperResult {
-  question: string
-  selectedMode: ResponseMode
-  scores: {
-    clarity: number
-    intentDepth: number
-    knowledgeRequirement: number
-    consequenceWeight: number
-  }
-  totalScore: number
-  recommendation: 'quick' | 'refine' | 'fire' | 'suggest_thoughtful'
-  reasoning: string
-  refinedVersions?: {
-    precision: string
-    bigPicture: string
-  } | null
-}
+type ChatStage = 'input' | 'refining' | 'refined' | 'firing' | 'complete'
 
 // Question complexity detection
 interface ComplexityAnalysis {
@@ -530,8 +511,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [showRefinementHints, setShowRefinementHints] = useState(true)
   const [justDismissedHints, setJustDismissedHints] = useState(false)
 
-  // Gatekeeper state
-  const [gatekeeperResult, setGatekeeperResult] = useState<GatekeeperResult | null>(null)
   const [autoDowngradedQuestion, setAutoDowngradedQuestion] = useState<string | null>(null)
 
   // OSCAR bubble onboarding state
@@ -750,94 +729,15 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     }
   }, [workspaceId])
 
-  // STEP 0: Gatekeeper - classify question before allowing expensive modes
-  const handleGatekeeper = async () => {
+  // Simplified: Just send the question directly based on mode
+  // Quick mode: direct fire, Thoughtful/Contemplate: go through panel
+  const handleSend = async () => {
     if (!input.trim() || isLoading) return
 
     const userQuestion = input.trim()
 
-    // Quick mode always bypasses gatekeeper
-    if (responseMode === 'quick') {
-      handleDirectFire(userQuestion)
-      return
-    }
-
-    setChatStage('gating')
-    setIsLoading(true)
-
-    try {
-      const response = await fetch('/api/oscar/classify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          question: userQuestion,
-          selectedMode: responseMode,
-        }),
-      })
-
-      if (!response.ok) {
-        // If gatekeeper fails, fall through to normal refine flow
-        console.warn('Gatekeeper failed, proceeding with refine')
-        handleRefine()
-        return
-      }
-
-      const data: GatekeeperResult = await response.json()
-      setGatekeeperResult(data)
-
-      // Handle the recommendation
-      if (data.recommendation === 'fire') {
-        // Question is deep enough, proceed to refine or fire
-        handleRefine()
-      } else if (data.recommendation === 'quick') {
-        // Question is too shallow - auto-answer in Quick mode silently
-        // Track that we auto-downgraded so we can offer "go deeper" after
-        setAutoDowngradedQuestion(userQuestion)
-        setResponseMode('quick')
-        handleDirectFire(userQuestion)
-      } else if (data.recommendation === 'refine') {
-        // Question needs refinement - show refinement options
-        setChatStage('gatekeeper-prompt')
-        setIsLoading(false)
-      } else if (data.recommendation === 'suggest_thoughtful') {
-        // Contemplate overkill, suggest Thoughtful
-        setChatStage('gatekeeper-prompt')
-        setIsLoading(false)
-      }
-    } catch (error) {
-      console.error('Gatekeeper error:', error)
-      // Fallback: proceed with normal refine flow
-      handleRefine()
-    }
-  }
-
-  // Handle gatekeeper actions
-  const handleGatekeeperAction = (action: 'refine' | 'quick' | 'fire' | 'use-precision' | 'use-bigpicture' | 'switch-thoughtful') => {
-    if (!gatekeeperResult) return
-
-    if (action === 'quick') {
-      setResponseMode('quick')
-      handleDirectFire(gatekeeperResult.question)
-    } else if (action === 'fire') {
-      // User insists, proceed with their chosen mode
-      handleRefine()
-    } else if (action === 'refine') {
-      // User wants to refine themselves
-      setChatStage('input')
-      setGatekeeperResult(null)
-      setIsLoading(false)
-    } else if (action === 'use-precision' && gatekeeperResult.refinedVersions?.precision) {
-      setInput(gatekeeperResult.refinedVersions.precision)
-      setChatStage('input')
-      setGatekeeperResult(null)
-    } else if (action === 'use-bigpicture' && gatekeeperResult.refinedVersions?.bigPicture) {
-      setInput(gatekeeperResult.refinedVersions.bigPicture)
-      setChatStage('input')
-      setGatekeeperResult(null)
-    } else if (action === 'switch-thoughtful') {
-      setResponseMode('thoughtful')
-      handleRefine()
-    }
+    // All modes now just fire directly - OSQR can ask clarifying questions naturally in its response
+    handleDirectFire(userQuestion)
   }
 
   // STEP 1: Refine the question
@@ -1046,8 +946,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       if (chatStage === 'input' || chatStage === 'complete') {
-        // Route through gatekeeper for Thoughtful/Contemplate
-        handleGatekeeper()
+        handleSend()
       }
     }
   }
@@ -1056,7 +955,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const handleStartOver = () => {
     setChatStage('input')
     setRefineResult(null)
-    setGatekeeperResult(null)
     setAutoDowngradedQuestion(null)
     setRefinedQuestion('')
     setClarifyingAnswers([])
@@ -1175,154 +1073,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
               <p className="text-sm text-slate-500 max-w-sm">
                 Ask OSQR anything below, or click the OSQR bubble to continue your conversation with him there.
               </p>
-            </div>
-          )}
-
-          {/* Gating indicator */}
-          {chatStage === 'gating' && (
-            <div className="relative flex h-full flex-col items-center justify-center text-center animate-fade-in">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-500/10 ring-1 ring-blue-500/20 mb-4">
-                <Loader2 className="h-8 w-8 text-blue-400 animate-spin" />
-              </div>
-              <p className="text-slate-400">Evaluating question depth...</p>
-            </div>
-          )}
-
-          {/* Gatekeeper Prompt */}
-          {chatStage === 'gatekeeper-prompt' && gatekeeperResult && (
-            <div className="relative flex h-full flex-col items-center justify-center animate-fade-in">
-              <Card className="max-w-xl w-full bg-slate-800/80 border-slate-700/50 p-6">
-                {/* Header with score visualization */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/10 ring-1 ring-blue-500/20">
-                      <Target className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <span className="font-semibold text-slate-200">Question Analysis</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-xs text-slate-500">Depth Score:</span>
-                    <span className={`text-sm font-bold ${
-                      gatekeeperResult.totalScore >= 9 ? 'text-purple-400' :
-                      gatekeeperResult.totalScore >= 6 ? 'text-blue-400' :
-                      'text-amber-400'
-                    }`}>
-                      {gatekeeperResult.totalScore}/12
-                    </span>
-                  </div>
-                </div>
-
-                {/* User's question */}
-                <div className="mb-4 p-3 rounded-lg bg-slate-700/50 border border-slate-600/50">
-                  <p className="text-sm text-slate-300">"{gatekeeperResult.question}"</p>
-                </div>
-
-                {/* Reasoning */}
-                <p className="text-sm text-slate-400 mb-5">{gatekeeperResult.reasoning}</p>
-
-                {/* Actions based on recommendation */}
-                {gatekeeperResult.recommendation === 'quick' && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-slate-300 mb-3">
-                      I can answer this instantly in <span className="text-amber-400 font-medium">Quick</span> mode, or we can explore deeper. What's your goal?
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => handleGatekeeperAction('quick')}
-                        className="bg-amber-500 hover:bg-amber-600 text-white"
-                      >
-                        <Zap className="h-4 w-4 mr-1.5" />
-                        Answer in Quick Mode
-                      </Button>
-                      <Button
-                        onClick={() => handleGatekeeperAction('refine')}
-                        variant="outline"
-                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
-                      >
-                        Let me refine my question
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {gatekeeperResult.recommendation === 'refine' && gatekeeperResult.refinedVersions && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-slate-300 mb-3">
-                      Here are two stronger versions of your question:
-                    </p>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => handleGatekeeperAction('use-precision')}
-                        className="w-full text-left p-3 rounded-lg bg-slate-700/50 border border-slate-600/50 hover:border-blue-500/50 hover:bg-slate-700 transition-all group"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Target className="h-3.5 w-3.5 text-blue-400" />
-                          <span className="text-xs font-medium text-blue-400">Precision</span>
-                        </div>
-                        <p className="text-sm text-slate-300 group-hover:text-slate-100">
-                          {gatekeeperResult.refinedVersions.precision}
-                        </p>
-                      </button>
-                      <button
-                        onClick={() => handleGatekeeperAction('use-bigpicture')}
-                        className="w-full text-left p-3 rounded-lg bg-slate-700/50 border border-slate-600/50 hover:border-purple-500/50 hover:bg-slate-700 transition-all group"
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Sparkles className="h-3.5 w-3.5 text-purple-400" />
-                          <span className="text-xs font-medium text-purple-400">Big Picture</span>
-                        </div>
-                        <p className="text-sm text-slate-300 group-hover:text-slate-100">
-                          {gatekeeperResult.refinedVersions.bigPicture}
-                        </p>
-                      </button>
-                    </div>
-                    <div className="flex gap-2 mt-4 pt-3 border-t border-slate-700/50">
-                      <Button
-                        onClick={() => handleGatekeeperAction('fire')}
-                        variant="ghost"
-                        size="sm"
-                        className="text-slate-400 hover:text-slate-200"
-                      >
-                        Use my original question anyway
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {gatekeeperResult.recommendation === 'suggest_thoughtful' && (
-                  <div className="space-y-3">
-                    <p className="text-sm text-slate-300 mb-3">
-                      This question would get a great answer in <span className="text-blue-400 font-medium">Thoughtful</span> mode.
-                      <span className="text-purple-400 font-medium"> Contemplate</span> mode is best for high-stakes decisions.
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        onClick={() => handleGatekeeperAction('switch-thoughtful')}
-                        className="bg-blue-500 hover:bg-blue-600 text-white"
-                      >
-                        <Lightbulb className="h-4 w-4 mr-1.5" />
-                        Use Thoughtful Mode
-                      </Button>
-                      <Button
-                        onClick={() => handleGatekeeperAction('fire')}
-                        variant="outline"
-                        className="border-purple-500/50 text-purple-400 hover:bg-purple-500/10"
-                      >
-                        <GraduationCap className="h-4 w-4 mr-1.5" />
-                        Proceed with Contemplate
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Cancel option */}
-                <button
-                  onClick={handleStartOver}
-                  className="cursor-pointer mt-4 text-xs text-slate-500 hover:text-slate-400 transition-colors"
-                >
-                  ← Start over
-                </button>
-              </Card>
             </div>
           )}
 
@@ -1714,23 +1464,23 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           {/* Refine Card - Shows after refinement */}
           {chatStage === 'refined' && refineResult && !refineResult.readyToFire && (
             <div ref={refineCardRef} className="mx-auto max-w-2xl">
-              <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/20">
+              <Card className="border-amber-500/30 bg-slate-800/90 dark:border-amber-500/30 dark:bg-slate-800/90">
                 <CardContent className="p-6">
                   <div className="flex items-center gap-2 mb-4">
-                    <Target className="h-5 w-5 text-amber-600" />
-                    <h3 className="font-semibold text-neutral-900 dark:text-neutral-100">Let's sharpen your question</h3>
+                    <Target className="h-5 w-5 text-amber-500" />
+                    <h3 className="font-semibold text-white">Let's sharpen your question</h3>
                   </div>
 
                   {/* Analysis */}
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4">{refineResult.analysis}</p>
+                  <p className="text-sm text-slate-300 mb-4">{refineResult.analysis}</p>
 
                   {/* Clarifying Questions */}
                   {refineResult.clarifyingQuestions.length > 0 && (
                     <div className="space-y-3 mb-4">
-                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Quick clarifications:</p>
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Quick clarifications:</p>
                       {refineResult.clarifyingQuestions.map((q, idx) => (
                         <div key={idx} className="space-y-1">
-                          <label className="text-sm text-neutral-700 dark:text-neutral-300">{q}</label>
+                          <label className="text-sm text-slate-200">{q}</label>
                           <input
                             type="text"
                             placeholder="Your answer (optional)..."
@@ -1740,7 +1490,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                               newAnswers[idx] = e.target.value
                               setClarifyingAnswers(newAnswers)
                             }}
-                            className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-700"
+                            className="w-full px-3 py-2 text-sm border rounded-md bg-white dark:bg-slate-800 border-neutral-200 dark:border-slate-600 text-neutral-900 dark:text-white placeholder:text-neutral-400 dark:placeholder:text-slate-400"
                           />
                         </div>
                       ))}
@@ -1749,12 +1499,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
                   {/* Suggested Refinement */}
                   <div className="space-y-2 mb-4">
-                    <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Refined question:</p>
+                    <p className="text-xs font-medium text-slate-400 uppercase tracking-wide">Refined question:</p>
                     <Textarea
                       value={refinedQuestion}
                       onChange={(e) => setRefinedQuestion(e.target.value)}
                       rows={3}
-                      className="bg-white dark:bg-neutral-900"
+                      className="bg-white dark:bg-slate-800 text-neutral-900 dark:text-white border-neutral-200 dark:border-slate-600"
                     />
                   </div>
 
@@ -1820,7 +1570,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                           responseMode === 'quick'
                             ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
                             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         <Zap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'quick' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
                         <span className="hidden sm:inline">Quick</span>
@@ -1851,7 +1601,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                           responseMode === 'thoughtful'
                             ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
                             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
                         <Lightbulb className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'thoughtful' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
                         <span className="hidden sm:inline">Thoughtful</span>
@@ -1882,9 +1632,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                           setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'contemplate' }))
                         }}
                         disabled={isLoading}
-                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial cursor-pointer ${
                           !canUseContemplate
-                            ? 'text-slate-500 opacity-60 cursor-pointer'
+                            ? 'text-slate-500 opacity-60'
                             : responseMode === 'contemplate'
                               ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
                               : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
@@ -1919,21 +1669,29 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                   </Tooltip>
                 </div>
 
-                {/* Group 2: Panel (standalone) */}
+                {/* Group 2: Council (standalone) */}
                 <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => setShowDebug(!showDebug)}
+                        onClick={() => {
+                          const newShowDebug = !showDebug
+                          setShowDebug(newShowDebug)
+                          // When enabling Council, upgrade Quick mode to Thoughtful
+                          // (Quick has no panel debate to show)
+                          if (newShowDebug && responseMode === 'quick') {
+                            setResponseMode('thoughtful')
+                          }
+                        }}
                         disabled={isLoading}
                         className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
                           showDebug
                             ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.02]'
                             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
-                        <PanelRight className={`h-4 w-4 transition-transform duration-300 ${showDebug ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                        <span className="hidden sm:inline">Panel</span>
+                        <Users className={`h-4 w-4 transition-transform duration-300 ${showDebug ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                        <span className="hidden sm:inline">Council</span>
                         {showDebug && (
                           <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1943,8 +1701,8 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                       </button>
                     </TooltipTrigger>
                     <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
-                      <p className="font-medium text-emerald-400">Debug Panel</p>
-                      <p className="text-xs text-slate-400">Show the thinking process and refinement steps</p>
+                      <p className="font-medium text-emerald-400">Council Mode</p>
+                      <p className="text-xs text-slate-400">Watch multiple AI perspectives debate and refine the answer</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -1970,9 +1728,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                           setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'supreme' }))
                         }}
                         disabled={isLoading}
-                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial cursor-pointer ${
                           !hasEarnedSupreme
-                            ? 'text-slate-500/70 cursor-pointer hover:text-slate-400'
+                            ? 'text-slate-500/70 hover:text-slate-400'
                             : responseMode === 'supreme'
                               ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-lg shadow-rose-500/30 scale-[1.02]'
                               : 'text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10'
@@ -2130,7 +1888,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                     // Good question - show Fire button
                     return (
                       <Button
-                        onClick={() => handleGatekeeper()}
+                        onClick={() => handleSend()}
                         disabled={isLoading || !input.trim()}
                         size="lg"
                         className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
@@ -2149,7 +1907,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                     // Simple/unrefined question - show Send button
                     return (
                       <Button
-                        onClick={() => handleGatekeeper()}
+                        onClick={() => handleSend()}
                         disabled={isLoading || !input.trim()}
                         size="lg"
                         className="flex-1 sm:flex-initial px-4 sm:px-6"
@@ -2170,12 +1928,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                   if (showFireButton) {
                     return (
                       <Button
-                        onClick={handleGatekeeper}
-                        disabled={isLoading || !input.trim() || chatStage === 'gatekeeper-prompt'}
+                        onClick={handleSend}
+                        disabled={isLoading || !input.trim()}
                         size="lg"
                         className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
                       >
-                        {isLoading && (chatStage === 'refining' || chatStage === 'gating') ? (
+                        {isLoading && (chatStage === 'refining') ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <>
@@ -2190,12 +1948,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                     // Note: chatStage can't be 'refined' here since that's handled by showFireButton
                     return (
                       <Button
-                        onClick={handleGatekeeper}
-                        disabled={isLoading || !input.trim() || chatStage === 'gatekeeper-prompt'}
+                        onClick={handleSend}
+                        disabled={isLoading || !input.trim()}
                         size="lg"
                         className="flex-1 sm:flex-initial px-4 sm:px-6"
                       >
-                        {isLoading && (chatStage === 'refining' || chatStage === 'gating') ? (
+                        {isLoading && (chatStage === 'refining') ? (
                           <Loader2 className="h-5 w-5 animate-spin" />
                         ) : (
                           <>
