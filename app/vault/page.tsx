@@ -33,10 +33,10 @@ export default async function VaultPage() {
       <MainLayout user={{ name: 'Guest', email: 'guest@example.com' }} workspaceName="No Workspace">
         <div className="flex h-[60vh] items-center justify-center">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-100">
+            <h2 className="text-2xl font-bold text-slate-100">
               No Workspace Found
             </h2>
-            <p className="mt-2 text-neutral-600 dark:text-neutral-400">
+            <p className="mt-2 text-slate-400">
               Please run: npm run db:seed
             </p>
           </div>
@@ -71,14 +71,21 @@ export default async function VaultPage() {
   }
 
   return (
-    <MainLayout user={user} workspaceName={workspace.name}>
+    <MainLayout
+      user={user}
+      workspaceName={workspace.name}
+      workspaceId={workspace.id}
+      showMSC={true}
+      pageTitle="Memory Vault"
+      pageDescription="Your personal knowledge base for OSQR"
+    >
       <VaultPageClient workspaceId={workspace.id}>
         {/* Stats overview */}
         <VaultStats totalDocuments={totalDocuments} />
 
         {/* Document list */}
         <div className="pt-4">
-          <h2 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100 mb-4">
+          <h2 className="text-lg font-semibold text-slate-100 mb-4">
             All Documents
           </h2>
           <DocumentList

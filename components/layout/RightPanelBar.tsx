@@ -40,6 +40,7 @@ interface RightPanelBarProps {
   onAskOSQR?: (prompt: string) => void
   onHighlightElement?: (target: HighlightTarget) => void
   highlightTarget?: HighlightTarget
+  onExpandedChange?: (expanded: boolean) => void
 }
 
 interface SidebarData {
@@ -167,8 +168,14 @@ function getCapabilityLabel(level: number): { label: string; description: string
   return labels[Math.min(level, labels.length - 1)] || labels[0]
 }
 
-export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, highlightTarget }: RightPanelBarProps) {
-  const [activeSection, setActiveSection] = useState<PanelSection>(null)
+export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, highlightTarget, onExpandedChange }: RightPanelBarProps) {
+  const [activeSection, setActiveSectionState] = useState<PanelSection>(null)
+
+  // Wrapper to notify parent when panel expands/collapses
+  const setActiveSection = (section: PanelSection) => {
+    setActiveSectionState(section)
+    onExpandedChange?.(section !== null)
+  }
   const [data, setData] = useState<SidebarData | null>(null)
   const [mscItemCount, setMscItemCount] = useState(0)
   const [hasUnseenChanges, setHasUnseenChanges] = useState<Record<string, boolean>>({})
@@ -177,7 +184,7 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
   const [showAddPicker, setShowAddPicker] = useState(false)
 
   // New tips highlight system
-  const { setHighlightId } = useTipsHighlight()
+  const { highlightId, setHighlightId } = useTipsHighlight()
 
   // OSQR proactive insights state
   const [pendingInsight, setPendingInsight] = useState<PendingInsight | null>(null)
@@ -357,6 +364,9 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
 
   // Mark section as seen when opened
   const openSection = (section: PanelSection) => {
+    // Clear any active highlight to avoid CSS interference
+    setHighlightId(null)
+
     if (activeSection === section) {
       setActiveSection(null)
     } else {
@@ -391,20 +401,23 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
 
   return (
     <>
-      {/* Backdrop when drawer is open */}
-      {activeSection && (
+      {/* Backdrop when drawer is open (not for tips - it has its own highlight overlay) */}
+      {activeSection && activeSection !== 'tips' && (
         <div
           className="fixed inset-0 z-30 bg-black/20 lg:bg-transparent"
           onClick={handleBackdropClick}
         />
       )}
 
-      {/* Main container */}
-      <div className="fixed right-0 top-16 bottom-0 z-40 flex">
-        {/* Slide-out drawer */}
+      {/* Main container - w-14 matches icon bar, drawer overflows to the left */}
+      <div className={cn(
+        "h-full w-14 relative",
+        activeSection === 'tips' ? "z-[10000]" : "z-40"
+      )} data-tips-panel="true">
+        {/* Slide-out drawer - positioned absolutely to overflow left without affecting icon bar */}
         <div
           className={cn(
-            'h-full bg-gradient-to-b from-slate-900 to-slate-950 border-l border-slate-700/50 shadow-2xl transition-all duration-300 ease-out overflow-hidden',
+            'absolute top-0 right-14 h-full bg-gradient-to-b from-slate-900 to-slate-950 border-l border-slate-700/50 shadow-2xl transition-all duration-300 ease-out overflow-hidden',
             activeSection ? 'w-80' : 'w-0'
           )}
         >
@@ -779,7 +792,7 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
                     <h4 className="font-semibold text-xs text-white">Status</h4>
                   </div>
                   <p className="text-xs text-slate-400">
-                    {pendingInsight ? 'OSQR has something to share with you' : 'OSQR is watching and learning. When something comes up, the icon will pulse.'}
+                    {pendingInsight ? 'OSQR has something to share with you' : 'OSQR is learning. When something comes up, the icon will pulse.'}
                   </p>
                 </div>
               </div>
@@ -809,7 +822,10 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Getting Started - The Panel */}
                 <div
-                  className="rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-blue-400/50 hover:border-blue-400/50"
+                  className={cn(
+                    "rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-4 cursor-pointer",
+                    highlightId === 'panel-main' && "ring-2 ring-blue-400/50"
+                  )}
                   onMouseEnter={() => setHighlightId('panel-main')}
                   onMouseLeave={() => setHighlightId(null)}
                 >
@@ -825,7 +841,10 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
 
                 {/* Command Center Tip */}
                 <div
-                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-blue-400/50 hover:border-blue-400/50"
+                  className={cn(
+                    "rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer",
+                    highlightId === 'command-center-icon' && "ring-2 ring-blue-400/50"
+                  )}
                   onMouseEnter={() => setHighlightId('command-center-icon')}
                   onMouseLeave={() => setHighlightId(null)}
                 >
@@ -840,7 +859,10 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
 
                 {/* Memory Vault Tip */}
                 <div
-                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-purple-400/50 hover:border-purple-400/50"
+                  className={cn(
+                    "rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer",
+                    highlightId === 'vault-link' && "ring-2 ring-purple-400/50"
+                  )}
                   onMouseEnter={() => setHighlightId('vault-link')}
                   onMouseLeave={() => setHighlightId(null)}
                 >
@@ -855,7 +877,10 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
 
                 {/* Chat Input Tip */}
                 <div
-                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-cyan-400/50 hover:border-cyan-400/50"
+                  className={cn(
+                    "rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer",
+                    highlightId === 'chat-input' && "ring-2 ring-cyan-400/50"
+                  )}
                   onMouseEnter={() => setHighlightId('chat-input')}
                   onMouseLeave={() => setHighlightId(null)}
                 >
@@ -870,7 +895,10 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
 
                 {/* Focus Mode Tip */}
                 <div
-                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-orange-400/50 hover:border-orange-400/50"
+                  className={cn(
+                    "rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer",
+                    highlightId === 'focus-mode-toggle' && "ring-2 ring-orange-400/50"
+                  )}
                   onMouseEnter={() => setHighlightId('focus-mode-toggle')}
                   onMouseLeave={() => setHighlightId(null)}
                 >
@@ -885,7 +913,10 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
 
                 {/* Sidebar Tip */}
                 <div
-                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-slate-400/50 hover:border-slate-400/50"
+                  className={cn(
+                    "rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer",
+                    highlightId === 'sidebar' && "ring-2 ring-slate-400/50"
+                  )}
                   onMouseEnter={() => setHighlightId('sidebar')}
                   onMouseLeave={() => setHighlightId(null)}
                 >
@@ -897,13 +928,34 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
                     Access your conversation threads, Memory Vault, settings, and more from the left sidebar. Collapse it for more screen space.
                   </p>
                 </div>
+
+                {/* Right Panel Bar Tip */}
+                <div
+                  className={cn(
+                    "rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer",
+                    highlightId === 'right-panel-bar' && "ring-2 ring-blue-400/50"
+                  )}
+                  onMouseEnter={() => setHighlightId('right-panel-bar')}
+                  onMouseLeave={() => setHighlightId(null)}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <ChevronRight className="h-4 w-4 text-blue-400" />
+                    <h4 className="font-semibold text-sm text-white">Command Sidebar</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Quick access to your Command Center, stats, knowledge score, streak, and OSQR insights. Each icon expands into a detailed panel.
+                  </p>
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Icon bar */}
-        <div className="w-14 h-full border-l border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center py-4 gap-2">
+        {/* Icon bar - absolute positioned at right edge, always clickable */}
+        <div
+          data-highlight-id="right-panel-bar"
+          className="absolute top-0 right-0 z-10 w-14 h-full border-l border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center py-4 gap-2"
+        >
           {/* Command Center - shows item count (always visible) */}
           <div className={cn(
             "relative group transition-all duration-300",
@@ -916,7 +968,7 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
                 'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
                 'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20',
                 activeSection === 'command' && 'ring-2 ring-blue-400/50 bg-blue-500/20',
-                highlightTarget === 'command-center' && 'ring-4 ring-blue-400 bg-blue-500/30 brightness-125 shadow-lg shadow-blue-500/30'
+                highlightTarget === 'command-center' && 'ring-4 ring-amber-400 bg-amber-500/20 brightness-125 shadow-lg shadow-amber-400/30'
               )}
             >
               <Zap className="h-4 w-4 text-blue-400" />

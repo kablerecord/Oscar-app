@@ -1130,7 +1130,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   }
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] gap-0">
+    <div className="flex h-full min-h-[500px] gap-0">
       {/* Main chat area */}
       <div className={`flex flex-col flex-1 transition-all duration-300 ${showArtifacts ? 'mr-0' : ''}`}>
         {/* Messages area */}
@@ -1353,12 +1353,19 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                     </div>
                     <Card className="bg-slate-700/50 border-slate-600/50 p-4">
                       {message.thinking ? (
-                        <div className="flex items-center space-x-2 text-sm text-slate-400">
-                          <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                        <div className="flex items-center space-x-3 text-sm text-slate-400">
+                          {/* Tri-color thinking dots - matches OSQR's 3 agents */}
+                          <div className="flex items-center space-x-1">
+                            <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce shadow-sm shadow-blue-500/50" style={{ animationDelay: '0ms', animationDuration: '0.8s' }} />
+                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-bounce shadow-sm shadow-emerald-500/50" style={{ animationDelay: '150ms', animationDuration: '0.8s' }} />
+                            <div className="h-2 w-2 rounded-full bg-purple-500 animate-bounce shadow-sm shadow-purple-500/50" style={{ animationDelay: '300ms', animationDuration: '0.8s' }} />
+                          </div>
                           <span>
-                            {responseMode === 'quick' && 'Quick response - consulting expert...'}
-                            {responseMode === 'thoughtful' && 'Consulting panel and synthesizing...'}
+                            {responseMode === 'quick' && 'Quick response incoming...'}
+                            {responseMode === 'thoughtful' && 'Panel is deliberating...'}
                             {responseMode === 'contemplate' && 'Deep analysis in progress...'}
+                            {responseMode === 'supreme' && 'Supreme Council convening...'}
+                            {!responseMode && 'Thinking...'}
                           </span>
                         </div>
                       ) : (

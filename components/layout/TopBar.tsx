@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Search, User, Menu, Brain } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -40,17 +41,28 @@ interface TopBarProps {
   activeBadge?: UserBadge | null // The badge to display next to user icon
   pageTitle?: string // Current page title (e.g., "The Panel")
   pageDescription?: string // Current page description
+  sidebarCollapsed?: boolean // Whether the sidebar is collapsed
 }
 
-export function TopBar({ user, onMenuClick, activeBadge, pageTitle, pageDescription }: TopBarProps) {
+export function TopBar({ user, onMenuClick, activeBadge, pageTitle, pageDescription, sidebarCollapsed = false }: TopBarProps) {
   const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState('')
 
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/login' })
   }
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      // Navigate to panel with search query pre-filled
+      router.push(`/panel?q=${encodeURIComponent(searchQuery.trim())}`)
+      setSearchQuery('')
+    }
+  }
+
   return (
-    <header className="fixed left-0 lg:left-64 right-0 top-0 z-[100] h-16 border-b border-slate-700/50 bg-slate-900">
+    <header className="h-full w-full border-b border-slate-700/50 bg-slate-900 shadow-md shadow-slate-950/50">
       <div className="flex h-full items-center justify-between px-4 sm:px-6">
         {/* Left: Hamburger menu (mobile) + Workspace selector */}
         <div className="flex items-center space-x-3 sm:space-x-4">
@@ -86,19 +98,26 @@ export function TopBar({ user, onMenuClick, activeBadge, pageTitle, pageDescript
         </div>
 
         {/* Center: Search bar - hidden on mobile */}
-        <div className="hidden md:block relative w-64 lg:w-96">
+        <form onSubmit={handleSearch} className="hidden md:block relative w-64 lg:w-96">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type="search"
-            placeholder="Search..."
+            placeholder="Ask OSQR anything..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
-        </div>
+        </form>
 
         {/* Right: Focus Mode + User menu */}
         <div className="flex items-center space-x-2 sm:space-x-3">
-          {/* Mobile search button */}
-          <Button variant="ghost" size="icon" className="md:hidden rounded-full">
+          {/* Mobile search button - goes to panel */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden rounded-full"
+            onClick={() => router.push('/panel')}
+          >
             <Search className="h-5 w-5" />
           </Button>
 

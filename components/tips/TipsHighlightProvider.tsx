@@ -1,11 +1,12 @@
 'use client'
 
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react'
 
 // All highlightable elements in the app
 export type HighlightId =
   | 'panel-main' // Main chat panel area
   | 'command-center-icon' // Command Center icon in right panel bar
+  | 'right-panel-bar' // Right panel bar (Command Center sidebar)
   | 'sidebar' // Left sidebar
   | 'vault-link' // Memory Vault link in sidebar
   | 'focus-mode-toggle' // Focus mode toggle in top bar
@@ -39,12 +40,34 @@ interface TipsHighlightProviderProps {
 
 export function TipsHighlightProvider({ children }: TipsHighlightProviderProps) {
   const [highlightId, setHighlightIdState] = useState<HighlightId>(null)
+  const currentHighlightRef = useRef<HighlightId>(null)
+  const clearTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const setHighlightId = useCallback((id: HighlightId) => {
+    // Clear any pending timeout to clear highlight
+    if (clearTimeoutRef.current) {
+      clearTimeout(clearTimeoutRef.current)
+      clearTimeoutRef.current = null
+    }
+
+    // If setting to null, delay slightly to prevent flicker
+    if (id === null) {
+      clearTimeoutRef.current = setTimeout(() => {
+        if (currentHighlightRef.current !== null) {
+          currentHighlightRef.current = null
+          setHighlightIdState(null)
+        }
+      }, 50)
+      return
+    }
+
+    // Prevent unnecessary re-renders if same value
+    if (currentHighlightRef.current === id) return
+    currentHighlightRef.current = id
     setHighlightIdState(id)
   }, [])
 
-  // Apply highlight effect via data attribute
+  // Apply highlight effect via data attribute - direct DOM manipulation for speed
   useEffect(() => {
     // Remove previous highlight
     document.querySelectorAll('[data-tips-highlighted="true"]').forEach(el => {
@@ -56,8 +79,6 @@ export function TipsHighlightProvider({ children }: TipsHighlightProviderProps) 
       const target = document.querySelector(`[data-highlight-id="${highlightId}"]`)
       if (target) {
         target.setAttribute('data-tips-highlighted', 'true')
-        // Scroll into view if needed
-        target.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
       }
     }
   }, [highlightId])
@@ -67,80 +88,43 @@ export function TipsHighlightProvider({ children }: TipsHighlightProviderProps) 
       {children}
       {/* Global styles for highlight effect */}
       <style jsx global>{`
-        [data-tips-highlighted="true"] {
-          position: relative;
-          z-index: 9999 !important;
-          animation: tips-highlight-pulse 1.5s ease-in-out infinite;
-        }
-
-        [data-tips-highlighted="true"]::before {
-          content: '';
-          position: absolute;
-          inset: -8px;
-          border-radius: 16px;
-          background: radial-gradient(ellipse at center, rgba(59, 130, 246, 0.3) 0%, transparent 70%);
-          pointer-events: none;
-          z-index: -1;
-        }
-
-        [data-tips-highlighted="true"]::after {
-          content: '';
-          position: absolute;
-          inset: -4px;
-          border-radius: 12px;
-          border: 2px solid rgba(59, 130, 246, 0.8);
-          box-shadow:
-            0 0 20px 4px rgba(59, 130, 246, 0.5),
-            0 0 40px 8px rgba(59, 130, 246, 0.3),
-            inset 0 0 20px 4px rgba(59, 130, 246, 0.1);
-          pointer-events: none;
-          animation: tips-highlight-ring 1.5s ease-in-out infinite;
-        }
-
-        @keyframes tips-highlight-pulse {
-          0%, 100% {
-            transform: scale(1);
-          }
-          50% {
-            transform: scale(1.02);
-          }
-        }
-
-        @keyframes tips-highlight-ring {
-          0%, 100% {
-            opacity: 1;
-            box-shadow:
-              0 0 20px 4px rgba(59, 130, 246, 0.5),
-              0 0 40px 8px rgba(59, 130, 246, 0.3),
-              inset 0 0 20px 4px rgba(59, 130, 246, 0.1);
-          }
-          50% {
-            opacity: 0.7;
-            box-shadow:
-              0 0 30px 8px rgba(59, 130, 246, 0.6),
-              0 0 60px 16px rgba(59, 130, 246, 0.4),
-              inset 0 0 30px 8px rgba(59, 130, 246, 0.15);
-          }
-        }
-
-        /* Dim overlay when highlighting */
+        /* Dim overlay - using body::before */
         body:has([data-tips-highlighted="true"])::before {
           content: '';
           position: fixed;
           inset: 0;
-          background: rgba(0, 0, 0, 0.5);
-          z-index: 9998;
+          background: rgba(2, 6, 23, 0.85);
+          z-index: 9990;
           pointer-events: none;
-          animation: tips-dim-in 0.3s ease-out;
         }
 
-        @keyframes tips-dim-in {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+        /* Highlighted element - above overlay with glow */
+        [data-tips-highlighted="true"] {
+          position: relative;
+          z-index: 9995 !important;
+          box-shadow:
+            0 0 0 3px rgba(251, 191, 36, 0.9),
+            0 0 20px 4px rgba(251, 191, 36, 0.5),
+            0 0 40px 8px rgba(251, 191, 36, 0.25);
+          border-radius: 12px;
+        }
+
+        /* Grid cells containing highlighted elements need elevated z-index */
+        body:has([data-tips-highlighted="true"]) [data-grid-cell] {
+          z-index: auto;
+        }
+        body:has([data-tips-highlighted="true"]) [data-grid-cell]:has([data-tips-highlighted="true"]) {
+          z-index: 9995 !important;
+        }
+
+        /* Tips panel - always above overlay when highlight is active */
+        body:has([data-tips-highlighted="true"]) [data-tips-panel="true"] {
+          z-index: 10000 !important;
+        }
+
+        /* Right panel grid cell needs high z-index when highlight is active */
+        body:has([data-tips-highlighted="true"]) [data-grid-cell="rightpanel"] {
+          z-index: 10000 !important;
         }
       `}</style>
     </TipsHighlightContext.Provider>

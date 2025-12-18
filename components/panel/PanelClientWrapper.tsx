@@ -30,6 +30,7 @@ export function PanelClientWrapper({
   const chatRef = useRef<RefineFireChatHandle>(null)
   const [highlightTarget, setHighlightTarget] = useState<HighlightTarget>(null)
   const [showSuggestModal, setShowSuggestModal] = useState(false)
+  const [rightPanelExpanded, setRightPanelExpanded] = useState(false)
 
   // Keyboard shortcuts
   const { shortcuts, showShortcutsModal, setShowShortcutsModal } = useKeyboardShortcuts({
@@ -75,8 +76,10 @@ export function PanelClientWrapper({
         onHighlightElement={handleHighlightElement}
         pageTitle="The Panel"
         pageDescription="Ask OSQR anything — refined questions, expert answers"
+        rightPanelExpanded={rightPanelExpanded}
+        onRightPanelExpandedChange={setRightPanelExpanded}
       >
-        <div data-highlight-id="panel-main">
+        <div data-highlight-id="panel-main" className="h-[calc(100vh-8rem)]">
           <RefineFireChat
             ref={chatRef}
             workspaceId={workspaceId}

@@ -24,24 +24,29 @@ interface MainLayoutProps {
   onHighlightElement?: (target: HighlightTarget) => void
   pageTitle?: string
   pageDescription?: string
+  rightPanelExpanded?: boolean
+  onRightPanelExpandedChange?: (expanded: boolean) => void
 }
 
-export function MainLayout({ children, user, workspaceName, workspaceId, showMSC = false, capabilityLevel, onAskOSQR, highlightTarget, onHighlightElement, pageTitle, pageDescription }: MainLayoutProps) {
+// Breakpoint for mobile view (matches Tailwind's 'sm')
+const MOBILE_BREAKPOINT = 640
+
+export function MainLayout({ children, user, workspaceName, workspaceId, showMSC = false, capabilityLevel, onAskOSQR, highlightTarget, onHighlightElement, pageTitle, pageDescription, rightPanelExpanded, onRightPanelExpandedChange }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const { focusMode } = useFocusMode()
 
-  // CSS classes for highlight effect - brighten target, blur background
-  const getHighlightClass = (target: HighlightTarget) => {
-    if (highlightTarget === target) {
-      return 'ring-4 ring-blue-400 ring-offset-2 ring-offset-slate-950 rounded-xl z-[60] relative brightness-110 shadow-lg shadow-blue-500/20'
+  // Track window size for responsive grid
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
     }
-    return ''
-  }
-
-  // Overlay class when something is highlighted (blur everything else, don't darken)
-  const isHighlighting = highlightTarget !== null && highlightTarget !== undefined
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Load collapsed state from localStorage
   useEffect(() => {
@@ -61,12 +66,27 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
     }
   }
 
+  // Calculate grid columns based on state and screen size
+  const leftSidebarWidth = isMobile ? '0px' : (sidebarCollapsed ? '3.5rem' : '16rem') // 56px or 256px
+  // Right panel is always 3.5rem - drawer is absolutely positioned and overflows left
+  const rightPanelWidth = isMobile ? '0px' : (showMSC && workspaceId && !focusMode ? '3.5rem' : '0px')
+
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div
+      className="h-screen overflow-hidden bg-slate-950 grid"
+      style={{
+        gridTemplateRows: '4rem 1fr', // TopBar height, then remaining
+        gridTemplateColumns: `${leftSidebarWidth} 1fr ${rightPanelWidth}`,
+        gridTemplateAreas: `
+          "topbar topbar topbar"
+          "sidebar main rightpanel"
+        `,
+      }}
+    >
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 sm:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -74,20 +94,45 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
       {/* Mobile right panel overlay */}
       {rightPanelOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 sm:hidden"
           onClick={() => setRightPanelOpen(false)}
         />
       )}
 
-      {/* Sidebar - hidden on mobile (slide out), shown on lg+ */}
-      {/* Focus Mode: subtle blur on sidebar when active - keep it visible but muted */}
+      {/* TopBar - spans full width */}
+      <div style={{ gridArea: 'topbar' }} data-grid-cell="topbar" className="z-30">
+        <TopBar
+          user={user}
+          onMenuClick={() => setSidebarOpen(true)}
+          pageTitle={pageTitle}
+          pageDescription={pageDescription}
+          sidebarCollapsed={sidebarCollapsed}
+        />
+      </div>
+
+      {/* Left Sidebar */}
+      <div
+        style={{ gridArea: 'sidebar' }}
+        data-grid-cell="sidebar"
+        className={`
+          hidden sm:block overflow-hidden transition-all duration-300
+          ${focusMode ? 'blur-[2px] opacity-50 pointer-events-none' : ''}
+          ${highlightTarget === 'sidebar' || highlightTarget === 'vault' ? 'ring-4 ring-amber-400 ring-inset rounded-r-xl brightness-110 shadow-lg shadow-amber-400/30 z-[60]' : ''}
+        `}
+      >
+        <Sidebar
+          workspaceId={workspaceId}
+          onClose={() => setSidebarOpen(false)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapsed}
+        />
+      </div>
+
+      {/* Mobile Sidebar - slides in from left */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out
+        fixed inset-y-0 left-0 z-50 sm:hidden transform transition-transform duration-300 ease-in-out
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         ${sidebarCollapsed ? 'w-14' : 'w-64'}
-        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        ${focusMode ? 'lg:blur-[2px] lg:opacity-50 lg:pointer-events-none' : ''}
-        ${isHighlighting && highlightTarget !== 'sidebar' && highlightTarget !== 'vault' ? 'blur-[2px]' : ''}
-        ${highlightTarget === 'sidebar' || highlightTarget === 'vault' ? 'ring-4 ring-blue-400 ring-inset rounded-r-xl z-[60] brightness-110 shadow-lg shadow-blue-500/20' : ''}
       `}>
         <Sidebar
           workspaceId={workspaceId}
@@ -97,65 +142,73 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
         />
       </div>
 
-      <TopBar
-        user={user}
-        onMenuClick={() => setSidebarOpen(true)}
-        pageTitle={pageTitle}
-        pageDescription={pageDescription}
-      />
-
-      {/* Main content area with right panel bar */}
-      {/* ml-0 on mobile, ml-64 (or ml-14 when collapsed) on lg+ */}
-      <div className={`mt-16 flex min-h-[calc(100vh-4rem)] transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-14' : 'lg:ml-64'}`}>
-        <main className={`
-          flex-1 p-4 sm:p-6 transition-all duration-300
-          ${showMSC && workspaceId && !focusMode ? 'lg:mr-14' : ''}
-          ${highlightTarget === 'panel' ? 'relative z-[60]' : ''}
-          ${isHighlighting && highlightTarget !== 'panel' && highlightTarget !== 'modes' && highlightTarget !== 'keyboard' && highlightTarget !== 'profile' ? 'blur-[2px]' : ''}
+      {/* Main Content - fills remaining space */}
+      <main
+        style={{ gridArea: 'main' }}
+        data-grid-cell="main"
+        className={`
+          overflow-y-auto transition-all duration-300
+          ${highlightTarget === 'panel' || highlightTarget === 'modes' || highlightTarget === 'keyboard' || highlightTarget === 'profile' ? 'relative z-[60]' : ''}
+        `}
+      >
+        <div className={`
+          mx-auto max-w-7xl p-4 sm:p-6 transition-all duration-300
+          ${highlightTarget === 'panel' ? 'ring-4 ring-amber-400 ring-offset-4 ring-offset-slate-950 rounded-2xl brightness-110 shadow-lg shadow-amber-400/30' : ''}
         `}>
-          <div className={`
-            mx-auto max-w-7xl transition-all duration-300
-            ${highlightTarget === 'panel' ? 'ring-4 ring-blue-400 ring-offset-4 ring-offset-slate-950 rounded-2xl brightness-110 shadow-lg shadow-blue-500/20' : ''}
-          `}>
-            {children}
-          </div>
-        </main>
+          {children}
+        </div>
+      </main>
 
-        {/* Right Panel Bar - Slide-out on mobile, fixed on lg+ */}
-        {/* Focus Mode: subtle blur on panel when active - keep it visible but muted */}
-        {showMSC && workspaceId && (
-          <div className={`
-            fixed inset-y-0 right-0 z-50 w-14 transform transition-all duration-300 ease-in-out
-            ${rightPanelOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'}
-            ${focusMode ? 'lg:blur-[2px] lg:opacity-50 lg:pointer-events-none' : ''}
-            ${isHighlighting && highlightTarget !== 'command-center' ? 'blur-[2px]' : ''}
+      {/* Right Panel - in grid, not fixed */}
+      {showMSC && workspaceId && (
+        <div
+          style={{ gridArea: 'rightpanel' }}
+          data-grid-cell="rightpanel"
+          className={`
+            hidden sm:block overflow-visible transition-all duration-300
+            ${focusMode ? 'blur-[2px] opacity-50 pointer-events-none' : ''}
             ${highlightTarget === 'command-center' ? 'z-[60] brightness-110' : ''}
-          `}>
-            <RightPanelBar
-              workspaceId={workspaceId}
-              onAskOSQR={onAskOSQR}
-              onHighlightElement={onHighlightElement}
-              highlightTarget={highlightTarget}
-            />
-          </div>
-        )}
-      </div>
+          `}
+        >
+          <RightPanelBar
+            workspaceId={workspaceId}
+            onAskOSQR={onAskOSQR}
+            onHighlightElement={onHighlightElement}
+            highlightTarget={highlightTarget}
+            onExpandedChange={onRightPanelExpandedChange}
+          />
+        </div>
+      )}
 
-      {/* Mobile toggle buttons - shown only on small screens, positioned at top corners */}
-      {/* Left panel toggle - top left, below TopBar */}
+      {/* Mobile Right Panel - slides in from right */}
+      {showMSC && workspaceId && (
+        <div className={`
+          fixed inset-y-0 right-0 z-50 sm:hidden transform transition-transform duration-300 ease-in-out
+          ${rightPanelOpen ? 'translate-x-0' : 'translate-x-full'}
+        `}>
+          <RightPanelBar
+            workspaceId={workspaceId}
+            onAskOSQR={onAskOSQR}
+            onHighlightElement={onHighlightElement}
+            highlightTarget={highlightTarget}
+            onExpandedChange={onRightPanelExpandedChange}
+          />
+        </div>
+      )}
+
+      {/* Mobile toggle buttons - shown only on small screens */}
       <button
         onClick={() => setSidebarOpen(true)}
-        className="fixed top-[72px] left-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/90 text-slate-300 shadow-lg ring-1 ring-slate-700/50 hover:bg-slate-700 hover:text-white transition-colors lg:hidden backdrop-blur-sm"
+        className="fixed top-[72px] left-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-800/90 text-slate-300 shadow-lg ring-1 ring-slate-700/50 hover:bg-slate-700 hover:text-white transition-colors sm:hidden backdrop-blur-sm"
         title="Open navigation"
       >
         <PanelLeftOpen className="h-4 w-4" />
       </button>
 
-      {/* Right panel toggle - top right, below TopBar */}
       {showMSC && workspaceId && (
         <button
           onClick={() => setRightPanelOpen(true)}
-          className="fixed top-[72px] right-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/90 text-white shadow-lg hover:bg-blue-500 transition-colors lg:hidden backdrop-blur-sm"
+          className="fixed top-[72px] right-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/90 text-white shadow-lg hover:bg-blue-500 transition-colors sm:hidden backdrop-blur-sm"
           title="Open command center"
         >
           <PanelRightOpen className="h-4 w-4" />

@@ -219,7 +219,7 @@ export function DocumentList({
       {/* Search */}
       <form onSubmit={handleSearch} className="flex gap-2">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <Input
             type="text"
             placeholder="Search documents..."
@@ -235,15 +235,15 @@ export function DocumentList({
 
       {/* Bulk actions bar - shows when documents exist */}
       {documents.length > 0 && (
-        <div className="flex items-center gap-4 py-2 px-1 border-b border-neutral-200 dark:border-neutral-700">
+        <div className="flex items-center gap-4 py-2 px-1 border-b border-slate-700">
           {/* Select all checkbox */}
           <button
             onClick={toggleSelectAll}
-            className="flex items-center justify-center w-5 h-5 rounded hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer"
+            className="flex items-center justify-center w-5 h-5 rounded hover:bg-slate-800 cursor-pointer"
             title={selectAllState === 'all' ? 'Deselect all' : 'Select all'}
           >
             {selectAllState === 'none' && (
-              <Square className="h-4 w-4 text-neutral-400" />
+              <Square className="h-4 w-4 text-slate-400" />
             )}
             {selectAllState === 'some' && (
               <Minus className="h-4 w-4 text-blue-500" />
@@ -255,7 +255,7 @@ export function DocumentList({
 
           {selectedIds.size > 0 ? (
             <>
-              <span className="text-sm text-neutral-600 dark:text-neutral-300">
+              <span className="text-sm text-slate-300">
                 {selectedIds.size} selected
               </span>
               <Button
@@ -270,7 +270,7 @@ export function DocumentList({
               </Button>
             </>
           ) : (
-            <span className="text-sm text-neutral-500 dark:text-neutral-400">
+            <span className="text-sm text-slate-400">
               Select documents to delete
             </span>
           )}
@@ -281,12 +281,12 @@ export function DocumentList({
       <div className="space-y-2">
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-neutral-300 border-t-blue-600" />
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-600 border-t-blue-500" />
           </div>
         ) : documents.length === 0 ? (
           <Card className="p-8 text-center">
-            <FileText className="mx-auto h-12 w-12 text-neutral-500" />
-            <p className="mt-4 text-neutral-600 dark:text-neutral-400">
+            <FileText className="mx-auto h-12 w-12 text-slate-500" />
+            <p className="mt-4 text-slate-400">
               No documents found
             </p>
           </Card>
@@ -299,8 +299,8 @@ export function DocumentList({
             return (
               <Card
                 key={doc.id}
-                className={`p-4 transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-800/50 ${
-                  isSelected ? 'ring-2 ring-blue-500 bg-blue-50/50 dark:bg-blue-900/20' : ''
+                className={`p-4 transition-colors hover:bg-slate-800/50 ${
+                  isSelected ? 'ring-2 ring-blue-500 bg-blue-900/20' : ''
                 } ${selectedDoc === doc.id ? 'ring-2 ring-purple-500' : ''}`}
               >
                 <div className="flex items-center justify-between">
@@ -308,12 +308,12 @@ export function DocumentList({
                     {/* Checkbox */}
                     <button
                       onClick={() => toggleSelect(doc.id)}
-                      className="flex items-center justify-center w-5 h-5 rounded hover:bg-neutral-200 dark:hover:bg-neutral-700 cursor-pointer flex-shrink-0"
+                      className="flex items-center justify-center w-5 h-5 rounded hover:bg-slate-700 cursor-pointer flex-shrink-0"
                     >
                       {isSelected ? (
                         <CheckSquare className="h-4 w-4 text-blue-500" />
                       ) : (
-                        <Square className="h-4 w-4 text-neutral-400" />
+                        <Square className="h-4 w-4 text-slate-400" />
                       )}
                     </button>
 
@@ -321,10 +321,10 @@ export function DocumentList({
                       <Icon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                      <h3 className="font-medium text-slate-100 truncate">
                         {doc.title}
                       </h3>
-                      <span className="text-sm text-neutral-500 dark:text-neutral-400">
+                      <span className="text-sm text-slate-400">
                         {formatDate(doc.createdAt)}
                       </span>
                     </div>
@@ -356,8 +356,8 @@ export function DocumentList({
 
       {/* Pagination */}
       {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between border-t pt-4">
-          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+        <div className="flex items-center justify-between border-t border-slate-700 pt-4">
+          <p className="text-sm text-slate-400">
             Showing {(pagination.page - 1) * pagination.limit + 1} -{' '}
             {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
             {pagination.total} documents

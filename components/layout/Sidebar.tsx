@@ -286,7 +286,7 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
   // Collapsed mode - icon-only sidebar
   if (isCollapsed) {
     return (
-      <aside data-highlight-id="sidebar" className="fixed left-0 top-0 z-40 h-screen w-14 border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
+      <aside data-highlight-id="sidebar" className="h-full w-full border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
         <div className="flex h-full flex-col items-center">
           {/* Logo - compact */}
           <div className="flex h-16 items-center justify-center border-b border-slate-700/50 w-full">
@@ -419,7 +419,7 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
   }
 
   return (
-    <aside data-highlight-id="sidebar" className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
+    <aside data-highlight-id="sidebar" className="h-full w-full border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
       <div className="flex h-full flex-col">
         {/* Logo / App Name */}
         <div className="flex h-16 items-center justify-between border-b border-slate-700/50 px-6">
