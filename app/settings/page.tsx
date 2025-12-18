@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Database } from 'lucide-react'
+import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2 } from 'lucide-react'
+import { MainLayout } from '@/components/layout/MainLayout'
 
 interface UserData {
   name: string
@@ -218,19 +219,9 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] py-12 px-4">
-      {/* Navigation */}
-      <nav className="max-w-3xl mx-auto mb-8">
-        <Link
-          href="/panel"
-          className="inline-flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to OSQR
-        </Link>
-      </nav>
-
-      <div className="max-w-3xl mx-auto space-y-8">
+    <MainLayout>
+      <div className="min-h-screen bg-[#0a0a0a] py-12 px-4">
+        <div className="max-w-3xl mx-auto space-y-8">
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-white">Settings</h1>
@@ -701,6 +692,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </MainLayout>
   )
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { FocusModeProvider } from "@/components/focus/FocusModeContext";
+import { TipsHighlightProvider } from "@/components/tips/TipsHighlightProvider";
 
 export const metadata: Metadata = {
   title: "OSQR - Your AI Operating System for Capability",
@@ -28,9 +29,11 @@ export default function RootLayout({
 
         <SessionProvider>
           <FocusModeProvider>
-            <div className="relative">
-              {children}
-            </div>
+            <TipsHighlightProvider>
+              <div className="relative">
+                {children}
+              </div>
+            </TipsHighlightProvider>
           </FocusModeProvider>
         </SessionProvider>
       </body>

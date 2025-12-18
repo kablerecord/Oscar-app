@@ -33,11 +33,9 @@ import {
   Mic,
   MicOff,
 } from 'lucide-react'
-import { OSCARBubble, type PendingInsight, type OSCARBubbleHandle } from '@/components/oscar/OSCARBubble'
 import { RoutingNotification } from '@/components/oscar/RoutingNotification'
 import { ShareActions } from '@/components/share/ShareActions'
 import { ResponseActions } from '@/components/chat/ResponseActions'
-import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
 import {
   type OnboardingState,
   getInitialOnboardingState,
@@ -330,6 +328,8 @@ const PENDING_REQUEST_KEY = (workspaceId: string) => `osqr-pending-${workspaceId
 export interface RefineFireChatHandle {
   setInputAndFocus: (text: string) => void
   askAndShowInBubble: (prompt: string) => Promise<void>
+  focusInput: () => void
+  clearChat: () => void
 }
 
 export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatProps>(
@@ -507,11 +507,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [clarifyingAnswers, setClarifyingAnswers] = useState<string[]>([])
   const [refinedQuestion, setRefinedQuestion] = useState('')
 
-  // Profile question state
-  const [showProfileQuestion, setShowProfileQuestion] = useState(false)
-  const [currentQuestion, setCurrentQuestion] = useState<ProfileQuestion | null>(null)
-  const [answeredQuestionIds, setAnsweredQuestionIds] = useState<string[]>([])
-
   // Artifact panel state
   const [showArtifacts, setShowArtifacts] = useState(false)
   const [currentArtifacts, setCurrentArtifacts] = useState<ArtifactBlock[]>([])
@@ -566,54 +561,31 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const refineCardRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const oscarBubbleRef = useRef<OSCARBubbleHandle>(null)
 
   // Expose methods to parent components via ref
   useImperativeHandle(ref, () => ({
     setInputAndFocus: (text: string) => {
       setInput(text)
-      // OSQR bubble handles its own state now
       setTimeout(() => {
         textareaRef.current?.focus()
       }, 100)
     },
     askAndShowInBubble: async (prompt: string) => {
-      // Open the bubble first
-      if (oscarBubbleRef.current) {
-        oscarBubbleRef.current.openBubble()
-        // Show a "thinking" message
-        oscarBubbleRef.current.addMessage("Thinking...", 'tip')
-      }
-
-      try {
-        // Call the quick answer API
-        const response = await fetch('/api/osqr', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            question: prompt,
-            mode: 'quick',
-            useKnowledge: false,
-          }),
-        })
-
-        if (!response.ok) {
-          throw new Error('Failed to get response')
-        }
-
-        const data = await response.json()
-        const answer = data.answer || data.response || "I couldn't generate a response. Try asking in a different way."
-
-        // Remove the "thinking" message and add the real response
-        if (oscarBubbleRef.current) {
-          oscarBubbleRef.current.addMessage(answer, 'tip')
-        }
-      } catch (error) {
-        console.error('Error asking OSQR:', error)
-        if (oscarBubbleRef.current) {
-          oscarBubbleRef.current.addMessage("Sorry, I had trouble with that. Try asking in the main chat.", 'tip')
-        }
-      }
+      // Now just puts the question in the main input since OSQR is in the right panel
+      setInput(prompt)
+      setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 100)
+    },
+    focusInput: () => {
+      textareaRef.current?.focus()
+    },
+    clearChat: () => {
+      setMessages([])
+      setInput('')
+      setChatStage('input')
+      setRefineResult(null)
+      setRefinedQuestion('')
     }
   }), [])
 
@@ -655,23 +627,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       refineCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
   }, [chatStage])
-
-  // Load answered questions on mount
-  useEffect(() => {
-    async function loadAnsweredQuestions() {
-      try {
-        const response = await fetch(`/api/profile/answers?workspaceId=${workspaceId}`)
-        if (response.ok) {
-          const data = await response.json()
-          const ids = data.answers.map((a: any) => a.questionId)
-          setAnsweredQuestionIds(ids)
-        }
-      } catch (error) {
-        console.error('Failed to load answered questions:', error)
-      }
-    }
-    loadAnsweredQuestions()
-  }, [workspaceId])
 
   // Fetch personalized greeting data (updates default greeting when ready)
   useEffect(() => {
@@ -953,13 +908,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     // Add "thinking" placeholder with mode
     setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true, mode: responseMode }])
 
-    // Show profile question during wait time (even in quick mode - bubble will be there when they need it)
-    const nextQuestion = getNextQuestion(answeredQuestionIds)
-    if (nextQuestion) {
-      setCurrentQuestion(nextQuestion)
-      setShowProfileQuestion(true)
-    }
-
     try {
       const response = await fetch('/api/oscar/ask', {
         method: 'POST',
@@ -1105,64 +1053,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     setChatStage('input')
   }
 
-  // Profile question handlers
-  const handleProfileAnswer = async (answer: string) => {
-    if (!currentQuestion) return
-    try {
-      const response = await fetch('/api/profile/answer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          workspaceId,
-          questionId: currentQuestion.id,
-          category: currentQuestion.category,
-          question: currentQuestion.question,
-          answer,
-        }),
-      })
-      if (response.ok) {
-        setAnsweredQuestionIds((prev) => [...prev, currentQuestion.id])
-        const nextQuestion = getNextQuestion([...answeredQuestionIds, currentQuestion.id])
-        if (nextQuestion) {
-          setCurrentQuestion(nextQuestion)
-        } else {
-          setShowProfileQuestion(false)
-        }
-      }
-    } catch (error) {
-      console.error('Failed to save profile answer:', error)
-    }
-  }
-
-  const handleProfileSkip = () => {
-    const nextQuestion = getNextQuestion([...answeredQuestionIds, currentQuestion?.id || ''])
-    if (nextQuestion) {
-      setCurrentQuestion(nextQuestion)
-    } else {
-      setShowProfileQuestion(false)
-    }
-  }
-
-  const handleProfileClose = () => {
-    setShowProfileQuestion(false)
-  }
-
-  // Handle proactive insight "Tell me more" - starts a conversation from the insight
-  const handleInsightConversation = (insight: PendingInsight) => {
-    // Convert insight to a conversation starter question
-    const conversationStarter = `Tell me more about this: "${insight.title}" - ${insight.message}`
-
-    // Set the input and immediately fire
-    setInput(conversationStarter)
-    // Use thoughtful mode for insight follow-ups (more detailed response)
-    setResponseMode('thoughtful')
-
-    // Fire after a brief delay to let state update
-    setTimeout(() => {
-      handleFire(conversationStarter)
-    }, 100)
-  }
-
   const handleShowArtifacts = (artifacts: ArtifactBlock[]) => {
     setCurrentArtifacts(artifacts)
     setShowArtifacts(true)
@@ -1262,10 +1152,10 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
               </div>
 
               <h3 className="text-lg font-medium text-slate-400 mb-2">
-                Your workspace is ready
+                Ready to work with OSQR
               </h3>
               <p className="text-sm text-slate-500 max-w-sm">
-                Ask OSQR anything below, or click the OSQR bubble to continue your conversation.
+                Ask OSQR anything below, or click the OSQR bubble to continue your conversation with him there.
               </p>
             </div>
           )}
@@ -1889,7 +1779,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
             <span className="hidden sm:block text-sm font-medium text-slate-400">Mode:</span>
             <TooltipProvider delayDuration={200}>
-              <div className="flex items-center gap-2">
+              <div data-highlight-id="response-modes" className="flex items-center gap-2">
                 {/* Group 1: Quick / Thoughtful / Contemplate */}
                 <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
                   {/* Quick Mode */}
@@ -2164,7 +2054,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
           {/* Input */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-            <div className="relative flex-1">
+            <div data-highlight-id="chat-input" className="relative flex-1">
               <Textarea
                 ref={textareaRef}
                 placeholder={
@@ -2302,35 +2192,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       {showArtifacts && currentArtifacts.length > 0 && (
         <ArtifactPanel artifacts={currentArtifacts} onClose={() => setShowArtifacts(false)} />
       )}
-
-      {/* OSCAR Bubble - Handles onboarding + profile questions */}
-      <OSCARBubble
-        ref={oscarBubbleRef}
-        onboardingState={onboardingState}
-        onOnboardingProgress={setOnboardingState}
-        profileQuestion={currentQuestion}
-        answeredCount={answeredQuestionIds.length}
-        totalQuestions={getTotalQuestions()}
-        onProfileAnswer={handleProfileAnswer}
-        onProfileSkip={handleProfileSkip}
-        onModeChanged={(mode) => {
-          // Trigger onboarding discovery when user tries new modes
-          setOnboardingState(prev =>
-            progressOnboarding(prev, { type: 'mode_changed', mode })
-          )
-        }}
-        onQuestionAsked={() => {
-          // Trigger onboarding progress when user asks first question
-          setOnboardingState(prev =>
-            progressOnboarding(prev, { type: 'asked_question' })
-          )
-        }}
-        alwaysVisible={true}
-        workspaceId={workspaceId}
-        isFocusMode={responseMode === 'contemplate'}
-        onStartConversation={handleInsightConversation}
-        isGreetingCentered={false}
-      />
 
       {/* Upgrade Modal for Contemplate Mode */}
       {showUpgradeModal && (

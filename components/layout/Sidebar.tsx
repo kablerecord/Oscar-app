@@ -22,6 +22,8 @@ import {
   FolderPlus,
   Search,
   History,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -35,6 +37,8 @@ import { Input } from '@/components/ui/input'
 interface SidebarProps {
   workspaceId?: string
   onClose?: () => void
+  isCollapsed?: boolean
+  onToggleCollapse?: () => void
 }
 
 interface RecentThread {
@@ -71,7 +75,7 @@ const navigation = [
   },
 ]
 
-export function Sidebar({ workspaceId, onClose }: SidebarProps) {
+export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCollapse }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [recentThreads, setRecentThreads] = useState<RecentThread[]>([])
@@ -279,8 +283,143 @@ export function Sidebar({ workspaceId, onClose }: SidebarProps) {
     return `${diffDays}d ago`
   }
 
+  // Collapsed mode - icon-only sidebar
+  if (isCollapsed) {
+    return (
+      <aside data-highlight-id="sidebar" className="fixed left-0 top-0 z-40 h-screen w-14 border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
+        <div className="flex h-full flex-col items-center">
+          {/* Logo - compact */}
+          <div className="flex h-16 items-center justify-center border-b border-slate-700/50 w-full">
+            <Link href="/panel" className="group" onClick={onClose}>
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 ring-1 ring-blue-500/30 group-hover:ring-blue-500/50 transition-all">
+                <Brain className="h-5 w-5 text-blue-400" />
+              </div>
+            </Link>
+          </div>
+
+          {/* Icon-only navigation */}
+          <nav className="flex flex-col items-center gap-2 py-4">
+            {/* New Chat */}
+            <div className="relative group">
+              <button
+                onClick={handleNewChat}
+                disabled={isCreatingChat || !workspaceId}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all disabled:opacity-50"
+              >
+                <Plus className="h-5 w-5" />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[120px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Plus className="h-3.5 w-3.5 text-blue-400" />
+                    <span className="text-sm font-semibold text-white">New Chat</span>
+                  </div>
+                  <p className="text-xs text-slate-400">Start a new conversation</p>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45" />
+              </div>
+            </div>
+
+            {/* Search */}
+            <div className="relative group">
+              <button
+                onClick={() => router.push('/panel?search=true')}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[120px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Search className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="text-sm font-semibold text-white">Search</span>
+                  </div>
+                  <p className="text-xs text-slate-400">Find chats & content</p>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45" />
+              </div>
+            </div>
+
+            <div className="h-px w-8 bg-slate-700/50 my-1" />
+
+            {navigation.map((item) => {
+              const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
+              const Icon = item.icon
+              const iconColor = item.name === 'Panel' ? 'text-blue-400' : item.name === 'Memory Vault' ? 'text-purple-400' : 'text-slate-400'
+
+              return (
+                <div key={item.name} className="relative group">
+                  <Link
+                    href={item.href}
+                    data-highlight-id={item.name === 'Memory Vault' ? 'vault-link' : undefined}
+                    className={cn(
+                      'flex h-10 w-10 items-center justify-center rounded-xl transition-all',
+                      isActive
+                        ? 'bg-blue-500/10 text-blue-400 ring-1 ring-blue-500/20'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </Link>
+                  {/* Tooltip */}
+                  <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                    <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[140px]">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Icon className={cn('h-3.5 w-3.5', iconColor)} />
+                        <span className="text-sm font-semibold text-white">{item.name}</span>
+                      </div>
+                      <p className="text-xs text-slate-400">{item.description}</p>
+                    </div>
+                    <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45" />
+                  </div>
+                </div>
+              )
+            })}
+          </nav>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Expand button */}
+          {onToggleCollapse && (
+            <div className="relative group mb-4">
+              <button
+                onClick={onToggleCollapse}
+                className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all"
+              >
+                <PanelLeftOpen className="h-5 w-5" />
+              </button>
+              {/* Tooltip */}
+              <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[120px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <PanelLeftOpen className="h-3.5 w-3.5 text-slate-400" />
+                    <span className="text-sm font-semibold text-white">Expand</span>
+                  </div>
+                  <p className="text-xs text-slate-400">Show full sidebar</p>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2 -left-1 w-2 h-2 bg-slate-900 border-l border-b border-slate-700 rotate-45" />
+              </div>
+            </div>
+          )}
+
+          {/* Activity indicator */}
+          <div className="border-t border-slate-700/50 py-4 w-full flex justify-center">
+            <div className="flex -space-x-1">
+              <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></div>
+              <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" style={{ animationDelay: '0.2s' }}></div>
+              <div className="h-2 w-2 animate-pulse rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" style={{ animationDelay: '0.4s' }}></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    )
+  }
+
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
+    <aside data-highlight-id="sidebar" className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950">
       <div className="flex h-full flex-col">
         {/* Logo / App Name */}
         <div className="flex h-16 items-center justify-between border-b border-slate-700/50 px-6">
@@ -295,6 +434,16 @@ export function Sidebar({ workspaceId, onClose }: SidebarProps) {
               OSQR
             </span>
           </Link>
+          {/* Collapse button - only visible on lg+ */}
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              className="cursor-pointer hidden lg:block p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Collapse sidebar"
+            >
+              <PanelLeftClose className="h-4 w-4" />
+            </button>
+          )}
           {/* Close button - only visible on mobile */}
           {onClose && (
             <button
@@ -337,6 +486,7 @@ export function Sidebar({ workspaceId, onClose }: SidebarProps) {
               <Link
                 key={item.name}
                 href={item.href}
+                data-highlight-id={item.name === 'Memory Vault' ? 'vault-link' : undefined}
                 className={cn(
                   'group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive

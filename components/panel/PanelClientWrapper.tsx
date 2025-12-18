@@ -3,6 +3,9 @@
 import { useState, useCallback, useRef } from 'react'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { RefineFireChat, type RefineFireChatHandle } from '@/components/oscar/RefineFireChat'
+import type { HighlightTarget } from '@/components/layout/RightPanelBar'
+import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts'
+import { KeyboardShortcutsModal, SuggestShortcutModal } from '@/components/shortcuts/KeyboardShortcutsModal'
 
 interface PanelClientWrapperProps {
   user: {
@@ -25,6 +28,26 @@ export function PanelClientWrapper({
   userTier,
 }: PanelClientWrapperProps) {
   const chatRef = useRef<RefineFireChatHandle>(null)
+  const [highlightTarget, setHighlightTarget] = useState<HighlightTarget>(null)
+  const [showSuggestModal, setShowSuggestModal] = useState(false)
+
+  // Keyboard shortcuts
+  const { shortcuts, showShortcutsModal, setShowShortcutsModal } = useKeyboardShortcuts({
+    workspaceId,
+    onNewChat: () => {
+      // Clear current chat and focus input
+      if (chatRef.current) {
+        chatRef.current.clearChat?.()
+        chatRef.current.focusInput?.()
+      }
+    },
+    onFocusInput: () => {
+      if (chatRef.current) {
+        chatRef.current.focusInput?.()
+      }
+    },
+    onOpenShortcutsHelp: () => setShowShortcutsModal(true),
+  })
 
   // Callback for MSCPanel's "Ask OSQR" button
   // Opens the OSQR bubble and shows the answer directly instead of pre-filling input
@@ -34,32 +57,52 @@ export function PanelClientWrapper({
     }
   }, [])
 
-  return (
-    <MainLayout
-      user={user}
-      workspaceName={workspaceName}
-      workspaceId={workspaceId}
-      showMSC={true}
-      capabilityLevel={capabilityLevel}
-      onAskOSQR={handleAskOSQR}
-    >
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">
-            The Panel
-          </h1>
-          <p className="mt-2 text-slate-300">
-            Ask OSQR anything. Your question gets refined, then sent to a panel of AI experts for the best answer.
-          </p>
-        </div>
+  // Callback for Tips highlight feature
+  const handleHighlightElement = useCallback((target: HighlightTarget) => {
+    setHighlightTarget(target)
+  }, [])
 
-        <RefineFireChat
-          ref={chatRef}
-          workspaceId={workspaceId}
-          onboardingCompleted={onboardingCompleted}
-          userTier={userTier}
-        />
-      </div>
-    </MainLayout>
+  return (
+    <>
+      <MainLayout
+        user={user}
+        workspaceName={workspaceName}
+        workspaceId={workspaceId}
+        showMSC={true}
+        capabilityLevel={capabilityLevel}
+        onAskOSQR={handleAskOSQR}
+        highlightTarget={highlightTarget}
+        onHighlightElement={handleHighlightElement}
+        pageTitle="The Panel"
+        pageDescription="Ask OSQR anything — refined questions, expert answers"
+      >
+        <div data-highlight-id="panel-main">
+          <RefineFireChat
+            ref={chatRef}
+            workspaceId={workspaceId}
+            onboardingCompleted={onboardingCompleted}
+            userTier={userTier}
+          />
+        </div>
+      </MainLayout>
+
+      {/* Keyboard Shortcuts Modal */}
+      <KeyboardShortcutsModal
+        isOpen={showShortcutsModal}
+        onClose={() => setShowShortcutsModal(false)}
+        shortcuts={shortcuts}
+        onSuggestShortcut={() => {
+          setShowShortcutsModal(false)
+          setShowSuggestModal(true)
+        }}
+      />
+
+      {/* Suggest Shortcut Modal */}
+      <SuggestShortcutModal
+        isOpen={showSuggestModal}
+        onClose={() => setShowSuggestModal(false)}
+        userEmail={user.email}
+      />
+    </>
   )
 }

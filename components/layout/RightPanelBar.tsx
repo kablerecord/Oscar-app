@@ -14,12 +14,32 @@ import {
   FolderKanban,
   Lightbulb,
   Pin,
+  Plus,
+  Trash2,
+  MessageCircle,
+  Send,
+  Sparkles,
 } from 'lucide-react'
 import { MSCPanel } from '@/components/msc/MSCPanel'
+import { useTipsHighlight, type HighlightId } from '@/components/tips/TipsHighlightProvider'
+
+// Legacy types - keeping for backwards compatibility but using new system
+export type HighlightTarget =
+  | 'panel' // Main chat panel
+  | 'command-center' // Command Center icon/panel
+  | 'vault' // Memory Vault (sidebar)
+  | 'profile' // Profile questions
+  | 'modes' // Response modes in chat
+  | 'keyboard' // Keyboard shortcut area
+  | 'focus-mode' // Focus mode toggle
+  | 'sidebar' // Left sidebar
+  | null
 
 interface RightPanelBarProps {
   workspaceId: string
   onAskOSQR?: (prompt: string) => void
+  onHighlightElement?: (target: HighlightTarget) => void
+  highlightTarget?: HighlightTarget
 }
 
 interface SidebarData {
@@ -47,10 +67,43 @@ interface SidebarData {
   } | null
 }
 
-type PanelSection = 'command' | 'stats' | 'knowledge' | 'streak' | 'tips' | null
+type PanelSection = 'command' | 'stats' | 'knowledge' | 'streak' | 'tips' | 'osqr' | null
+
+// Pending insight type from API
+interface PendingInsight {
+  id: string
+  type: string
+  title: string
+  message: string
+  priority: number
+  hasExpandedContent: boolean
+}
 
 // Track what the user has seen
 const LAST_SEEN_KEY = 'osqr_panel_last_seen'
+const HIDDEN_PANELS_KEY = 'osqr_hidden_panels'
+
+// Available panels that can be shown/hidden (Command Center and Tips are always visible)
+type HideablePanel = 'stats' | 'knowledge' | 'streak'
+const HIDEABLE_PANELS: { id: HideablePanel; label: string; icon: typeof Zap; color: string }[] = [
+  { id: 'stats', label: 'Quick Stats', icon: TrendingUp, color: 'cyan' },
+  { id: 'knowledge', label: 'Knowledge', icon: Brain, color: 'purple' },
+  { id: 'streak', label: 'Streak', icon: Flame, color: 'orange' },
+]
+
+function getHiddenPanels(): HideablePanel[] {
+  if (typeof window === 'undefined') return []
+  try {
+    return JSON.parse(localStorage.getItem(HIDDEN_PANELS_KEY) || '[]')
+  } catch {
+    return []
+  }
+}
+
+function setHiddenPanels(panels: HideablePanel[]) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(HIDDEN_PANELS_KEY, JSON.stringify(panels))
+}
 
 function getLastSeen(): Record<string, number> {
   if (typeof window === 'undefined') return {}
@@ -114,12 +167,46 @@ function getCapabilityLabel(level: number): { label: string; description: string
   return labels[Math.min(level, labels.length - 1)] || labels[0]
 }
 
-export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
+export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, highlightTarget }: RightPanelBarProps) {
   const [activeSection, setActiveSection] = useState<PanelSection>(null)
   const [data, setData] = useState<SidebarData | null>(null)
   const [mscItemCount, setMscItemCount] = useState(0)
   const [hasUnseenChanges, setHasUnseenChanges] = useState<Record<string, boolean>>({})
   const [lastFetchTime, setLastFetchTime] = useState(0)
+  const [hiddenPanels, setHiddenPanelsState] = useState<HideablePanel[]>([])
+  const [showAddPicker, setShowAddPicker] = useState(false)
+
+  // New tips highlight system
+  const { setHighlightId } = useTipsHighlight()
+
+  // OSQR proactive insights state
+  const [pendingInsight, setPendingInsight] = useState<PendingInsight | null>(null)
+  const [osqrChatInput, setOsqrChatInput] = useState('')
+  const [osqrChatLoading, setOsqrChatLoading] = useState(false)
+
+  // Load hidden panels from localStorage
+  useEffect(() => {
+    setHiddenPanelsState(getHiddenPanels())
+  }, [])
+
+  // Hide a panel
+  const hidePanel = (panel: HideablePanel) => {
+    const newHidden = [...hiddenPanels, panel]
+    setHiddenPanelsState(newHidden)
+    setHiddenPanels(newHidden)
+    setActiveSection(null) // Close the panel
+  }
+
+  // Show a panel
+  const showPanel = (panel: HideablePanel) => {
+    const newHidden = hiddenPanels.filter(p => p !== panel)
+    setHiddenPanelsState(newHidden)
+    setHiddenPanels(newHidden)
+    setShowAddPicker(false)
+  }
+
+  // Get panels that can be restored
+  const availablePanels = HIDEABLE_PANELS.filter(p => hiddenPanels.includes(p.id))
 
   // Fetch sidebar data
   const fetchData = useCallback(async () => {
@@ -186,6 +273,88 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
     fetchMscCount()
   }, [fetchData, fetchMscCount])
 
+  // Poll for pending insights (for OSQR icon pulse)
+  const fetchPendingInsights = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/insights/pending?trigger=idle&deliver=false`)
+      if (res.ok) {
+        const result = await res.json()
+        if (result.hasInsight && result.insight) {
+          setPendingInsight(result.insight)
+        } else {
+          setPendingInsight(null)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch pending insights:', error)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchPendingInsights()
+    // Poll every 30 seconds
+    const interval = setInterval(fetchPendingInsights, 30000)
+    return () => clearInterval(interval)
+  }, [fetchPendingInsights])
+
+  // Handle OSQR chat from the panel
+  const handleOsqrChat = async () => {
+    if (!osqrChatInput.trim() || osqrChatLoading) return
+
+    const message = osqrChatInput.trim()
+    setOsqrChatInput('')
+    setOsqrChatLoading(true)
+
+    try {
+      // Use the parent's onAskOSQR callback to send to panel
+      if (onAskOSQR) {
+        onAskOSQR(message)
+        setActiveSection(null) // Close the OSQR panel
+      }
+    } finally {
+      setOsqrChatLoading(false)
+    }
+  }
+
+  // Handle insight engagement - tell me more
+  const handleInsightEngage = async () => {
+    if (!pendingInsight) return
+
+    try {
+      await fetch(`/api/insights/${pendingInsight.id}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'engage' }),
+      })
+
+      // Send to panel
+      if (onAskOSQR) {
+        onAskOSQR(`Tell me more about: ${pendingInsight.title}`)
+      }
+
+      setPendingInsight(null)
+      setActiveSection(null)
+    } catch (error) {
+      console.error('Failed to engage insight:', error)
+    }
+  }
+
+  // Handle insight dismiss
+  const handleInsightDismiss = async () => {
+    if (!pendingInsight) return
+
+    try {
+      await fetch(`/api/insights/${pendingInsight.id}/feedback`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'dismiss' }),
+      })
+      setPendingInsight(null)
+    } catch (error) {
+      console.error('Failed to dismiss insight:', error)
+    }
+  }
+
   // Mark section as seen when opened
   const openSection = (section: PanelSection) => {
     if (activeSection === section) {
@@ -202,6 +371,7 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
   // Close panel when clicking outside
   const handleBackdropClick = () => {
     setActiveSection(null)
+    setShowAddPicker(false)
   }
 
   // Calculate metrics for badges
@@ -257,12 +427,28 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                     </div>
                     <h3 className="font-bold text-sm text-white">Quick Stats</h3>
                   </div>
-                  <button
-                    onClick={() => setActiveSection(null)}
-                    className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
-                  >
-                    <X className="h-4 w-4 text-slate-400 hover:text-white" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <div className="relative group/trash">
+                      <button
+                        onClick={() => hidePanel('stats')}
+                        className="cursor-pointer p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4 text-slate-500 group-hover/trash:text-red-400" />
+                      </button>
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/trash:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                        <div className="bg-slate-800 border border-slate-600 rounded px-2 py-1 shadow-lg whitespace-nowrap">
+                          <span className="text-xs text-slate-200">Remove</span>
+                        </div>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-slate-800 border-b border-r border-slate-600 rotate-45" />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveSection(null)}
+                      className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                    >
+                      <X className="h-4 w-4 text-slate-400 hover:text-white" />
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -307,12 +493,28 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                     </div>
                     <h3 className="font-bold text-sm text-white">OSQR Knows You</h3>
                   </div>
-                  <button
-                    onClick={() => setActiveSection(null)}
-                    className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
-                  >
-                    <X className="h-4 w-4 text-slate-400 hover:text-white" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <div className="relative group/trash">
+                      <button
+                        onClick={() => hidePanel('knowledge')}
+                        className="cursor-pointer p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4 text-slate-500 group-hover/trash:text-red-400" />
+                      </button>
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/trash:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                        <div className="bg-slate-800 border border-slate-600 rounded px-2 py-1 shadow-lg whitespace-nowrap">
+                          <span className="text-xs text-slate-200">Remove</span>
+                        </div>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-slate-800 border-b border-r border-slate-600 rotate-45" />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveSection(null)}
+                      className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                    >
+                      <X className="h-4 w-4 text-slate-400 hover:text-white" />
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -379,12 +581,28 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                     </div>
                     <h3 className="font-bold text-sm text-white">Your Streak</h3>
                   </div>
-                  <button
-                    onClick={() => setActiveSection(null)}
-                    className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
-                  >
-                    <X className="h-4 w-4 text-slate-400 hover:text-white" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <div className="relative group/trash">
+                      <button
+                        onClick={() => hidePanel('streak')}
+                        className="cursor-pointer p-1.5 rounded-lg hover:bg-red-500/20 transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4 text-slate-500 group-hover/trash:text-red-400" />
+                      </button>
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 opacity-0 group-hover/trash:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                        <div className="bg-slate-800 border border-slate-600 rounded px-2 py-1 shadow-lg whitespace-nowrap">
+                          <span className="text-xs text-slate-200">Remove</span>
+                        </div>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-slate-800 border-b border-r border-slate-600 rotate-45" />
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setActiveSection(null)}
+                      className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                    >
+                      <X className="h-4 w-4 text-slate-400 hover:text-white" />
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -466,6 +684,108 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
             </div>
           )}
 
+          {/* OSQR Panel */}
+          {activeSection === 'osqr' && (
+            <div className="h-full flex flex-col">
+              <div className="px-4 py-4 border-b border-slate-700/50 bg-gradient-to-r from-blue-950/50 to-purple-950/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="relative p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 shadow-lg shadow-blue-500/25">
+                      <Brain className="h-4 w-4 text-white" />
+                      <Sparkles className="absolute -right-1 -top-1 h-2.5 w-2.5 text-blue-300" />
+                    </div>
+                    <h3 className="font-bold text-sm text-white">OSQR</h3>
+                  </div>
+                  <button
+                    onClick={() => setActiveSection(null)}
+                    className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                  >
+                    <X className="h-4 w-4 text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* Pending Insight - show if there's one */}
+                {pendingInsight ? (
+                  <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Lightbulb className="h-4 w-4 text-amber-400" />
+                      <h4 className="font-semibold text-sm text-amber-300">
+                        {pendingInsight.type === 'contradiction' && 'Pattern Noticed'}
+                        {pendingInsight.type === 'clarify' && 'Quick Thought'}
+                        {pendingInsight.type === 'next_step' && 'Ready for Next Step?'}
+                        {pendingInsight.type === 'recall' && 'Remember This?'}
+                        {!['contradiction', 'clarify', 'next_step', 'recall'].includes(pendingInsight.type) && 'Insight'}
+                      </h4>
+                    </div>
+                    <p className="text-sm text-slate-200 leading-relaxed mb-4">
+                      {pendingInsight.message}
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleInsightEngage}
+                        className="cursor-pointer flex-1 px-3 py-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-sm font-medium transition-colors"
+                      >
+                        Tell me more
+                      </button>
+                      <button
+                        onClick={handleInsightDismiss}
+                        className="cursor-pointer px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-700 text-slate-400 text-sm transition-colors"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* Default state - quick chat input */
+                  <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MessageCircle className="h-4 w-4 text-blue-400" />
+                      <h4 className="font-semibold text-sm text-white">Quick Question</h4>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-3">
+                      Ask OSQR something quick. For deeper conversations, use the main panel.
+                    </p>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={osqrChatInput}
+                        onChange={(e) => setOsqrChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleOsqrChat()}
+                        placeholder="Ask something..."
+                        className="w-full px-3 py-2 pr-10 rounded-lg bg-slate-700/50 border border-slate-600/50 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500/50"
+                      />
+                      {osqrChatInput.trim() && (
+                        <button
+                          onClick={handleOsqrChat}
+                          disabled={osqrChatLoading}
+                          className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md bg-blue-500 hover:bg-blue-600 text-white transition-colors disabled:opacity-50"
+                        >
+                          <Send className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Status indicators */}
+                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex -space-x-1">
+                      <div className="h-2 w-2 animate-pulse rounded-full bg-blue-500 shadow-sm shadow-blue-500/50"></div>
+                      <div className="h-2 w-2 animate-pulse rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="h-2 w-2 animate-pulse rounded-full bg-purple-500 shadow-sm shadow-purple-500/50" style={{ animationDelay: '0.4s' }}></div>
+                    </div>
+                    <h4 className="font-semibold text-xs text-white">Status</h4>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    {pendingInsight ? 'OSQR has something to share with you' : 'OSQR is watching and learning. When something comes up, the icon will pulse.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Tips Panel */}
           {activeSection === 'tips' && (
             <div className="h-full flex flex-col">
@@ -484,13 +804,19 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                     <X className="h-4 w-4 text-slate-400 hover:text-white" />
                   </button>
                 </div>
+                <p className="text-[10px] text-slate-500 mt-2">Hover over a tip to spotlight the element</p>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Getting Started */}
-                <div className="rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-4">
+                {/* Getting Started - The Panel */}
+                <div
+                  className="rounded-xl bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-blue-400/50 hover:border-blue-400/50"
+                  onMouseEnter={() => setHighlightId('panel-main')}
+                  onMouseLeave={() => setHighlightId(null)}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Zap className="h-4 w-4 text-blue-400" />
                     <h4 className="font-semibold text-sm text-white">The Panel</h4>
+                    <span className="ml-auto text-[9px] text-blue-400 opacity-60">← Hover to spotlight</span>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed">
                     This is where you chat with OSQR. Ask any question and it gets refined before being sent to a panel of AI experts. The better your question, the better the answer.
@@ -498,7 +824,11 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                 </div>
 
                 {/* Command Center Tip */}
-                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                <div
+                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-blue-400/50 hover:border-blue-400/50"
+                  onMouseEnter={() => setHighlightId('command-center-icon')}
+                  onMouseLeave={() => setHighlightId(null)}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Zap className="h-4 w-4 text-blue-400" />
                     <h4 className="font-semibold text-sm text-white">Command Center</h4>
@@ -509,7 +839,11 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                 </div>
 
                 {/* Memory Vault Tip */}
-                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                <div
+                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-purple-400/50 hover:border-purple-400/50"
+                  onMouseEnter={() => setHighlightId('vault-link')}
+                  onMouseLeave={() => setHighlightId(null)}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <FolderKanban className="h-4 w-4 text-purple-400" />
                     <h4 className="font-semibold text-sm text-white">Memory Vault</h4>
@@ -519,47 +853,48 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
                   </p>
                 </div>
 
-                {/* Profile Questions Tip */}
-                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                {/* Chat Input Tip */}
+                <div
+                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-cyan-400/50 hover:border-cyan-400/50"
+                  onMouseEnter={() => setHighlightId('chat-input')}
+                  onMouseLeave={() => setHighlightId(null)}
+                >
                   <div className="flex items-center gap-2 mb-2">
-                    <Brain className="h-4 w-4 text-purple-400" />
-                    <h4 className="font-semibold text-sm text-white">Profile Questions</h4>
+                    <MessageCircle className="h-4 w-4 text-cyan-400" />
+                    <h4 className="font-semibold text-sm text-white">Chat Input</h4>
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    The more OSQR knows about you, the better it can help. Answer profile questions over time—they appear naturally in conversation when relevant.
-                  </p>
-                </div>
-
-                {/* Modes Tip */}
-                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="h-4 w-4 text-green-400" />
-                    <h4 className="font-semibold text-sm text-white">Response Modes</h4>
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    <span className="text-cyan-400 font-medium">Quick</span> for fast answers. <span className="text-amber-400 font-medium">Thoughtful</span> for deeper analysis. OSQR auto-selects the best mode, but you can override it.
-                  </p>
-                </div>
-
-                {/* Keyboard Shortcut */}
-                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-slate-400 font-mono text-xs">⌘K</span>
-                    <h4 className="font-semibold text-sm text-white">Quick Access</h4>
-                  </div>
-                  <p className="text-xs text-slate-400 leading-relaxed">
-                    Press <span className="font-mono bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-300">⌘K</span> (or <span className="font-mono bg-slate-700/50 px-1.5 py-0.5 rounded text-slate-300">Ctrl+K</span>) anywhere to quickly start a new conversation.
+                    Type your question here. OSQR will refine it automatically to get you the best possible answer from the panel of AI experts.
                   </p>
                 </div>
 
                 {/* Focus Mode Tip */}
-                <div className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4">
+                <div
+                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-orange-400/50 hover:border-orange-400/50"
+                  onMouseEnter={() => setHighlightId('focus-mode-toggle')}
+                  onMouseLeave={() => setHighlightId(null)}
+                >
                   <div className="flex items-center gap-2 mb-2">
                     <Target className="h-4 w-4 text-orange-400" />
                     <h4 className="font-semibold text-sm text-white">Focus Mode</h4>
                   </div>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Need to concentrate? Toggle Focus Mode from settings to dim the sidebars and minimize distractions while you work.
+                    Need to concentrate? Click the eye icon in the top right to toggle Focus Mode and dim the sidebars.
+                  </p>
+                </div>
+
+                {/* Sidebar Tip */}
+                <div
+                  className="rounded-xl bg-slate-800/30 border border-slate-700/50 p-4 cursor-pointer transition-all hover:ring-2 hover:ring-slate-400/50 hover:border-slate-400/50"
+                  onMouseEnter={() => setHighlightId('sidebar')}
+                  onMouseLeave={() => setHighlightId(null)}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <ChevronLeft className="h-4 w-4 text-slate-400" />
+                    <h4 className="font-semibold text-sm text-white">Navigation Sidebar</h4>
+                  </div>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Access your conversation threads, Memory Vault, settings, and more from the left sidebar. Collapse it for more screen space.
                   </p>
                 </div>
               </div>
@@ -569,100 +904,289 @@ export function RightPanelBar({ workspaceId, onAskOSQR }: RightPanelBarProps) {
 
         {/* Icon bar */}
         <div className="w-14 h-full border-l border-slate-700/50 bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center py-4 gap-2">
-          {/* Panel label */}
-          <span className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mb-1">Panel</span>
-
-          {/* Command Center - shows item count */}
-          <button
-            onClick={() => openSection('command')}
-            className={cn(
-              'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
-              'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20',
-              activeSection === 'command' && 'ring-2 ring-blue-400/50 bg-blue-500/20'
-            )}
-            title="Command Center"
-          >
-            <Zap className="h-4 w-4 text-blue-400" />
-            <span className="text-[9px] font-bold text-blue-300">
-              {mscItemCount || 0}
-            </span>
-          </button>
+          {/* Command Center - shows item count (always visible) */}
+          <div className={cn(
+            "relative group transition-all duration-300",
+            highlightTarget === 'command-center' && 'scale-125 z-[60]'
+          )}>
+            <button
+              onClick={() => openSection('command')}
+              data-highlight-id="command-center-icon"
+              className={cn(
+                'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                'bg-blue-500/10 border-blue-500/20 hover:bg-blue-500/20',
+                activeSection === 'command' && 'ring-2 ring-blue-400/50 bg-blue-500/20',
+                highlightTarget === 'command-center' && 'ring-4 ring-blue-500 bg-blue-500/30 shadow-lg shadow-blue-500/50'
+              )}
+            >
+              <Zap className="h-4 w-4 text-blue-400" />
+              <span className="text-[9px] font-bold text-blue-300">
+                {mscItemCount || 0}
+              </span>
+            </button>
+            {/* Tooltip */}
+            <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+              <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <Zap className="h-3.5 w-3.5 text-blue-400" />
+                  <span className="text-sm font-semibold text-white">Command Center</span>
+                </div>
+                <p className="text-xs text-slate-400">Your goals, tasks & action items</p>
+              </div>
+              <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
+            </div>
+          </div>
 
           {/* Stats - shows capability level as colored bar */}
-          <button
-            onClick={() => openSection('stats')}
-            className={cn(
-              'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
-              'bg-cyan-500/10 border-cyan-500/20 hover:bg-cyan-500/20',
-              activeSection === 'stats' && 'ring-2 ring-cyan-400/50 bg-cyan-500/20'
-            )}
-            title="Quick Stats"
-          >
-            <TrendingUp className="h-4 w-4 text-cyan-400" />
-            {/* Capability level bar - 5 segments */}
-            <div className="flex gap-0.5">
-              {[0, 1, 2, 3, 4].map((level) => (
-                <div
-                  key={level}
-                  className={cn(
-                    'w-1 h-1.5 rounded-sm transition-colors',
-                    level <= (data?.quickStats?.capabilityLevel || 0)
-                      ? 'bg-cyan-400'
-                      : 'bg-slate-600'
-                  )}
-                />
-              ))}
+          {!hiddenPanels.includes('stats') && (
+            <div className="relative group">
+              <button
+                onClick={() => openSection('stats')}
+                className={cn(
+                  'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                  'bg-cyan-500/10 border-cyan-500/20 hover:bg-cyan-500/20',
+                  activeSection === 'stats' && 'ring-2 ring-cyan-400/50 bg-cyan-500/20'
+                )}
+              >
+                <TrendingUp className="h-4 w-4 text-cyan-400" />
+                {/* Capability level bar - 5 segments */}
+                <div className="flex gap-0.5">
+                  {[0, 1, 2, 3, 4].map((level) => (
+                    <div
+                      key={level}
+                      className={cn(
+                        'w-1 h-1.5 rounded-sm transition-colors',
+                        level <= (data?.quickStats?.capabilityLevel || 0)
+                          ? 'bg-cyan-400'
+                          : 'bg-slate-600'
+                      )}
+                    />
+                  ))}
+                </div>
+              </button>
+              {/* Tooltip */}
+              <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp className="h-3.5 w-3.5 text-cyan-400" />
+                    <span className="text-sm font-semibold text-white">Quick Stats</span>
+                  </div>
+                  <p className="text-xs text-slate-400">Vault usage & capability level</p>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
+              </div>
             </div>
-          </button>
+          )}
 
           {/* Knowledge - shows percentage as mini arc/bar */}
-          <button
-            onClick={() => openSection('knowledge')}
-            className={cn(
-              'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
-              'bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/20',
-              activeSection === 'knowledge' && 'ring-2 ring-purple-400/50 bg-purple-500/20'
-            )}
-            title="Knowledge Score"
-          >
-            <Brain className="h-4 w-4 text-purple-400" />
-            <span className="text-[9px] font-bold text-purple-300">
-              {knowledgeScore?.score || 0}%
-            </span>
-          </button>
+          {!hiddenPanels.includes('knowledge') && (
+            <div className="relative group">
+              <button
+                onClick={() => openSection('knowledge')}
+                className={cn(
+                  'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                  'bg-purple-500/10 border-purple-500/20 hover:bg-purple-500/20',
+                  activeSection === 'knowledge' && 'ring-2 ring-purple-400/50 bg-purple-500/20'
+                )}
+              >
+                <Brain className="h-4 w-4 text-purple-400" />
+                <span className="text-[9px] font-bold text-purple-300">
+                  {knowledgeScore?.score || 0}%
+                </span>
+              </button>
+              {/* Tooltip */}
+              <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Brain className="h-3.5 w-3.5 text-purple-400" />
+                    <span className="text-sm font-semibold text-white">Knowledge Score</span>
+                  </div>
+                  <p className="text-xs text-slate-400">How well OSQR knows you</p>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
+              </div>
+            </div>
+          )}
 
           {/* Streak - shows current streak number */}
-          <button
-            onClick={() => openSection('streak')}
-            className={cn(
-              'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
-              'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20',
-              activeSection === 'streak' && 'ring-2 ring-orange-400/50 bg-orange-500/20'
-            )}
-            title="Your Streak"
-          >
-            <Flame className="h-4 w-4 text-orange-400" />
-            <span className="text-[9px] font-bold text-orange-300">
-              {data?.usageStreak?.currentStreak || 0}d
-            </span>
-          </button>
+          {!hiddenPanels.includes('streak') && (
+            <div className="relative group">
+              <button
+                onClick={() => openSection('streak')}
+                className={cn(
+                  'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                  'bg-orange-500/10 border-orange-500/20 hover:bg-orange-500/20',
+                  activeSection === 'streak' && 'ring-2 ring-orange-400/50 bg-orange-500/20'
+                )}
+              >
+                <Flame className="h-4 w-4 text-orange-400" />
+                <span className="text-[9px] font-bold text-orange-300">
+                  {data?.usageStreak?.currentStreak || 0}d
+                </span>
+              </button>
+              {/* Tooltip */}
+              <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Flame className="h-3.5 w-3.5 text-orange-400" />
+                    <span className="text-sm font-semibold text-white">Your Streak</span>
+                  </div>
+                  <p className="text-xs text-slate-400">Daily usage & activity history</p>
+                </div>
+                <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
+              </div>
+            </div>
+          )}
+
+          {/* Add button - shows when panels are hidden */}
+          {availablePanels.length > 0 && (
+            <div className="relative group/add">
+              <button
+                onClick={() => setShowAddPicker(!showAddPicker)}
+                className={cn(
+                  'flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                  'bg-slate-500/10 border-slate-500/20 hover:bg-slate-500/20 border-dashed',
+                  showAddPicker && 'ring-2 ring-slate-400/50 bg-slate-500/20'
+                )}
+              >
+                <Plus className="h-4 w-4 text-slate-400" />
+                <span className="text-[9px] font-bold text-slate-400">
+                  +{availablePanels.length}
+                </span>
+              </button>
+
+              {/* Tooltip - only show when picker is not open */}
+              {!showAddPicker && (
+                <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover/add:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                  <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[140px]">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Plus className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-sm font-semibold text-white">Add Panel</span>
+                    </div>
+                    <p className="text-xs text-slate-400">Restore hidden panels</p>
+                  </div>
+                  <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
+                </div>
+              )}
+
+              {/* Picker dropdown */}
+              {showAddPicker && (
+                <div className="absolute right-full mr-2 top-0 bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl p-2 min-w-[140px] z-50">
+                  <div className="text-[10px] text-slate-500 uppercase font-bold px-2 py-1 mb-1">
+                    Add Panel
+                  </div>
+                  {availablePanels.map((panel) => {
+                    const Icon = panel.icon
+                    const colorClasses = {
+                      cyan: 'hover:bg-cyan-500/20 text-cyan-400',
+                      purple: 'hover:bg-purple-500/20 text-purple-400',
+                      orange: 'hover:bg-orange-500/20 text-orange-400',
+                    }[panel.color] || 'hover:bg-slate-500/20 text-slate-400'
+                    return (
+                      <button
+                        key={panel.id}
+                        onClick={() => showPanel(panel.id)}
+                        className={cn(
+                          'flex items-center gap-2 w-full px-2 py-1.5 rounded-lg transition-colors cursor-pointer',
+                          colorClasses.split(' ')[0]
+                        )}
+                      >
+                        <Icon className={cn('h-4 w-4', colorClasses.split(' ')[1])} />
+                        <span className="text-xs text-slate-300">{panel.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* OSQR - shows pulse when has pending insight */}
+          <div className="relative group">
+            <button
+              onClick={() => openSection('osqr')}
+              className={cn(
+                'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                pendingInsight
+                  ? 'bg-gradient-to-br from-amber-500/20 to-orange-500/20 border-amber-500/30 hover:from-amber-500/30 hover:to-orange-500/30'
+                  : 'bg-gradient-to-br from-blue-500/10 to-purple-500/10 border-blue-500/20 hover:from-blue-500/20 hover:to-purple-500/20',
+                activeSection === 'osqr' && 'ring-2 ring-blue-400/50'
+              )}
+            >
+              <div className="relative">
+                <Brain className={cn(
+                  'h-4 w-4',
+                  pendingInsight ? 'text-amber-400' : 'text-blue-400'
+                )} />
+                {pendingInsight && (
+                  <span className="absolute -top-1 -right-1 h-2.5 w-2.5">
+                    <span className="absolute inset-0 rounded-full bg-amber-400 animate-ping opacity-75" style={{ animationDuration: '1.5s' }} />
+                    <span className="absolute inset-0 rounded-full bg-amber-400" />
+                  </span>
+                )}
+              </div>
+              <span className={cn(
+                'text-[9px] font-bold',
+                pendingInsight ? 'text-amber-300' : 'text-blue-300'
+              )}>
+                {pendingInsight ? '!' : 'OSQR'}
+              </span>
+            </button>
+            {/* Tooltip */}
+            <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+              <div className={cn(
+                'border rounded-lg px-3 py-2 shadow-xl min-w-[160px]',
+                pendingInsight
+                  ? 'bg-amber-950/90 border-amber-700'
+                  : 'bg-slate-900 border-slate-700'
+              )}>
+                <div className="flex items-center gap-2 mb-1">
+                  <Brain className={cn('h-3.5 w-3.5', pendingInsight ? 'text-amber-400' : 'text-blue-400')} />
+                  <span className="text-sm font-semibold text-white">
+                    {pendingInsight ? 'OSQR has an insight!' : 'OSQR'}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-400">
+                  {pendingInsight ? 'Click to see what OSQR noticed' : 'Quick chat & proactive insights'}
+                </p>
+              </div>
+              <div className={cn(
+                'absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 border-r border-t rotate-45',
+                pendingInsight
+                  ? 'bg-amber-950/90 border-amber-700'
+                  : 'bg-slate-900 border-slate-700'
+              )} />
+            </div>
+          </div>
 
           {/* Spacer to push tips to bottom */}
           <div className="flex-1" />
 
-          {/* Tips - at the bottom */}
-          <button
-            onClick={() => openSection('tips')}
-            className={cn(
-              'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
-              'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20',
-              activeSection === 'tips' && 'ring-2 ring-yellow-400/50 bg-yellow-500/20'
-            )}
-            title="Tips & Walkthrough"
-          >
-            <Lightbulb className="h-4 w-4 text-yellow-400" />
-            <span className="text-[9px] font-bold text-yellow-300">Tips</span>
-          </button>
+          {/* Tips - at the bottom (always visible) */}
+          <div className="relative group">
+            <button
+              onClick={() => openSection('tips')}
+              className={cn(
+                'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                'bg-yellow-500/10 border-yellow-500/20 hover:bg-yellow-500/20',
+                activeSection === 'tips' && 'ring-2 ring-yellow-400/50 bg-yellow-500/20'
+              )}
+            >
+              <Lightbulb className="h-4 w-4 text-yellow-400" />
+              <span className="text-[9px] font-bold text-yellow-300">Tips</span>
+            </button>
+            {/* Tooltip */}
+            <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+              <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <Lightbulb className="h-3.5 w-3.5 text-yellow-400" />
+                  <span className="text-sm font-semibold text-white">Tips & Help</span>
+                </div>
+                <p className="text-xs text-slate-400">Learn how to use OSQR</p>
+              </div>
+              <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
+            </div>
+          </div>
         </div>
       </div>
     </>

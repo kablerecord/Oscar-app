@@ -557,13 +557,15 @@ This roadmap defines **WHAT** to build. The Development Philosophy document defi
 | Version | Focus | Key Deliverables |
 |---------|-------|------------------|
 | **V1.0** | Core OSQR | Web app, PKV, multi-model routing, Refine→Fire |
+| **V1.1** | AI Feature Parity | Voice input, image analysis, image generation, web search, code execution |
 | **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction |
 | **V2.0** | Creator Marketplace | Marketplace launch, creator onboarding, plugin ecosystem |
 | **V3.0** | VS Code OSQR | Full VS Code extension, Builder Plugin, Queue System |
 | **V4.0** | Privacy Phone | OSQR-native phone, intelligence utility model, US manufacturing |
 | **V5.0** | Robotics Integration | OSQR intelligence layer for robotics/automation |
 
-### Phase 1: Foundation (V1.0)
+### Phase 1: Foundation (V1.0) ✅ COMPLETE
+### Phase 1.1: AI Feature Parity (V1.1) ⬅️ NEXT PRIORITY
 ### Phase 2: Core Experience (V1.0 → V1.5)
 ### Phase 3: Intelligence Layer (V1.5)
 ### Phase 4: Advanced Features (V1.5)
@@ -752,6 +754,83 @@ interface GlobalKnowledgeIndex {
 - Enables "OSQR-style" coaching using your frameworks
 - Differentiates OSQR from generic ChatGPT/Claude
 - Users get your system delivered by superintelligence
+
+---
+
+## Phase 1.1: AI Feature Parity (V1.1) ⬅️ NEXT PRIORITY
+*Focus: Match Claude/ChatGPT capabilities so users don't need separate subscriptions*
+*Full Spec: [docs/features/AI-FEATURES.md](docs/features/AI-FEATURES.md)*
+
+> **Status:** Next implementation priority after Phase 1 polish
+> **Goal:** OSQR subscribers get everything Claude and ChatGPT offer, plus our unique features
+
+### 1.1.1 Recently Completed (Phase 1 Polish)
+- [x] **Styled tooltips** - Left sidebar icons match right panel hover style
+- [x] **Mobile panel accessibility** - Slide-out drawers with toggle buttons
+- [x] **TopBar z-index fix** - Content no longer scrolls behind header
+- [x] **Keyboard shortcuts (⌘K)** - Modal with shortcut list + suggest feature
+- [x] **Tips highlighting system** - Interactive UI tours with halo effect
+- [x] **Welcome message update** - "Ready to work with OSQR"
+
+### 1.1.2 Voice Input (Whisper API)
+- [ ] **Wire existing mic button** to start recording
+- [ ] **Transcription** via OpenAI Whisper or browser Web Speech API
+- [ ] **Editable transcript** - user can edit before sending
+- [ ] **Visual feedback** during recording
+
+### 1.1.3 Image Analysis (Vision)
+- [ ] **Image upload UI** - drag-drop + button in chat
+- [ ] **Multi-model vision** - GPT-4V, Claude Vision, Gemini Vision
+- [ ] **Inline display** in conversation
+- [ ] **Auto-routing** to vision-capable model
+
+### 1.1.4 Direct File Attachments
+- [ ] **Paperclip button** in chat input
+- [ ] **Support formats** - PDF, DOCX, TXT, images, code files
+- [ ] **Temp storage** or inline processing
+- [ ] **Message-level context** (not just Vault)
+
+### 1.1.5 Image Generation (DALL-E 3)
+- [ ] **Detect image generation intent** or explicit mode
+- [ ] **DALL-E 3 integration** via OpenAI API
+- [ ] **Display generated image** in chat
+- [ ] **Save to Media Vault** option
+- [ ] **Regenerate/variations** support
+
+### 1.1.6 Web Search Integration
+- [ ] **Auto-detect** queries needing current info
+- [ ] **Search API** - Perplexity, Tavily, or SerpAPI
+- [ ] **Source citations** with answers
+- [ ] **Toggle** for explicit search mode
+
+### 1.1.7 Code Execution (Python Sandbox)
+- [ ] **Sandbox environment** - E2B, Pyodide, or Modal
+- [ ] **"Run" button** on Python code blocks
+- [ ] **Output display** inline
+- [ ] **Error handling** with helpful messages
+- [ ] **Data visualization** support (matplotlib, etc.)
+
+### 1.1.8 Voice Output (TTS)
+- [ ] **Speaker icon** on responses
+- [ ] **OpenAI TTS** or ElevenLabs integration
+- [ ] **Auto-play option** in settings
+- [ ] **Voice selection** preference
+
+### 1.1.9 Artifacts Enhancement
+- [ ] **Interactive code editing** in artifact panel
+- [ ] **Live preview** for HTML/React
+- [ ] **Version history**
+- [ ] **Export options** (copy, download)
+
+**Implementation Order:**
+1. Voice Input (mic already exists, just wire it)
+2. Image Analysis (high user value)
+3. Direct File Attachments (quick win)
+4. Image Generation (differentiator)
+5. Web Search (current events)
+6. Code Execution (power users)
+7. Voice Output (polish)
+8. Artifacts Enhancement (ongoing)
 
 ---
 

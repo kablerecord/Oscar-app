@@ -1,6 +1,6 @@
 'use client'
 
-import { Search, User, Menu, Brain, Sparkles } from 'lucide-react'
+import { Search, User, Menu, Brain } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -11,7 +11,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { CapabilityLevelIndicator } from '@/components/capability/CapabilityBadge'
 import { FocusModeToggle } from '@/components/focus/FocusModeToggle'
 import {
   Tooltip,
@@ -37,13 +36,13 @@ interface TopBarProps {
     name?: string | null
     email?: string | null
   }
-  workspaceName?: string
-  capabilityLevel?: number | null
   onMenuClick?: () => void
   activeBadge?: UserBadge | null // The badge to display next to user icon
+  pageTitle?: string // Current page title (e.g., "The Panel")
+  pageDescription?: string // Current page description
 }
 
-export function TopBar({ user, workspaceName = 'My Workspace', capabilityLevel, onMenuClick, activeBadge }: TopBarProps) {
+export function TopBar({ user, onMenuClick, activeBadge, pageTitle, pageDescription }: TopBarProps) {
   const router = useRouter()
 
   const handleSignOut = async () => {
@@ -51,7 +50,7 @@ export function TopBar({ user, workspaceName = 'My Workspace', capabilityLevel, 
   }
 
   return (
-    <header className="fixed left-0 lg:left-64 right-0 top-0 z-30 h-16 border-b border-slate-700/50 bg-slate-900">
+    <header className="fixed left-0 lg:left-64 right-0 top-0 z-[100] h-16 border-b border-slate-700/50 bg-slate-900">
       <div className="flex h-full items-center justify-between px-4 sm:px-6">
         {/* Left: Hamburger menu (mobile) + Workspace selector */}
         <div className="flex items-center space-x-3 sm:space-x-4">
@@ -71,18 +70,19 @@ export function TopBar({ user, workspaceName = 'My Workspace', capabilityLevel, 
             <span className="text-lg font-bold tracking-tight gradient-text">OSQR</span>
           </div>
 
-          {/* Desktop: Workspace info */}
-          <div className="hidden sm:block text-sm">
-            <div className="flex items-center space-x-2">
-              <span className="font-medium text-slate-100">
-                {workspaceName}
-              </span>
-              {capabilityLevel !== undefined && capabilityLevel !== null && (
-                <CapabilityLevelIndicator level={capabilityLevel} size="sm" />
+          {/* Desktop: Page title */}
+          {pageTitle && (
+            <div className="hidden sm:block text-sm">
+              <div className="font-medium text-slate-100">
+                {pageTitle}
+              </div>
+              {pageDescription && (
+                <div className="text-xs text-slate-400 max-w-sm truncate">
+                  {pageDescription}
+                </div>
               )}
             </div>
-            <div className="text-xs text-slate-400">Personal workspace</div>
-          </div>
+          )}
         </div>
 
         {/* Center: Search bar - hidden on mobile */}
