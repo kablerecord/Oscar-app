@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 
+// CORS headers for cross-origin requests from marketing site
+const corsHeaders = {
+  'Access-Control-Allow-Origin': 'https://osqr.app',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+// Handle preflight requests
+export async function OPTIONS() {
+  return NextResponse.json({}, { headers: corsHeaders })
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { code } = await req.json()
@@ -8,7 +20,7 @@ export async function POST(req: NextRequest) {
     if (!code) {
       return NextResponse.json(
         { valid: false, error: 'Access code is required' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       )
     }
 
@@ -25,14 +37,14 @@ export async function POST(req: NextRequest) {
     if (!accessCode) {
       return NextResponse.json(
         { valid: false, error: 'Invalid access code' },
-        { status: 404 }
+        { status: 404, headers: corsHeaders }
       )
     }
 
     if (accessCode.useCount >= accessCode.maxUses) {
       return NextResponse.json(
         { valid: false, error: 'This access code has reached its usage limit' },
-        { status: 400 }
+        { status: 400, headers: corsHeaders }
       )
     }
 
@@ -41,12 +53,12 @@ export async function POST(req: NextRequest) {
       valid: true,
       code: accessCode.code,
       usesRemaining: accessCode.maxUses - accessCode.useCount,
-    })
+    }, { headers: corsHeaders })
   } catch (error) {
     console.error('Access code validation error:', error)
     return NextResponse.json(
       { valid: false, error: 'Failed to validate access code' },
-      { status: 500 }
+      { status: 500, headers: corsHeaders }
     )
   }
 }

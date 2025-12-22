@@ -4,20 +4,7 @@ This file tracks items that are blocked during autonomous development and need u
 
 ## Currently Blocked
 
-### 1. Marketing Site Access Code (osqr.app)
-**Date:** 2025-12-22
-**What:** Marketing site (osqr.app) access code validation is broken
-**Status:** BLOCKED - Need clarification
-**Questions:**
-- Is osqr.app a separate codebase from app.osqr.app?
-- If osqr.app is just a redirect to app.osqr.app, the access code validation should work via /signup?code=xxx
-- If osqr.app has its own landing page, where is that code located?
-
-**Best Guess:** The marketing site at osqr.app may be a simple landing page that redirects to app.osqr.app/signup?code=xxx. If it's in this codebase, I couldn't find it. The access code validation at /api/access-code/validate works correctly.
-
----
-
-### 2. Claude Data Folder Indexing Verification
+### 1. Claude Data Folder Indexing Verification
 **Date:** 2025-12-08
 **What:** Cannot verify if folder is indexed: `/Users/kablerecord/Desktop/Personal Brand/AI GPT/Export data/Claude/Claude Data Dec 1 2025`
 **Status:** Database is now online, can verify indexing
@@ -49,7 +36,7 @@ npm run index-knowledge "/Users/kablerecord/Desktop/Personal Brand/AI GPT/Export
 
 ---
 
-### 3. Production Testing (Requires User Action)
+### 2. Production Testing (Requires User Action)
 **Date:** 2025-12-22
 **What:** The following features need to be tested in production by a user:
 **Status:** NEEDS USER TESTING
@@ -91,3 +78,11 @@ npm run index-knowledge "/Users/kablerecord/Desktop/Personal Brand/AI GPT/Export
 **Date Blocked:** 2025-12-09
 **Date Resolved:** 2025-12-09
 **Resolution:** Successfully ran `npx tsx scripts/index-osqr-self.ts`. Indexed 85 files with system scope tag.
+
+### ✅ Marketing Site Access Code (osqr.app)
+**Date Blocked:** 2025-12-22
+**Date Resolved:** 2025-12-22
+**Resolution:** Fixed two issues:
+1. Added CORS headers to `/api/access-code/validate` endpoint to allow cross-origin requests from osqr.app
+2. Updated all hardcoded Railway URLs in osqr-website to use `app.osqr.app`
+3. Added `osqr-alpha-2024` to fallback access codes in Hero.tsx
