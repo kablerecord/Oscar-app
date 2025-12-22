@@ -339,7 +339,7 @@ export async function POST(req: NextRequest) {
       if (isSimpleQuestion) {
         // Fast path: minimal context for simple questions
         console.log('[Stream] Fast path: skipping heavy context for simple question')
-        autoContext = { context: undefined, sources: { identity: false, profile: false, msc: false, knowledge: false, threads: false, systemMode: false }, raw: {} }
+        autoContext = { context: '', sources: { identity: false, profile: false, msc: false, knowledge: false, threads: false, systemMode: false }, raw: {} }
         crossSessionMemory = { recentSummaries: [], accumulatedFacts: {}, hasMemory: false }
       } else {
         // Full context assembly for complex questions
