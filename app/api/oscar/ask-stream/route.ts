@@ -325,20 +325,39 @@ export async function POST(req: NextRequest) {
         systemPrompt: agent.systemPrompt,
       }))
 
-      // 10. Assemble context
-      const autoContext = await assembleContext(workspaceId, message, {
-        includeProfile: true,
-        includeMSC: true,
-        includeKnowledge: useKnowledge,
-        includeThreads: true,
-        maxKnowledgeChunks: 5,
-        maxThreads: 3,
-        systemMode,
-      })
+      // 10. Assemble context - with timing for debugging
+      const startContext = Date.now()
 
-      const tilContext = await getTILContext(workspaceId, message)
-      const crossSessionMemory = await getCrossSessionMemory(workspaceId, 5)
-      const memoryContext = formatMemoryForPrompt(crossSessionMemory)
+      // For Quick mode with simple questions, skip heavy context gathering
+      const isSimpleQuestion = effectiveMode === 'quick' && complexity <= 2
+
+      let autoContext: Awaited<ReturnType<typeof assembleContext>>
+      let tilContext: string | null = null
+      let crossSessionMemory: Awaited<ReturnType<typeof getCrossSessionMemory>>
+      let memoryContext: string = ''
+
+      if (isSimpleQuestion) {
+        // Fast path: minimal context for simple questions
+        console.log('[Stream] Fast path: skipping heavy context for simple question')
+        autoContext = { context: undefined, sources: { identity: false, profile: false, msc: false, knowledge: false, threads: false, systemMode: false }, raw: {} }
+        crossSessionMemory = { recentSummaries: [], accumulatedFacts: {}, hasMemory: false }
+      } else {
+        // Full context assembly for complex questions
+        autoContext = await assembleContext(workspaceId, message, {
+          includeProfile: true,
+          includeMSC: true,
+          includeKnowledge: useKnowledge,
+          includeThreads: true,
+          maxKnowledgeChunks: 5,
+          maxThreads: 3,
+          systemMode,
+        })
+        tilContext = await getTILContext(workspaceId, message)
+        crossSessionMemory = await getCrossSessionMemory(workspaceId, 5)
+        memoryContext = formatMemoryForPrompt(crossSessionMemory)
+      }
+
+      console.log(`[Stream] Context assembly took ${Date.now() - startContext}ms`)
 
       // Cross-project context
       let crossProjectContext: string | undefined
@@ -360,6 +379,7 @@ export async function POST(req: NextRequest) {
       const context = contextParts.join('\n\n---\n\n') || undefined
 
       // Create thread for this conversation
+      const startDb = Date.now()
       const thread = await prisma.chatThread.create({
         data: { workspaceId, title: message.slice(0, 100), mode: 'panel' },
       })
@@ -368,6 +388,7 @@ export async function POST(req: NextRequest) {
       await prisma.chatMessage.create({
         data: { threadId: thread.id, role: 'user', content: message },
       })
+      console.log(`[Stream] Thread + message creation took ${Date.now() - startDb}ms`)
 
       // 11. Send metadata before streaming starts
       // This tells the client: "pre-flight is done, text is coming"
@@ -400,10 +421,17 @@ export async function POST(req: NextRequest) {
       let fullResponse = ''
 
       // Use the streaming method
+      const startAI = Date.now()
+      let firstChunkTime: number | null = null
       for await (const chunk of OSQR.askStream(osqrRequest)) {
+        if (!firstChunkTime) {
+          firstChunkTime = Date.now() - startAI
+          console.log(`[Stream] First AI chunk received in ${firstChunkTime}ms`)
+        }
         fullResponse += chunk
         await sendEvent('text', { chunk })
       }
+      console.log(`[Stream] Total AI streaming took ${Date.now() - startAI}ms`)
 
       // 13. Post-process the response
       // Safety post-processing
