@@ -191,7 +191,7 @@ export async function trackQuestion(
   workspaceId: string,
   question: string,
   metadata: {
-    responseMode: 'quick' | 'thoughtful' | 'contemplate'
+    responseMode: 'quick' | 'thoughtful' | 'contemplate' | 'council'
     isFollowUp: boolean
     previousTopic?: string
     responseTime?: number  // How long OSQR took
@@ -982,12 +982,28 @@ export async function getSurpriseAnalysis(workspaceId: string): Promise<Surprise
     byDimension[s.dimension].push(s)
   }
 
-  const patterns = Object.entries(byDimension).map(([dimension, events]) => ({
-    dimension,
-    frequency: events.length,
-    avgDeviation: events.reduce((sum, e) => sum + e.deviation, 0) / events.length,
-    trend: 'stable' as const,  // TODO: Calculate actual trend
-  }))
+  const patterns = Object.entries(byDimension).map(([dimension, events]) => {
+    // Calculate trend based on deviation changes over time
+    let trend: 'increasing' | 'decreasing' | 'stable' = 'stable'
+    if (events.length >= 3) {
+      const sorted = [...events].sort((a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      )
+      const recentHalf = sorted.slice(Math.floor(sorted.length / 2))
+      const olderHalf = sorted.slice(0, Math.floor(sorted.length / 2))
+      const recentAvg = recentHalf.reduce((sum, e) => sum + e.deviation, 0) / recentHalf.length
+      const olderAvg = olderHalf.reduce((sum, e) => sum + e.deviation, 0) / olderHalf.length
+      const delta = recentAvg - olderAvg
+      if (delta > 0.1) trend = 'increasing'
+      else if (delta < -0.1) trend = 'decreasing'
+    }
+    return {
+      dimension,
+      frequency: events.length,
+      avgDeviation: events.reduce((sum, e) => sum + e.deviation, 0) / events.length,
+      trend,
+    }
+  })
 
   // Generate insights
   const insights: string[] = []

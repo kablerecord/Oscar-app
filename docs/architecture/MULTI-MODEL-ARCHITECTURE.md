@@ -528,8 +528,54 @@ For Council Mode and panel transparency, each model has a defined personality:
 
 ---
 
+## Context from Architecture
+
+### Related Components
+- Constitutional Framework — Validates all model outputs
+- Memory Vault — Provides context for prompt enrichment
+- Throttle — Checks tier access for modes
+- Council Mode — Extends routing to visible multi-model
+- Bubble — May suggest mode changes based on question complexity
+
+### Architecture References
+- See: `docs/features/COUNCIL-MODE.md` — Visible deliberation
+- See: `lib/ai/model-router.ts` — Implementation
+- See: `lib/ai/providers/` — Provider adapters
+
+### Integration Points
+- Receives from: User query, Memory context, Tier info
+- Sends to: Model providers, Constitutional (validation), Synthesis engine
+
+### Tech Stack Constraints
+- Providers: Anthropic SDK, OpenAI SDK
+- Streaming: Native provider streaming
+- Fallback: Must end with guaranteed model (Claude Haiku)
+
+---
+
+## Testable Invariants
+
+### Pre-conditions
+- At least one model provider is available
+- API keys are configured for enabled models
+
+### Post-conditions
+- Response is from an enabled model
+- Cost is tracked (async, non-blocking)
+
+### Invariants
+- Fallback chain must end with a guaranteed model
+- Confidence thresholds determine escalation
+- Cost tracking is async and never blocks response
+- All model outputs pass constitutional validation
+- Question type detection uses regex patterns in priority order
+- Complexity score is always 1-5 (clamped)
+
+---
+
 ## Version History
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2025-12-20 | 1.1 | Added Context from Architecture, Testable Invariants |
 | 2025-12-09 | 1.0 | Initial spec with full model registry |

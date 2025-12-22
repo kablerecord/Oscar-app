@@ -7,10 +7,12 @@
  * @see docs/BEHAVIORAL_INTELLIGENCE_LAYER.md
  * @see docs/TELEMETRY_SPEC.md
  *
- * STATUS: STUB - Implementation pending
+ * STATUS: IMPLEMENTED - Database persistence enabled
  */
 
-import { PrivacyTier, PrivacyTierManager } from './PrivacyTierManager'
+import { prisma } from '@/lib/db/prisma'
+import { createHash } from 'crypto'
+import { PrivacyTier, PrivacyTierManager, getPrivacyTierManager } from './PrivacyTierManager'
 
 // =============================================================================
 // EVENT TYPES
@@ -76,6 +78,7 @@ export class TelemetryCollector {
   private privacyManager: PrivacyTierManager
   private eventQueue: BaseTelemetryEvent[] = []
   private flushInterval: NodeJS.Timeout | null = null
+  private isStarted = false
 
   // Configuration
   private readonly BATCH_SIZE = 100
@@ -89,8 +92,14 @@ export class TelemetryCollector {
    * Start the collector (begins periodic flushing)
    */
   start(): void {
-    // TODO: Implement periodic flush
-    console.log('[TelemetryCollector] Started (stub)')
+    if (this.isStarted) return
+
+    this.flushInterval = setInterval(async () => {
+      await this.flush()
+    }, this.FLUSH_INTERVAL_MS)
+
+    this.isStarted = true
+    console.log('[TelemetryCollector] Started with periodic flush')
   }
 
   /**
@@ -99,9 +108,11 @@ export class TelemetryCollector {
   async stop(): Promise<void> {
     if (this.flushInterval) {
       clearInterval(this.flushInterval)
+      this.flushInterval = null
     }
     await this.flush()
-    console.log('[TelemetryCollector] Stopped (stub)')
+    this.isStarted = false
+    console.log('[TelemetryCollector] Stopped')
   }
 
   /**
@@ -212,7 +223,6 @@ export class TelemetryCollector {
   // =============================================================================
 
   private sanitizeEvent(event: BaseTelemetryEvent): BaseTelemetryEvent {
-    // TODO: Implement proper hashing
     return {
       ...event,
       userId: event.userId ? this.hashIdentifier(event.userId) : undefined,
@@ -222,26 +232,46 @@ export class TelemetryCollector {
     }
   }
 
+  /**
+   * Hash identifier using SHA-256 for privacy
+   */
   private hashIdentifier(id: string): string {
-    // TODO: Implement SHA-256 hashing
-    // For now, just return a placeholder
-    return `hashed_${id.substring(0, 8)}`
+    return createHash('sha256').update(id).digest('hex').substring(0, 32)
   }
 
   private generateSessionId(): string {
     return `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   }
 
+  /**
+   * Flush events to database
+   */
   private async flush(): Promise<void> {
     if (this.eventQueue.length === 0) return
 
     const eventsToFlush = [...this.eventQueue]
     this.eventQueue = []
 
-    // TODO: Write to database
-    console.log(
-      `[TelemetryCollector] Would flush ${eventsToFlush.length} events (stub)`
-    )
+    try {
+      // Batch insert events to database
+      await prisma.telemetryEvent.createMany({
+        data: eventsToFlush.map(event => ({
+          eventType: event.eventType,
+          userIdHash: event.userId || null,
+          workspaceIdHash: event.workspaceId || null,
+          data: event.data as object, // Cast to Prisma Json type
+          timestamp: event.timestamp,
+        })),
+      })
+
+      console.log(`[TelemetryCollector] Flushed ${eventsToFlush.length} events to database`)
+    } catch (error) {
+      console.error('[TelemetryCollector] Flush error:', error)
+      // Re-queue events on failure (with limit to prevent infinite growth)
+      if (this.eventQueue.length < this.BATCH_SIZE * 5) {
+        this.eventQueue.unshift(...eventsToFlush)
+      }
+    }
   }
 }
 
@@ -253,8 +283,7 @@ let collectorInstance: TelemetryCollector | null = null
 
 export function getTelemetryCollector(): TelemetryCollector {
   if (!collectorInstance) {
-    // TODO: Get actual PrivacyTierManager instance
-    const privacyManager = new PrivacyTierManager()
+    const privacyManager = getPrivacyTierManager()
     collectorInstance = new TelemetryCollector(privacyManager)
   }
   return collectorInstance

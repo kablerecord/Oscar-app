@@ -43,31 +43,55 @@ export function PanelChat({ agents, workspaceId }: PanelChatProps) {
     setRoundtableResponses([])
     setShowRoundtable(false)
 
+    const selectedAgentsList = agents.filter((a) => selectedAgents.has(a.id))
+
+    // Initialize loading state
+    setResponses(
+      selectedAgentsList.map((agent) => ({
+        agentId: agent.id,
+        content: '',
+        isLoading: true,
+      }))
+    )
+
     try {
-      // TODO: Call API endpoint to get responses from selected agents
-      // For now, simulate responses
-      const selectedAgentsList = agents.filter((a) => selectedAgents.has(a.id))
+      // Call the OSQR ask API endpoint with thoughtful mode for panel responses
+      const response = await fetch('/api/oscar/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          workspaceId,
+          useKnowledge: useRag,
+          includeDebate: true, // Get panel discussion
+          mode: 'thoughtful',
+        }),
+      })
 
-      // Initialize loading state
-      setResponses(
-        selectedAgentsList.map((agent) => ({
-          agentId: agent.id,
-          content: '',
-          isLoading: true,
-        }))
-      )
+      if (!response.ok) {
+        throw new Error('Failed to get response from panel')
+      }
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      const data = await response.json()
 
-      // Mock responses
-      setResponses(
-        selectedAgentsList.map((agent) => ({
-          agentId: agent.id,
-          content: `This is a simulated response from ${agent.name}. In production, this would be the actual AI response based on the user's message: "${userMessage}"`,
+      // Map panel discussion to agent responses
+      if (data.panelDiscussion && data.panelDiscussion.length > 0) {
+        setResponses(
+          data.panelDiscussion.map((panel: any, idx: number) => ({
+            agentId: panel.agentId || selectedAgentsList[idx]?.id || `agent-${idx}`,
+            content: panel.content || '',
+            isLoading: false,
+            error: panel.error,
+          }))
+        )
+      } else {
+        // Fallback: show synthesis as single response
+        setResponses([{
+          agentId: selectedAgentsList[0]?.id || 'osqr',
+          content: data.answer,
           isLoading: false,
-        }))
-      )
+        }])
+      }
 
       setShowRoundtable(true)
     } catch (error) {
@@ -99,21 +123,56 @@ export function PanelChat({ agents, workspaceId }: PanelChatProps) {
     )
 
     try {
-      // TODO: Call API endpoint for roundtable mode
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // Call the OSQR ask API endpoint with contemplate mode for roundtable
+      const response = await fetch('/api/oscar/ask', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: userMessage,
+          workspaceId,
+          useKnowledge: useRag,
+          includeDebate: true, // Get roundtable discussion
+          mode: 'contemplate', // Contemplate mode includes roundtable
+        }),
+      })
 
-      // Mock roundtable responses
+      if (!response.ok) {
+        throw new Error('Failed to get roundtable response')
+      }
+
+      const data = await response.json()
+
+      // Map roundtable discussion to agent responses
+      if (data.roundtableDiscussion && data.roundtableDiscussion.length > 0) {
+        setRoundtableResponses(
+          data.roundtableDiscussion.map((panel: any, idx: number) => ({
+            agentId: panel.agentId || selectedAgentsList[idx]?.id || `agent-${idx}`,
+            content: panel.content || '',
+            isLoading: false,
+            error: panel.error,
+          }))
+        )
+      } else if (data.panelDiscussion && data.panelDiscussion.length > 0) {
+        // Fallback to panel discussion if no roundtable
+        setRoundtableResponses(
+          data.panelDiscussion.map((panel: any, idx: number) => ({
+            agentId: panel.agentId || selectedAgentsList[idx]?.id || `agent-${idx}`,
+            content: panel.content || '',
+            isLoading: false,
+            error: panel.error,
+          }))
+        )
+      }
+    } catch (error) {
+      console.error('Error in roundtable:', error)
       setRoundtableResponses(
-        selectedAgentsList.map((agent, idx) => ({
+        selectedAgentsList.map((agent) => ({
           agentId: agent.id,
-          content: `After reviewing the other agents' responses, I ${
-            idx % 2 === 0 ? 'agree' : 'would like to add'
-          } that... [Roundtable response from ${agent.name}]`,
+          content: '',
+          error: 'Failed to get roundtable response',
           isLoading: false,
         }))
       )
-    } catch (error) {
-      console.error('Error in roundtable:', error)
     }
   }
 

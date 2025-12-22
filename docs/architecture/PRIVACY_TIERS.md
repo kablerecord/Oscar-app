@@ -403,6 +403,52 @@ This is achieved through:
 
 ---
 
+## Context from Architecture
+
+### Related Components
+- Constitutional Framework — Enforces privacy principles from constitution
+- Memory Vault — Respects tier settings on all retrievals
+- Behavioral Intelligence — Collects data per tier settings
+- Telemetry — Event collection gated by tier
+- Knowledge Architecture — PKV isolation enforced
+
+### Architecture References
+- See: `docs/governance/OSQR_CONSTITUTION.md` — Privacy principles (Part 2.4)
+- See: `docs/architecture/KNOWLEDGE_ARCHITECTURE.md` — Two-brain model
+- See: `docs/features/BEHAVIORAL_INTELLIGENCE_LAYER.md` — Learning tiers
+
+### Integration Points
+- Receives from: User settings, Consent flow
+- Sends to: All data collection points, Memory queries, Telemetry events
+
+### Tech Stack Constraints
+- User settings stored in database
+- Tier check on every data collection
+- GDPR/CCPA compliance required
+
+---
+
+## Testable Invariants
+
+### Pre-conditions
+- User has made tier selection (defaults to Tier A)
+- Consent version is tracked
+
+### Post-conditions
+- Data collection respects selected tier exactly
+- User can upgrade/downgrade tier at any time
+
+### Invariants
+- Tier A: No behavioral data leaves browser
+- Tier B: Data stays within user's account context
+- Tier C: Anonymization before any aggregation
+- No event collected without checking tier first
+- Founder cannot access user vault contents regardless of tier
+- Deletion is cryptographic destruction
+- No psychological profiles stored at any tier
+
+---
+
 ## Related Documents
 
 - [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md)

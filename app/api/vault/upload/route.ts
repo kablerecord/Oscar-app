@@ -7,6 +7,13 @@ import { parsePDF } from '@/lib/utils/pdf-parser'
 import OpenAI from 'openai'
 import { createHash } from 'crypto'
 
+// ==========================================================================
+// @osqr/core Document Indexing Integration (I-8)
+// Routes uploaded documents through the unified indexing pipeline
+// ==========================================================================
+import { indexDocumentToVault, DocumentIndexing } from '@/lib/osqr'
+import { featureFlags } from '@/lib/osqr/config'
+
 // Generate SHA-256 hash of content for duplicate detection
 function generateContentHash(content: string): string {
   return createHash('sha256').update(content).digest('hex')
@@ -369,7 +376,55 @@ Respond in this JSON format:
         }
       }
 
-      // Phase 6: Complete
+      // Phase 6: OSQR Document Indexing (I-8)
+      // Route through the @osqr/core Document Indexing pipeline for:
+      // - Semantic chunking with multi-vector embeddings
+      // - Cross-document relationship detection
+      // - Storage in the user's PKV (Personal Knowledge Vault)
+      if (featureFlags.enableDocumentIndexing) {
+        await sendEvent({
+          phase: 'osqr_indexing',
+          progress: 96,
+          message: 'Indexing for semantic search across projects...',
+        })
+
+        try {
+          // Detect document type from filename (default to plaintext if unknown)
+          const docType = DocumentIndexing.detectDocumentType(fileName) || 'plaintext' as const
+
+          // Index through OSQR pipeline
+          const osqrResult = await indexDocumentToVault(
+            // Use session user email or workspace as userId
+            session?.user?.email || workspaceId,
+            {
+              name: fileName,
+              content: fileContent,
+              type: docType,
+              projectId: project.id,
+              metadata: {
+                fileType,
+                fileSize: file.size,
+                wordCount,
+                charCount,
+                summary,
+                oscarDocumentId: document.id,
+              },
+            },
+            { interface: 'web' }
+          )
+
+          if (osqrResult.success) {
+            console.log(`[OSQR Document Indexing] Indexed ${fileName}: ${osqrResult.chunks} chunks, ${osqrResult.relationships} relationships`)
+          } else {
+            console.warn(`[OSQR Document Indexing] Failed to index ${fileName}: ${osqrResult.error}`)
+          }
+        } catch (osqrError) {
+          // Don't fail the upload if OSQR indexing fails
+          console.error('[OSQR Document Indexing] Error:', osqrError)
+        }
+      }
+
+      // Phase 7: Complete
       await sendEvent({
         phase: 'complete',
         progress: 100,
@@ -382,6 +437,7 @@ Respond in this JSON format:
           chunksIndexed: chunks.length,
           wordCount,
           charCount,
+          osqrIndexed: featureFlags.enableDocumentIndexing,
         }
       })
 

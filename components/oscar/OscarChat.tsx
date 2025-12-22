@@ -4,18 +4,26 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
-import { Send, Brain, Loader2, ChevronDown, ChevronUp, Zap, Lightbulb, GraduationCap, PanelRight, X } from 'lucide-react'
+import { Send, Brain, Loader2, ChevronDown, ChevronUp, Zap, Lightbulb, GraduationCap, PanelRight, X, Users } from 'lucide-react'
 import { CompanionBubble } from '@/components/oscar/CompanionBubble'
 import { ShareActions } from '@/components/share/ShareActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
+import { CouncilCarousel, CouncilModeBadge, type ModelResponse } from '@/components/council/CouncilCarousel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
+
+interface CouncilData {
+  responses: ModelResponse[]
+  synthesis: string
+  hasDisagreement: boolean
+}
 
 interface Message {
   role: 'user' | 'osqr'
   content: string
   thinking?: boolean
   artifacts?: ArtifactBlock[]
+  council?: CouncilData
   debug?: {
     panelDiscussion?: any[]
     roundtableDiscussion?: any[]
@@ -24,11 +32,12 @@ interface Message {
 
 interface OscarChatProps {
   workspaceId: string
+  userTier?: 'starter' | 'pro' | 'master'
 }
 
 type ResponseMode = 'quick' | 'thoughtful' | 'contemplate'
 
-export function OscarChat({ workspaceId }: OscarChatProps) {
+export function OscarChat({ workspaceId, userTier = 'pro' }: OscarChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -36,6 +45,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
   const [showDebug, setShowDebug] = useState(false)
   const [expandedDebug, setExpandedDebug] = useState<number | null>(null)
   const [responseMode, setResponseMode] = useState<ResponseMode>('thoughtful')
+  const [showCouncilForMessage, setShowCouncilForMessage] = useState<number | null>(null)
 
   // Profile question state
   const [showProfileQuestion, setShowProfileQuestion] = useState(false)
@@ -139,6 +149,32 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
 
       const data = await response.json()
 
+      // Process council data from panelDiscussion if available (for thoughtful/contemplate modes)
+      let councilData: CouncilData | undefined
+      if (data.panelDiscussion && data.panelDiscussion.length > 0 && responseMode !== 'quick') {
+        // Transform panel discussion into council responses
+        const councilResponses: ModelResponse[] = data.panelDiscussion.map((panel: any) => ({
+          modelId: panel.modelId || panel.agentId || 'unknown',
+          modelName: panel.agentName || panel.modelName,
+          content: panel.content || '',
+          confidence: panel.confidence ?? 0.75, // Default confidence if not provided
+          reasoning: panel.reasoning,
+          isLoading: false,
+          error: panel.error,
+        }))
+
+        // Calculate disagreement (15% confidence delta)
+        const confidences = councilResponses.map((r: ModelResponse) => r.confidence)
+        const maxDelta = Math.max(...confidences) - Math.min(...confidences)
+        const hasDisagreement = maxDelta >= 0.15
+
+        councilData = {
+          responses: councilResponses,
+          synthesis: data.answer,
+          hasDisagreement,
+        }
+      }
+
       // Replace thinking placeholder with actual response
       setMessages((prev) => {
         const updated = [...prev]
@@ -147,6 +183,7 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
           content: data.answer,
           thinking: false,
           artifacts: data.artifacts,
+          council: councilData,
           debug: showDebug
             ? {
                 panelDiscussion: data.panelDiscussion,
@@ -278,6 +315,14 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
                     <span className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
                       OSQR
                     </span>
+                    {/* Council Mode Badge - shows when multi-model responses available */}
+                    {message.council && message.council.responses.length > 0 && (
+                      <CouncilModeBadge
+                        modelCount={message.council.responses.length}
+                        hasDisagreement={message.council.hasDisagreement}
+                        onClick={() => setShowCouncilForMessage(showCouncilForMessage === idx ? null : idx)}
+                      />
+                    )}
                   </div>
                   <Card className="p-4">
                     {message.thinking ? (
@@ -297,6 +342,25 @@ export function OscarChat({ workspaceId }: OscarChatProps) {
                       </div>
                     )}
                   </Card>
+
+                  {/* Council Carousel - shows individual model responses */}
+                  {message.council && showCouncilForMessage === idx && (
+                    <CouncilCarousel
+                      responses={message.council.responses}
+                      synthesis={message.council.synthesis}
+                      userTier={userTier}
+                      isVisible={true}
+                      onUpgrade={() => {
+                        // Navigate to pricing page
+                        window.location.href = '/pricing'
+                      }}
+                      onDiscussWithOscar={(modelId, content) => {
+                        // Pre-fill input with a reference to the model's response
+                        const modelName = message.council?.responses.find(r => r.modelId === modelId)?.modelName || modelId
+                        setInput(`Regarding what ${modelName} said about this - can you elaborate?`)
+                      }}
+                    />
+                  )}
 
                   {/* Share Actions - only show for completed responses */}
                   {!message.thinking && message.content && (

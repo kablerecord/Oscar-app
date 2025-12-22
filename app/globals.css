@@ -297,6 +297,57 @@ html {
   animation: subtle-pulse 2s ease-in-out infinite;
 }
 
+/* Thinking state - purple pulse (processing) */
+@keyframes thinking-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+  }
+}
+
+.animate-thinking-pulse {
+  animation: thinking-pulse 2s ease-in-out infinite;
+}
+
+/* Connected state - purple breathing (active conversation) */
+@keyframes connected-breathing {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 25px rgba(139, 92, 246, 0.4);
+  }
+}
+
+.animate-connected-breathing {
+  animation: connected-breathing 4s ease-in-out infinite;
+}
+
+/* Waiting state - static purple glow (no animation) */
+.bubble-waiting {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+}
+
+/* Reduced motion alternatives */
+@media (prefers-reduced-motion: reduce) {
+  .animate-subtle-pulse,
+  .animate-thinking-pulse,
+  .animate-connected-breathing,
+  .animate-pulse-glow-amber {
+    animation: none !important;
+  }
+
+  /* Static glow fallbacks */
+  .animate-subtle-pulse { box-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+  .animate-thinking-pulse { box-shadow: 0 0 25px rgba(139, 92, 246, 0.4); }
+  .animate-connected-breathing { box-shadow: 0 0 20px rgba(139, 92, 246, 0.3); }
+  .animate-pulse-glow-amber { box-shadow: 0 0 25px rgba(245, 158, 11, 0.5); }
+}
+
 /* ========================================
    Component Overrides for shadcn
    ======================================== */

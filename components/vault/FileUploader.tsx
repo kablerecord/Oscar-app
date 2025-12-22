@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 
 interface UploadProgress {
-  phase: 'idle' | 'starting' | 'extracting' | 'analyzing' | 'chunking' | 'embedding' | 'complete' | 'error'
+  phase: 'idle' | 'starting' | 'extracting' | 'analyzing' | 'chunking' | 'embedding' | 'osqr_indexing' | 'complete' | 'error'
   progress: number
   message: string
   data?: {
@@ -59,6 +59,7 @@ const phaseIcons = {
   analyzing: Brain,
   chunking: Layers,
   embedding: Sparkles,
+  osqr_indexing: Brain,
   complete: CheckCircle2,
   error: AlertCircle,
 }
@@ -70,6 +71,7 @@ const phaseColors = {
   analyzing: 'text-purple-500',
   chunking: 'text-amber-500',
   embedding: 'text-emerald-500',
+  osqr_indexing: 'text-purple-500',
   complete: 'text-green-500',
   error: 'text-red-500',
 }
@@ -219,7 +221,7 @@ export function FileUploader({
     setUploadProgress({ phase: 'idle', progress: 0, message: '' })
   }
 
-  const isUploading = ['starting', 'extracting', 'analyzing', 'chunking', 'embedding'].includes(uploadProgress.phase)
+  const isUploading = ['starting', 'extracting', 'analyzing', 'chunking', 'embedding', 'osqr_indexing'].includes(uploadProgress.phase)
   const PhaseIcon = phaseIcons[uploadProgress.phase]
   const phaseColor = phaseColors[uploadProgress.phase]
 
@@ -401,9 +403,10 @@ export function FileUploader({
               { phase: 'analyzing', label: 'Analyze', icon: Brain },
               { phase: 'chunking', label: 'Chunk', icon: Layers },
               { phase: 'embedding', label: 'Embed', icon: Sparkles },
+              { phase: 'osqr_indexing', label: 'OSQR', icon: Brain },
             ].map((step, idx) => {
               const StepIcon = step.icon
-              const phases = ['extracting', 'analyzing', 'chunking', 'embedding']
+              const phases = ['extracting', 'analyzing', 'chunking', 'embedding', 'osqr_indexing']
               const currentIdx = phases.indexOf(uploadProgress.phase)
               const stepIdx = phases.indexOf(step.phase)
               const isComplete = stepIdx < currentIdx

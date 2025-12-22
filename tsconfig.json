@@ -19,7 +19,9 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@osqr/core": ["../osqr/dist/index"],
+      "@osqr/core/*": ["../osqr/dist/*"]
     }
   },
   "include": [

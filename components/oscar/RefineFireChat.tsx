@@ -99,6 +99,10 @@ interface Message {
   // v1.1: Message tracking for feedback
   messageId?: string
   tokensUsed?: number
+  // I-9: Cross-project memory - indicates response used context from other projects
+  usedCrossProjectContext?: boolean
+  // I-10: Throttle - indicates response was degraded due to budget
+  degraded?: boolean
 }
 
 interface RefineResult {
@@ -329,6 +333,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [showDebug, setShowDebug] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showSupremeLockedModal, setShowSupremeLockedModal] = useState(false)
+
+  // Streaming state for bubble presence
+  const [streamingState, setStreamingState] = useState<'idle' | 'thinking' | 'streaming'>('idle')
 
   // Voice input state
   const [isRecording, setIsRecording] = useState(false)
@@ -785,7 +792,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     }
   }
 
-  // STEP 2: Fire the question to the panel
+  // STEP 2: Fire the question to the panel (with streaming support)
   const handleFire = async (questionToFire?: string) => {
     const finalQuestion = questionToFire || refinedQuestion || input.trim()
     if (!finalQuestion || isLoading) return
@@ -810,13 +817,230 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       { role: 'user', content: finalQuestion, refinedQuestion: refineResult?.originalQuestion !== finalQuestion ? refineResult?.originalQuestion : undefined },
     ])
 
-    // Add "thinking" placeholder with mode
+    // Add "thinking" placeholder with mode (will transition to streaming)
     setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true, mode: responseMode }])
+
+    // Set bubble to thinking state (purple pulse)
+    setStreamingState('thinking')
 
     try {
       // Build conversation history from current messages (excluding the thinking placeholder we just added)
       const conversationHistory = messages
         .filter(m => !m.thinking && m.content) // Exclude thinking placeholders and empty messages
+        .map(m => ({
+          role: m.role === 'user' ? 'user' as const : 'assistant' as const,
+          content: m.content,
+        }))
+
+      // Use streaming endpoint
+      const response = await fetch('/api/oscar/ask-stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: finalQuestion,
+          workspaceId,
+          useKnowledge,
+          includeDebate: showDebug,
+          mode: responseMode,
+          conversationHistory,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get response from OSQR')
+      }
+
+      // Handle SSE stream
+      const reader = response.body?.getReader()
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let streamedContent = ''
+      let metadata: {
+        threadId?: string
+        routing?: any
+        contextSources?: any
+        usedCrossProjectContext?: boolean
+        degraded?: boolean
+      } = {}
+      let finalData: {
+        messageId?: string
+        artifacts?: any[]
+      } = {}
+
+      // Read the stream
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete SSE events
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+        let currentEvent = ''
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            currentEvent = line.slice(7)
+          } else if (line.startsWith('data: ') && currentEvent) {
+            try {
+              const data = JSON.parse(line.slice(6))
+
+              switch (currentEvent) {
+                case 'metadata':
+                  // Store metadata for later use
+                  metadata = data
+
+                  // Handle special cases (redirect, throttled, blocked)
+                  if (data.redirect) {
+                    // Fall back to non-streaming endpoint
+                    throw new Error('REDIRECT_TO_NON_STREAMING')
+                  }
+                  if (data.throttled || data.blocked || data.featureLocked) {
+                    // These are handled in the text event
+                  }
+
+                  // Transition from thinking to streaming (connected state)
+                  setStreamingState('streaming') // Bubble: purple breathing
+
+                  setMessages((prev) => {
+                    const updated = [...prev]
+                    if (updated[updated.length - 1]?.thinking) {
+                      updated[updated.length - 1] = {
+                        ...updated[updated.length - 1],
+                        thinking: false, // No longer "thinking", now streaming
+                        routing: data.routing,
+                        usedCrossProjectContext: data.usedCrossProjectContext,
+                        degraded: data.degraded,
+                      }
+                    }
+                    return updated
+                  })
+
+                  // Show routing notification if auto-routed
+                  if (data.routing?.autoRouted) {
+                    setRoutingNotification({
+                      autoRouted: data.routing.autoRouted,
+                      autoRoutedReason: data.routing.autoRoutedReason,
+                      requestedMode: data.routing.requestedMode,
+                      effectiveMode: data.routing.effectiveMode,
+                      questionType: data.routing.questionType,
+                      complexity: data.routing.complexity,
+                    })
+                  }
+                  break
+
+                case 'text':
+                  // Append streamed text chunk
+                  streamedContent += data.chunk || ''
+
+                  // Update message content progressively
+                  setMessages((prev) => {
+                    const updated = [...prev]
+                    const lastIdx = updated.length - 1
+                    if (lastIdx >= 0 && updated[lastIdx].role === 'osqr') {
+                      updated[lastIdx] = {
+                        ...updated[lastIdx],
+                        content: streamedContent,
+                        thinking: false,
+                      }
+                    }
+                    return updated
+                  })
+                  break
+
+                case 'done':
+                  // Stream complete, finalize the message
+                  finalData = data
+
+                  setMessages((prev) => {
+                    const updated = [...prev]
+                    const lastIdx = updated.length - 1
+                    if (lastIdx >= 0 && updated[lastIdx].role === 'osqr') {
+                      updated[lastIdx] = {
+                        ...updated[lastIdx],
+                        content: streamedContent,
+                        thinking: false,
+                        artifacts: data.artifacts,
+                        messageId: data.messageId,
+                        mode: responseMode,
+                      }
+                    }
+                    return updated
+                  })
+
+                  // Show artifacts if any
+                  if (data.artifacts && data.artifacts.length > 0) {
+                    setCurrentArtifacts(data.artifacts)
+                    setShowArtifacts(true)
+                  }
+                  break
+
+                case 'error':
+                  throw new Error(data.error || 'Stream error')
+              }
+            } catch (parseError) {
+              // Ignore JSON parse errors for incomplete data
+              if (parseError instanceof Error && parseError.message !== 'REDIRECT_TO_NON_STREAMING') {
+                console.warn('SSE parse warning:', parseError)
+              } else {
+                throw parseError
+              }
+            }
+            currentEvent = ''
+          }
+        }
+      }
+
+      // Trigger onboarding progress for question asked AND answer received
+      setOnboardingState(prev => {
+        const afterQuestion = progressOnboarding(prev, { type: 'asked_question' })
+        return progressOnboarding(afterQuestion, { type: 'answer_received' })
+      })
+    } catch (error) {
+      console.error('Error asking OSQR:', error)
+
+      // If redirected to non-streaming, fall back
+      if (error instanceof Error && error.message === 'REDIRECT_TO_NON_STREAMING') {
+        // Fall back to non-streaming endpoint for special modes
+        await handleFireNonStreaming(finalQuestion)
+        return
+      }
+
+      setMessages((prev) => {
+        const updated = [...prev]
+        updated[updated.length - 1] = {
+          role: 'osqr',
+          content: 'I apologize, but I encountered an error. Please try again.',
+          thinking: false,
+        }
+        return updated
+      })
+    } finally {
+      setIsLoading(false)
+      setChatStage('complete')
+      setStreamingState('idle') // Reset bubble to idle state
+      // Reset for next question
+      setInput('')
+      setRefineResult(null)
+      setRefinedQuestion('')
+      setClarifyingAnswers([])
+      // PERSISTENCE: Clear pending request since we got a response
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
+      }
+    }
+  }
+
+  // Non-streaming fallback for special modes (planning, audit)
+  const handleFireNonStreaming = async (finalQuestion: string) => {
+    try {
+      const conversationHistory = messages
+        .filter(m => !m.thinking && m.content)
         .map(m => ({
           role: m.role === 'user' ? 'user' as const : 'assistant' as const,
           content: m.content,
@@ -841,8 +1065,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
       const data = await response.json()
 
-      // Replace thinking placeholder with actual response
-      // J-4: Transform panel discussion into structured council responses
+      // Transform panel discussion into structured council responses
       const councilResponses: PanelMemberResponse[] = (data.panelDiscussion || []).map((p: any, i: number) => ({
         agentId: p.agentId || `agent-${i}`,
         agentName: `Expert ${i + 1}`,
@@ -867,9 +1090,8 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           content: data.answer,
           thinking: false,
           artifacts: data.artifacts,
-          mode: responseMode, // Preserve the mode used for this response
-          routing: data.routing, // Include routing metadata for Alt-Opinion suggestions
-          // J-4: Include structured council data for visible reasoning
+          mode: responseMode,
+          routing: data.routing,
           councilResponses: showDebug && councilResponses.length > 0 ? councilResponses : undefined,
           councilRoundtable: showDebug && councilRoundtable.length > 0 ? councilRoundtable : undefined,
           debug: showDebug
@@ -878,20 +1100,19 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                 roundtableDiscussion: data.roundtableDiscussion,
               }
             : undefined,
-          // v1.1: Message tracking for feedback
           messageId: data.messageId,
           tokensUsed: data.tokensUsed,
+          usedCrossProjectContext: data.usedCrossProjectContext,
+          degraded: data.degraded,
         }
         return updated
       })
 
-      // If artifacts were returned, show the artifact panel
       if (data.artifacts && data.artifacts.length > 0) {
         setCurrentArtifacts(data.artifacts)
         setShowArtifacts(true)
       }
 
-      // Show routing notification if auto-routed
       if (data.routing?.autoRouted) {
         setRoutingNotification({
           autoRouted: data.routing.autoRouted,
@@ -903,14 +1124,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         })
       }
 
-      // Trigger onboarding progress for question asked AND answer received
-      // Must be done in single update to avoid race condition with batched state updates
       setOnboardingState(prev => {
         const afterQuestion = progressOnboarding(prev, { type: 'asked_question' })
         return progressOnboarding(afterQuestion, { type: 'answer_received' })
       })
     } catch (error) {
-      console.error('Error asking OSQR:', error)
+      console.error('Error in non-streaming fallback:', error)
       setMessages((prev) => {
         const updated = [...prev]
         updated[updated.length - 1] = {
@@ -920,18 +1139,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         }
         return updated
       })
-    } finally {
-      setIsLoading(false)
-      setChatStage('complete')
-      // Reset for next question
-      setInput('')
-      setRefineResult(null)
-      setRefinedQuestion('')
-      setClarifyingAnswers([])
-      // PERSISTENCE: Clear pending request since we got a response
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
-      }
     }
   }
 
@@ -1153,6 +1360,26 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                         workspaceId={workspaceId}
                         tokensUsed={message.tokensUsed}
                       />
+                    )}
+
+                    {/* I-9: Cross-project context indicator */}
+                    {!message.thinking && message.usedCrossProjectContext && (
+                      <div className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-purple-500/10 border border-purple-500/20 rounded-lg text-xs">
+                        <Columns className="h-3.5 w-3.5 text-purple-400" />
+                        <span className="text-purple-300">
+                          This response includes context from other projects
+                        </span>
+                      </div>
+                    )}
+
+                    {/* I-10: Degraded response indicator */}
+                    {!message.thinking && message.degraded && (
+                      <div className="mt-2 flex items-center gap-2 px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs">
+                        <AlertCircle className="h-3.5 w-3.5 text-amber-400" />
+                        <span className="text-amber-300">
+                          Response optimized for current usage tier
+                        </span>
+                      </div>
                     )}
 
                     {/* "Go Deeper" prompt for auto-downgraded questions */}
@@ -2095,6 +2322,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
             handleDirectFire(message)
           }}
           onHighlightElement={onHighlightElement}
+          streamingState={streamingState}
         />
       )}
     </div>

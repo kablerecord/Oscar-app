@@ -367,13 +367,37 @@ export async function getEngagementTrends(days: number = 30): Promise<Engagement
       }),
     ])
 
+    // Calculate average session duration from session_end telemetry events
+    let avgSessionMinutes = 15 // Default fallback
+    try {
+      const sessionEvents = await prisma.telemetryEvent.findMany({
+        where: {
+          eventType: 'session_end',
+          timestamp: {
+            gte: dayStart,
+            lt: dayEnd,
+          },
+        },
+        select: { data: true },
+      })
+      if (sessionEvents.length > 0) {
+        const totalSeconds = sessionEvents.reduce((sum, e) => {
+          const data = e.data as { durationSeconds?: number }
+          return sum + (data.durationSeconds || 0)
+        }, 0)
+        avgSessionMinutes = Math.round((totalSeconds / sessionEvents.length) / 60)
+      }
+    } catch {
+      // Telemetry table may not exist yet, use default
+    }
+
     trends.push({
       date: dayStart.toISOString().split('T')[0],
       activeUsers,
       newUsers,
       conversations,
       messages,
-      avgSessionMinutes: 15, // TODO: Calculate from actual session data
+      avgSessionMinutes,
     })
   }
 

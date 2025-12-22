@@ -408,10 +408,58 @@ Export the full council discussion as a PDF/document for reference.
 
 ---
 
+## Context from Architecture
+
+### Related Components
+- Multi-Model Router — Routes questions and classifies type
+- Constitutional Framework — Validates all model outputs
+- Memory Vault — Provides context for council prompts
+- Throttle — Enforces tier access (Master only)
+- Bubble — May suggest Council mode for complex questions
+
+### Architecture References
+- See: `docs/architecture/MULTI-MODEL-ARCHITECTURE.md` — Model registry and routing
+- See: `lib/ai/model-router.ts` — Question type detection
+- See: `lib/ai/panel.ts` — Panel orchestration
+
+### Integration Points
+- Receives from: User query, Memory context, Tier verification
+- Sends to: Multiple model providers (parallel), Constitutional (validation), Synthesis engine
+
+### Tech Stack Constraints
+- Streaming: Server-Sent Events (SSE)
+- Parallel execution: Promise.all with timeout guards
+- Models: Anthropic (Claude), OpenAI (GPT), Google (Gemini), xAI (Grok)
+
+---
+
+## Testable Invariants
+
+### Pre-conditions
+- User is on Master tier or higher
+- At least 2 models are selected
+- Question has been refined (if refinement enabled)
+
+### Post-conditions
+- All selected models have responded (or timed out gracefully)
+- OSQR synthesis includes perspectives from all responding models
+- Constitutional validation passed on synthesis
+
+### Invariants
+- Maximum 4 models per query (cost/performance constraint)
+- Each model has maximum 30 second timeout
+- Synthesis must identify agreements AND disagreements
+- Models stream independently (one slow model doesn't block others)
+- Rate limit: Maximum 10 Council sessions per day (Master tier)
+- Constitutional checks run on all model outputs and synthesis
+
+---
+
 ## Version History
 
 | Date | Version | Changes |
 |------|---------|---------|
+| 2025-12-20 | 0.2 | Added Context from Architecture, Testable Invariants |
 | 2025-12-09 | 0.1 | Initial spec created |
 
 ---

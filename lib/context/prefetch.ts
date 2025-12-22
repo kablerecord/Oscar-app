@@ -98,10 +98,22 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
     fetcher: async (workspaceId) => {
       const workspace = await prisma.workspace.findUnique({
         where: { id: workspaceId },
-        select: { name: true },
+        select: { name: true, tier: true, owner: { select: { name: true, email: true } } },
       })
-      // TODO: Add user profile table when available
-      return { name: workspace?.name }
+      // Also fetch profile answers for user preferences
+      const profileAnswers = await prisma.profileAnswer.findMany({
+        where: { workspaceId },
+        select: { category: true, answer: true },
+      })
+      const preferences = Object.fromEntries(
+        profileAnswers.map(p => [p.category, p.answer])
+      )
+      return {
+        name: workspace?.name,
+        tier: workspace?.tier,
+        ownerName: workspace?.owner?.name,
+        preferences,
+      }
     },
   },
   {

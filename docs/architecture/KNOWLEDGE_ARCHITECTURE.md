@@ -383,6 +383,51 @@ If needed for support:
 
 ---
 
+## Context from Architecture
+
+### Related Components
+- Constitutional Framework — Ensures privacy principles are enforced
+- Memory Vault — Implements the two-brain model storage
+- Document Indexing — Populates PKV with user documents
+- Router — Uses retrieved context for prompt enrichment
+- Privacy Tiers — Controls what data is collected/shared
+
+### Architecture References
+- See: `docs/architecture/PRIVACY_TIERS.md` — Privacy tier definitions
+- See: `docs/governance/OSQR_CONSTITUTION.md` — Privacy principles (Part 2.4)
+- See: `lib/osqr/memory-wrapper.ts` — Implementation
+
+### Integration Points
+- Receives from: User inputs, Document uploads, Conversation history
+- Sends to: Router (context), Guidance (project data), Bubble (proactive items)
+
+### Tech Stack Constraints
+- Vector storage: Chroma (embedded) or Pinecone (production)
+- Embedding model: text-embedding-3-small (1536 dimensions)
+- Encryption: Per-user encryption at rest
+
+---
+
+## Testable Invariants
+
+### Pre-conditions
+- User is authenticated
+- Privacy tier is known for retrieval
+
+### Post-conditions
+- Retrieved data respects privacy tier
+- PKV data encrypted at rest
+
+### Invariants
+- PKV queries never return data from another user's vault
+- GPKV is read-only for users (only OSQR team can update)
+- Embedding dimensions must match (1536) across all stores
+- Deletion is cryptographic destruction, not soft-delete
+- Founder cannot access user PKV content (architectural enforcement)
+- No psychological profiles stored (references only, runtime synthesis)
+
+---
+
 ## Summary
 
 OSQR's knowledge architecture is built on one principle:

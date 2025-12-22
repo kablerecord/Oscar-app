@@ -36,7 +36,8 @@ model Workspace {
   updatedAt             DateTime               @updatedAt
   onboardingCompleted   Boolean                @default(false)
   onboardingCompletedAt DateTime?
-  tier                  String                 @default("free")
+  tier                  String                 @default("starter") // Throttle tier: starter, pro, master, enterprise
+  tierUpdatedAt         DateTime?              // When tier was last changed (for proration)
   capabilityAssessedAt  DateTime?
   capabilityLevel       Int                    @default(0)
   identityStage         String?
@@ -54,6 +55,7 @@ model Workspace {
 
   @@index([ownerId])
   @@index([capabilityLevel])
+  @@index([tier])
 }
 
 model Project {
@@ -442,4 +444,81 @@ model ConversationSummary {
 
   @@index([workspaceId])
   @@index([workspaceId, createdAt])
+}
+
+// ============================================
+// Daily Budget Tracking (Throttle System)
+// ============================================
+
+// Tracks daily query budget per user with timezone-aware midnight resets
+model DailyBudget {
+  id                  String   @id @default(cuid())
+  userId              String
+  tier                String   // lite, pro, master, enterprise
+  date                String   // YYYY-MM-DD in user's timezone
+  premiumQueriesUsed  Int      @default(0)
+  premiumQueriesLimit Int
+  economyQueriesUsed  Int      @default(0)
+  overagePurchased    Int      @default(0)
+  referralBonus       Int      @default(0)
+  resetAt             DateTime // Midnight in user's timezone
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([userId])
+}
+
+// User timezone settings for budget reset timing
+model UserTimezone {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  timezone  String   @default("UTC") // IANA timezone string
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ============================================
+// Telemetry System for Behavioral Intelligence
+// ============================================
+
+// Telemetry events for behavioral tracking
+model TelemetryEvent {
+  id          String   @id @default(cuid())
+  eventType   String   // mode_selected, session_start, feature_used, etc.
+  userIdHash  String?  // Hashed user ID for privacy
+  workspaceIdHash String? // Hashed workspace ID
+  data        Json     // Event-specific data
+  timestamp   DateTime @default(now())
+
+  @@index([eventType])
+  @@index([userIdHash])
+  @@index([timestamp])
+}
+
+// User privacy settings for telemetry
+model UserPrivacySetting {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  privacyTier     String   @default("A") // A, B, or C
+  consentVersion  String   // Version of privacy policy consented to
+  consentTimestamp DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// Privacy opt-out history for audit trail
+model PrivacyOptOutRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  fromTier  String
+  toTier    String
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

@@ -36,10 +36,15 @@ This document exists because OSQR evolves faster than internalization. Use it to
 | [vision/PRIVACY-PHONE.md](vision/PRIVACY-PHONE.md) | V4.0 Privacy Phone strategy | Vision |
 | [vision/CREATOR_MARKETPLACE_GTM.md](vision/CREATOR_MARKETPLACE_GTM.md) | Marketplace go-to-market strategy | Complete |
 | [marketing/PODCAST_SEEDING_PLAYBOOK.md](marketing/PODCAST_SEEDING_PLAYBOOK.md) | Experience-first podcast outreach strategy | Complete |
+| [execution/SPOKEN_ARCHITECTURE.md](../execution/SPOKEN_ARCHITECTURE.md) | V2.0 Guided software development methodology | Specified |
+| [plugins/PLUGIN_CREATOR_SPEC.md](../plugins/PLUGIN_CREATOR_SPEC.md) | Conversational plugin development | Specified |
+| [features/QUERY_MODES.md](../features/QUERY_MODES.md) | Query modes (Quick/Thoughtful/Contemplate) + Council Mode | Specified |
+| [features/CAPTURE_ROUTER.md](../features/CAPTURE_ROUTER.md) | Natural language capture and reminder routing | Specified |
+| [features/EMAIL_INTEGRATION.md](../features/EMAIL_INTEGRATION.md) | Gmail integration for unified intelligence | Specified |
 
 ---
 
-## Full System Inventory (39 Systems, 9 Layers)
+## Full System Inventory (44 Systems, 9 Layers)
 
 ### Layer 0: Foundational Documents
 
@@ -91,6 +96,7 @@ This document exists because OSQR evolves faster than internalization. Use it to
 | 14 | **Thoughtful Mode** | Hidden panel reasoning + synthesis | ✅ Built | — |
 | 15 | **Contemplate Mode** | Extended multi-round deep reasoning | ✅ Built | — |
 | 16 | **Council Mode** | Visible multi-model panel, real-time streams, OSQR moderation | Specified | [COUNCIL-MODE.md](features/COUNCIL-MODE.md) |
+| 16a | **Query Modes Spec** | Quick/Thoughtful/Contemplate mode definitions, tier differentiation, Council Mode UI | Specified | [QUERY_MODES.md](../features/QUERY_MODES.md) |
 
 ---
 
@@ -150,6 +156,7 @@ This document exists because OSQR evolves faster than internalization. Use it to
 | 23 | **Temporal Intelligence Layer** | Knows when things happened, detects patterns over time | Conceptual | — |
 | 24 | **Cognitive Load Governor** | Blur don't hide, reduce overwhelm, progressive disclosure | Specified | [UX_PHILOSOPHY.md](UX_PHILOSOPHY.md) |
 | 25 | **Focus Mode** | UI simplification, context-aware visibility, noise reduction | Specified | [UX_PHILOSOPHY.md](UX_PHILOSOPHY.md) |
+| 25a | **Capture Router** | Natural language capture (remind me, note this), intelligent routing to calendar/memory/context triggers | Specified | [CAPTURE_ROUTER.md](../features/CAPTURE_ROUTER.md) |
 
 ---
 
@@ -182,6 +189,18 @@ This document exists because OSQR evolves faster than internalization. Use it to
 | 29 | **Creator Plugin System** | Judgment Profiles that change how OSQR thinks | Specified | [PLUGIN_ARCHITECTURE.md](PLUGIN_ARCHITECTURE.md) |
 | 30 | **Creator Marketplace** | Discovery, licensing, 80/20 economics | Specified | [CREATOR_MARKETPLACE.md](CREATOR_MARKETPLACE.md) |
 | 31 | **Plugin Council Mode (v1.5+)** | Multiple plugins, reasoning about disagreement | Specified | [CREATOR_MARKETPLACE.md](CREATOR_MARKETPLACE.md) |
+| 31a | **Plugin Creator Spec** | Conversational plugin development, extraction conversation, real-time control population | Specified | [PLUGIN_CREATOR_SPEC.md](../plugins/PLUGIN_CREATOR_SPEC.md) |
+
+---
+
+### Layer 8a: Data Integration Layer (V1.5)
+
+*External data sources that extend OSQR's knowledge*
+
+| # | System | Description | Status | Doc |
+|---|--------|-------------|--------|-----|
+| 32 | **Email Integration** | Gmail connection, conservative indexing, JIT retrieval, thread compaction | Specified | [EMAIL_INTEGRATION.md](../features/EMAIL_INTEGRATION.md) |
+| 33 | **Calendar Integration** | Event-based triggers for Capture Router, meeting context | Planned | — |
 
 ---
 
@@ -191,12 +210,13 @@ This document exists because OSQR evolves faster than internalization. Use it to
 
 | # | System | Description | Status | Doc |
 |---|--------|-------------|--------|-----|
-| 32 | **Media Vault** | Photos, videos, timeline, memory linking | Vision | — |
-| 33 | **VS Code Dev Companion (V3.0)** | Real OSQR backend in VS Code, PKV+MSC integration | Vision | [VSCODE-DEV-COMPANION.md](vision/VSCODE-DEV-COMPANION.md) |
-| 34 | **Autonomous Mode** | Task execution, assumption tracking, safe autonomy | Partial | ROADMAP Appendix D |
-| 35 | **Autonomous App Builder** | Blueprint generation, dependency graphs, scaffolding | Vision | [AUTONOMOUS-APP-BUILDER.md](vision/AUTONOMOUS-APP-BUILDER.md) |
-| 36 | **Privacy Phone (V4.0)** | OSQR-native phone, intelligence utility model, US manufacturing | Vision | [PRIVACY-PHONE.md](vision/PRIVACY-PHONE.md) |
-| 37 | **Robotics Integration (V5.0)** | OSQR intelligence layer for robotics/automation | Placeholder | — |
+| 34 | **Media Vault** | Photos, videos, timeline, memory linking | Vision | — |
+| 35 | **VS Code Dev Companion (V3.0)** | Real OSQR backend in VS Code, PKV+MSC integration | Vision | [VSCODE-DEV-COMPANION.md](vision/VSCODE-DEV-COMPANION.md) |
+| 35a | **Spoken Architecture (V2.0)** | Guided software development through conversation, auto-categorization, gap detection | Specified | [SPOKEN_ARCHITECTURE.md](../execution/SPOKEN_ARCHITECTURE.md) |
+| 36 | **Autonomous Mode** | Task execution, assumption tracking, safe autonomy | Partial | ROADMAP Appendix D |
+| 37 | **Autonomous App Builder** | Blueprint generation, dependency graphs, scaffolding | Vision | [AUTONOMOUS-APP-BUILDER.md](vision/AUTONOMOUS-APP-BUILDER.md) |
+| 38 | **Privacy Phone (V4.0)** | OSQR-native phone, intelligence utility model, US manufacturing | Vision | [PRIVACY-PHONE.md](vision/PRIVACY-PHONE.md) |
+| 39 | **Robotics Integration (V5.0)** | OSQR intelligence layer for robotics/automation | Placeholder | — |
 
 > **Note:** Robotics Integration is a future vision placeholder. Documentation will be created when strategic direction is defined.
 
@@ -305,6 +325,7 @@ When adding a new system/feature, document:
 | 2025-12-14 | Added Layer 0 (Constitution + Philosophy), User Intelligence Artifacts (37 systems, 10 layers) |
 | 2025-12-14 | Added UX_PHILOSOPHY.md (Focus Mode, Three UI States, Progressive Reveal) |
 | 2025-12-16 | Added Privacy Phone (V4.0) and Robotics Integration (V5.0 placeholder) to Layer 9; updated version references (V2.0=Marketplace, V3.0=VS Code, V4.0=Privacy Phone, V5.0=Robotics) |
+| 2025-12-21 | Added 5 new V1.5/V2.0 specs: Query Modes, Capture Router, Email Integration, Plugin Creator, Spoken Architecture V2.0. Added Layer 8a (Data Integration). Updated to 44 systems. |
 
 ---
 

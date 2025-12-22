@@ -1,5 +1,7 @@
 import { prisma } from '../db/prisma'
 import { vectorSearch, hybridSearch } from './vector-search'
+import { searchByConcept } from '../osqr/document-indexing-wrapper'
+import { featureFlags } from '../osqr/config'
 
 type KnowledgeScope = 'all' | 'system' | 'user'
 
@@ -9,6 +11,7 @@ interface SearchOptions {
   topK?: number
   useVectorSearch?: boolean // Default true if embeddings available
   scope?: KnowledgeScope // Filter by system (OSQR) vs user knowledge
+  useOSQRIndexing?: boolean // Use OSQR Document Indexing semantic search
 }
 
 interface SearchResult {
@@ -54,13 +57,37 @@ function isOSQRSystemQuery(query: string): boolean {
  * - Ambiguous -> search all
  */
 export async function searchKnowledge(options: SearchOptions): Promise<string | undefined> {
-  const { workspaceId, query, topK = 5, useVectorSearch = true } = options
+  const { workspaceId, query, topK = 5, useVectorSearch = true, useOSQRIndexing = true } = options
 
   // Auto-detect scope if not specified
   let scope = options.scope || 'all'
   if (!options.scope && isOSQRSystemQuery(query)) {
     scope = 'system'
     console.log('[Search] Auto-detected OSQR system query, preferring system docs')
+  }
+
+  // Try OSQR Document Indexing semantic search first (for user documents)
+  // This uses the @osqr/core pipeline with multi-vector embeddings
+  if (useOSQRIndexing && featureFlags.enableDocumentIndexing && scope !== 'system') {
+    try {
+      const osqrResults = await searchByConcept(workspaceId, query, { limit: topK })
+
+      if (osqrResults.length > 0) {
+        console.log(`[Search] OSQR semantic search found ${osqrResults.length} results`)
+
+        // Format results for context
+        const context = osqrResults
+          .map((result, idx) => {
+            const projectLabel = result.projectId ? ` (Project: ${result.projectId})` : ''
+            return `[Source ${idx + 1}: ${result.documentName}${projectLabel}]\n${result.chunkContent}`
+          })
+          .join('\n\n---\n\n')
+
+        return context
+      }
+    } catch (error) {
+      console.log('[Search] OSQR semantic search unavailable, falling back to vector search:', error)
+    }
   }
 
   // Check if we have any embeddings

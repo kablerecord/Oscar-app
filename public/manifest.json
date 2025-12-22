@@ -1,0 +1,35 @@
+{
+  "name": "OSQR",
+  "short_name": "OSQR",
+  "description": "Your AI thinking companion",
+  "start_url": "/mobile",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#8b5cf6",
+  "orientation": "portrait",
+  "scope": "/mobile",
+  "icons": [
+    {
+      "src": "/icons/osqr-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/osqr-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "New Thought",
+      "short_name": "New",
+      "description": "Start a new conversation",
+      "url": "/mobile/thread",
+      "icons": [{ "src": "/icons/osqr-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

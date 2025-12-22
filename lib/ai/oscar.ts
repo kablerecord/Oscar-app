@@ -34,7 +34,7 @@ function getApiKeyForProvider(provider: ProviderType): string {
  * 4. OSQR presents you with a single, refined answer
  */
 
-export type ResponseMode = 'quick' | 'thoughtful' | 'contemplate'
+export type ResponseMode = 'quick' | 'thoughtful' | 'contemplate' | 'council'
 
 export interface OSQRRequest {
   userMessage: string
@@ -400,11 +400,206 @@ ${context}
 
   /**
    * Stream OSQR's response (for better UX)
-   * TODO: Implement streaming version
+   * Runs panel discussions first (not streamed), then streams synthesis
    */
   static async *askStream(request: OSQRRequest): AsyncIterable<string> {
-    // For now, just yield the full response
-    const response = await this.ask(request)
-    yield response.answer
+    const { userMessage, panelAgents, context, mode = 'thoughtful', userId, userLevel } = request
+
+    switch (mode) {
+      case 'quick':
+        // Quick mode: stream directly from the provider
+        yield* this.quickResponseStream({ userMessage, panelAgents, context, userId })
+        break
+
+      case 'contemplate':
+        yield* this.contemplativeResponseStream({ userMessage, panelAgents, context, userId, userLevel })
+        break
+
+      case 'thoughtful':
+      default:
+        yield* this.thoughtfulResponseStream({ userMessage, panelAgents, context, userId, userLevel })
+        break
+    }
+  }
+
+  /**
+   * Quick mode streaming: Direct streaming from Claude
+   */
+  private static async *quickResponseStream(request: Omit<OSQRRequest, 'mode' | 'includeDebate'>): AsyncIterable<string> {
+    const { userMessage, context } = request
+    const routingDecision = routeQuestion(userMessage)
+
+    console.log(`OSQR: Quick mode streaming - using Claude Sonnet 4`)
+
+    const provider = ProviderRegistry.getProvider('anthropic', {
+      apiKey: getApiKeyForProvider('anthropic'),
+      model: 'claude-sonnet-4-20250514',
+    })
+
+    const messages: AIMessage[] = [
+      {
+        role: 'system',
+        content: this.getQuickModePrompt(routingDecision.questionType),
+      },
+    ]
+
+    if (context) {
+      messages.push({
+        role: 'system',
+        content: `Context from user's knowledge base:\n${context}`,
+      })
+    }
+
+    messages.push({ role: 'user', content: userMessage })
+
+    // Use generateStream if available
+    if (provider.generateStream) {
+      yield* provider.generateStream({ messages, temperature: 0.3 })
+    } else {
+      // Fallback to non-streaming
+      const response = await provider.generate({ messages, temperature: 0.3 })
+      yield response
+    }
+  }
+
+  /**
+   * Thoughtful mode streaming: Panel discussion first, then stream synthesis
+   */
+  private static async *thoughtfulResponseStream(request: Omit<OSQRRequest, 'mode' | 'includeDebate'>): AsyncIterable<string> {
+    const { userMessage, panelAgents, context, userId, userLevel } = request
+
+    // Step 1: Get panel responses (not streamed - happens behind the scenes)
+    console.log('OSQR: Thoughtful mode - consulting panel...')
+    const panelResponses = await PanelOrchestrator.askPanel({
+      userMessage,
+      agents: panelAgents,
+      context,
+    })
+
+    // Step 2: Roundtable (not streamed)
+    let roundtableResponses: PanelResponse[] | undefined
+    if (panelAgents.length > 1) {
+      console.log('OSQR: Facilitating roundtable...')
+      roundtableResponses = await PanelOrchestrator.roundtable(
+        { userMessage, agents: panelAgents, context },
+        panelResponses
+      )
+    }
+
+    // Step 3: Stream the synthesis
+    console.log('OSQR: Streaming synthesis...')
+    yield* this.synthesizeStream({
+      userMessage,
+      panelResponses,
+      roundtableResponses,
+      context,
+      userId,
+      userLevel,
+    })
+  }
+
+  /**
+   * Contemplate mode streaming: Extended panel discussion, then stream synthesis
+   */
+  private static async *contemplativeResponseStream(request: Omit<OSQRRequest, 'mode' | 'includeDebate'>): AsyncIterable<string> {
+    const { userMessage, panelAgents, context, userId, userLevel } = request
+
+    console.log('OSQR: Contemplate mode - deep analysis...')
+
+    // Step 1: Panel responses
+    const panelResponses = await PanelOrchestrator.askPanel({
+      userMessage,
+      agents: panelAgents,
+      context,
+    })
+
+    // Step 2: First roundtable
+    console.log('OSQR: Extended roundtable...')
+    const roundtableResponses = await PanelOrchestrator.roundtable(
+      { userMessage, agents: panelAgents, context },
+      panelResponses
+    )
+
+    // Step 3: Second roundtable for deeper insights
+    console.log('OSQR: Second round of deliberation...')
+    const secondRoundResponses = await PanelOrchestrator.roundtable(
+      { userMessage, agents: panelAgents, context },
+      roundtableResponses || panelResponses
+    )
+
+    // Step 4: Stream the synthesis
+    console.log('OSQR: Streaming deep synthesis...')
+    yield* this.synthesizeStream({
+      userMessage,
+      panelResponses,
+      roundtableResponses: secondRoundResponses,
+      context,
+      isDeepAnalysis: true,
+      userId,
+      userLevel,
+    })
+  }
+
+  /**
+   * Stream the synthesis step
+   */
+  private static async *synthesizeStream(params: {
+    userMessage: string
+    panelResponses: PanelResponse[]
+    roundtableResponses?: PanelResponse[]
+    context?: string
+    isDeepAnalysis?: boolean
+    userId?: string
+    userLevel?: number
+    questionType?: string
+  }): AsyncIterable<string> {
+    const { userMessage, panelResponses, roundtableResponses, context, isDeepAnalysis = false, userId, userLevel, questionType } = params
+
+    // Build synthesis prompt (same as non-streaming)
+    const messages: AIMessage[] = []
+
+    const systemPrompt = this.buildSystemPrompt({ userLevel, questionType })
+    messages.push({ role: 'system', content: systemPrompt })
+    messages.push({ role: 'user', content: `User's question: ${userMessage}` })
+
+    if (context) {
+      messages.push({
+        role: 'system',
+        content: `IMPORTANT - User's Knowledge Base Context:
+This is information retrieved from the user's personal knowledge base - their own documents, projects, and history. This is about THEIR specific situation. When synthesizing the panel's responses, prioritize information from this context and reference specific details rather than giving generic advice.
+
+--- KNOWLEDGE BASE ---
+${context}
+--- END KNOWLEDGE BASE ---`,
+      })
+    }
+
+    const panelSummary = this.buildPanelSummary(panelResponses, roundtableResponses)
+    messages.push({ role: 'system', content: `Panel Discussion Summary:\n${panelSummary}` })
+
+    const synthesisPrompt = isDeepAnalysis
+      ? `Now synthesize all of this into your answer for me. This is a complex topic, so take your time to be thorough. What's your best answer after hearing from everyone?`
+      : `Now give me your answer based on what the panel discussed. What do you think is the best response?`
+
+    messages.push({ role: 'user', content: synthesisPrompt })
+
+    // Get user's preferred synthesizer model
+    const synthConfig = userId
+      ? await getSynthesizerConfig(userId)
+      : { provider: 'anthropic' as const, model: SETTING_DEFAULTS.synthesizer_model as string }
+
+    const osqrProvider = ProviderRegistry.getProvider(synthConfig.provider, {
+      apiKey: getApiKeyForProvider(synthConfig.provider),
+      model: synthConfig.model,
+    })
+
+    // Stream the response
+    if (osqrProvider.generateStream) {
+      yield* osqrProvider.generateStream({ messages, temperature: 0.7 })
+    } else {
+      // Fallback to non-streaming
+      const answer = await osqrProvider.generate({ messages, temperature: 0.7 })
+      yield answer
+    }
   }
 }

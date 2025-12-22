@@ -617,4 +617,51 @@ function SurfaceRouter({ activeSurface }: Props) {
 
 ---
 
+## Context from Architecture
+
+### Related Components
+- Memory Vault — Provides last interaction, active project context
+- Guidance — Surfaces proactive items for display
+- Temporal — Provides commitment-based content
+- Plugins — May inject prompts and greeting overrides
+- Constitutional — Ensures decline-to-act patterns respect user agency
+
+### Architecture References
+- See: `docs/architecture/OSQR-IDENTITY-SURFACES.md` — Identity philosophy
+- See: `docs/architecture/PLUGIN_ARCHITECTURE.md` — Plugin prompt injection
+- See: `lib/osqr/bubble-wrapper.ts` — Implementation wrapper
+
+### Integration Points
+- Receives from: Temporal (commitments), Guidance (project context), Plugins (prompts)
+- Sends to: Router (user messages), Surface manager (transitions)
+
+### Tech Stack Constraints
+- React component with Framer Motion for animations
+- CSS custom properties for theming
+- ARIA compliance required
+- prefers-reduced-motion respected
+
+---
+
+## Testable Invariants
+
+### Pre-conditions
+- User is authenticated
+- Bubble component is mounted
+
+### Post-conditions
+- Greeting is displayed appropriate to time/context
+- Presence state reflects actual OSQR status
+
+### Invariants
+- Bubble must always be accessible (even in minimized state)
+- Voice activation must override current surface
+- Plugin prompts limited to 3 concurrent
+- Plugin greeting takes precedence when active
+- Animations respect prefers-reduced-motion
+- Quick actions limited to 3 visible
+- Decline-to-act suggestions always include proceed option
+
+---
+
 *This document specifies the technical implementation of the OSQR bubble. For identity and philosophy, see [OSQR-IDENTITY-SURFACES.md](../architecture/OSQR-IDENTITY-SURFACES.md).*

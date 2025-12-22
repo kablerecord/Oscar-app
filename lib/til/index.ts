@@ -29,7 +29,7 @@ export async function trackConversation(
   userMessage: string,
   osqrResponse: string,
   metadata?: {
-    mode?: 'quick' | 'thoughtful' | 'contemplate'
+    mode?: 'quick' | 'thoughtful' | 'contemplate' | 'council'
     isFollowUp?: boolean
     previousTopic?: string
   }

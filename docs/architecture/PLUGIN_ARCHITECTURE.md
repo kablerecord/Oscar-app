@@ -472,6 +472,53 @@ OSQR Core exposes controlled insertion points:
 
 ---
 
+## Context from Architecture
+
+### Related Components
+- Constitutional Framework — Provides override protection for sacred clauses
+- Memory Vault — Allows plugin annotation of memories
+- Bubble — Supports plugin prompt injection
+- Guidance — Can be influenced by plugin standards
+- Safety System — Crisis detection for plugin content
+
+### Architecture References
+- See: `docs/governance/OSQR_CONSTITUTION.md` — Constitutional constraints plugins cannot override
+- See: `docs/governance/SEPARATION_PATTERN.md` — Core/plugin separation
+- See: `docs/architecture/SAFETY_SYSTEM.md` — Crisis handling
+
+### Integration Points
+- Receives from: Plugin registry, User consent, Plugin hooks
+- Sends to: Response pipeline (hooks), Memory (annotations), Bubble (prompts)
+
+### Tech Stack Constraints
+- Plugin loading: Dynamic import
+- Hook execution: Pre/post response middleware
+- Safety: Constitutional validation on all plugin outputs
+
+---
+
+## Testable Invariants
+
+### Pre-conditions
+- User has opted into plugin (consent screen completed)
+- Plugin passes safety review
+
+### Post-conditions
+- Plugin influence is reflected in response (if applicable)
+- User can uninstall at any time
+
+### Invariants
+- Plugins cannot override OSQR Core responses
+- Plugins cannot prevent uninstall
+- Plugins cannot hide their intensity (consent required)
+- Plugins cannot access other users' data
+- Sacred constitutional clauses cannot be violated by plugins
+- Exit is always one click away
+- Plugins cannot impersonate OSQR Core
+- Red lines (agency, deception, coercion, harm) are enforced
+
+---
+
 ## Related Documents
 
 - [ROADMAP.md](../../ROADMAP.md) — Section 0: Strategic Vision

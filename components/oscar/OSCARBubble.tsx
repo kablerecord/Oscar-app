@@ -55,27 +55,38 @@ interface OSCARBubbleProps {
 
   // Highlight callback - for progressive discovery
   onHighlightElement?: (target: HighlightTarget) => void
+
+  // Streaming state - controls bubble presence animation
+  // thinking: purple pulse during pre-flight/panel discussion
+  // streaming: purple breathing as text streams in
+  streamingState?: 'idle' | 'thinking' | 'streaming'
 }
 
 /**
- * Bubble State Machine
+ * Bubble State Machine (Design System v1)
  *
- * States:
+ * States (matches Design System presence states):
  * - hidden: Bubble not visible (focus mode, etc.)
- * - idle: Blue pulse, waiting for insights or user
- * - holding: Has insight queued, amber pulse
+ * - idle: Blue glow, waiting for insights or user
+ * - thinking: Purple pulse, processing/waiting for API response
+ * - waiting: Subtle static purple, user is typing/listening
+ * - holding: Amber pulse, has insight queued
  * - expanded: Showing insight message in bubble
- * - connected: Flowing into panel (insight became conversation)
+ * - connected: Purple breathing, active conversation/flowing into panel
  *
  * Transitions:
  * - hidden → idle: Focus mode ends
  * - idle → holding: Insight queued and engagement allows
+ * - idle → thinking: User sends message, waiting for response
+ * - thinking → idle: Response received
+ * - idle → waiting: User starts typing
+ * - waiting → idle: User stops typing (timeout)
  * - holding → expanded: User clicks bubble
  * - expanded → connected: User clicks "Tell me more"
  * - expanded → idle: User dismisses
  * - any → hidden: Focus mode starts
  */
-type BubbleState = 'hidden' | 'idle' | 'holding' | 'expanded' | 'connected'
+type BubbleState = 'hidden' | 'idle' | 'thinking' | 'waiting' | 'holding' | 'expanded' | 'connected'
 
 // Types for proactive insights - exported for use by parent components
 export interface PendingInsight {
@@ -93,6 +104,44 @@ const CATEGORY_CONFIG: Record<InsightCategory, { icon: string; label: string; co
   clarify: { icon: '💡', label: 'Quick thought', color: 'text-blue-400' },
   next_step: { icon: '→', label: 'Next step', color: 'text-green-400' },
   recall: { icon: '💭', label: 'Remember', color: 'text-purple-400' },
+}
+
+/**
+ * Design System v1 - Bubble presence state animations
+ * Maps bubble states to their corresponding animation classes
+ */
+function getBubbleAnimationClass(state: BubbleState): string {
+  switch (state) {
+    case 'idle':
+      return 'animate-subtle-pulse' // Blue glow
+    case 'thinking':
+      return 'animate-thinking-pulse' // Purple pulse
+    case 'waiting':
+      return 'bubble-waiting' // Subtle static purple
+    case 'holding':
+      return 'animate-pulse-glow-amber' // Amber pulse
+    case 'connected':
+    case 'expanded':
+      return 'animate-connected-breathing' // Purple breathing
+    default:
+      return ''
+  }
+}
+
+/**
+ * Get background gradient class for pill based on state
+ */
+function getPillGradientClass(state: BubbleState): string {
+  switch (state) {
+    case 'holding':
+      return 'bg-gradient-to-r from-amber-500 to-orange-500'
+    case 'thinking':
+      return 'bg-gradient-to-r from-purple-500 to-violet-500'
+    case 'connected':
+      return 'bg-gradient-to-r from-purple-500 to-blue-500'
+    default:
+      return 'bg-gradient-to-r from-blue-500 to-purple-500'
+  }
 }
 
 // Ref handle type for external control
@@ -118,6 +167,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
   isGreetingCentered = false,
   onBubbleChat,
   onHighlightElement,
+  streamingState = 'idle',
 }: OSCARBubbleProps, ref) {
   // Legacy state (for onboarding compatibility)
   const [isOpen, setIsOpen] = useState(false)
@@ -191,6 +241,17 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
   }, [chatHistory, isOpen])
+
+  // Sync external streaming state with bubble state
+  // This allows the main chat to control bubble presence during streaming
+  useEffect(() => {
+    if (streamingState === 'thinking') {
+      setBubbleState('thinking')
+    } else if (streamingState === 'streaming') {
+      setBubbleState('connected')
+    }
+    // Don't auto-return to idle - let internal logic handle that
+  }, [streamingState])
 
   // Add a new message to chat history
   const addChatMessage = useCallback((message: string, type: ChatMessage['type'], category?: string) => {
@@ -526,6 +587,9 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
     setBubbleChatInput('')
     setBubbleChatLoading(true)
 
+    // Transition to thinking state (purple pulse)
+    setBubbleState('thinking')
+
     // Add user message to chat history
     addChatMessage(userMessage, 'user')
 
@@ -555,6 +619,8 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
       addChatMessage("Something went wrong. Let's try that again.", 'osqr')
     } finally {
       setBubbleChatLoading(false)
+      // Return to idle state after response
+      setBubbleState('idle')
     }
   }, [bubbleChatInput, bubbleChatLoading, onBubbleChat, addChatMessage])
 
@@ -770,10 +836,8 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
       <button
         onClick={isHolding ? handleShowInsight : handlePillClick}
         className={`fixed bottom-32 sm:bottom-28 right-16 sm:right-20 z-50 flex items-center gap-2 rounded-full px-4 py-2.5 text-white shadow-lg transition-all hover:scale-105 hover:shadow-xl ${
-          isHolding
-            ? 'bg-gradient-to-r from-amber-500 to-orange-500 animate-pulse-glow-amber'
-            : 'bg-gradient-to-r from-blue-500 to-purple-500 animate-subtle-pulse'
-        }`}
+          getPillGradientClass(bubbleState)
+        } ${getBubbleAnimationClass(bubbleState)}`}
       >
         {isHolding && pendingInsight ? (
           <>
@@ -1012,10 +1076,18 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
         bottom: 'auto',
       } : undefined}
     >
-      <div className="relative overflow-hidden rounded-[28px] bg-slate-900 shadow-xl shadow-blue-500/10 border border-slate-700/50">
-        {/* Animated background blobs */}
-        <div className="absolute -top-10 -right-10 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl animate-pulse" />
-        <div className="absolute -bottom-10 -left-10 w-20 h-20 bg-purple-500/10 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className={`relative overflow-hidden rounded-[28px] bg-slate-900 shadow-xl border border-slate-700/50 ${getBubbleAnimationClass(bubbleState)}`}>
+        {/* Animated background blobs - color matches presence state */}
+        <div className={`absolute -top-10 -right-10 w-24 h-24 rounded-full blur-2xl animate-pulse ${
+          bubbleState === 'holding' ? 'bg-amber-500/10' :
+          bubbleState === 'thinking' || bubbleState === 'connected' ? 'bg-purple-500/10' :
+          'bg-blue-500/10'
+        }`} />
+        <div className={`absolute -bottom-10 -left-10 w-20 h-20 rounded-full blur-2xl animate-pulse ${
+          bubbleState === 'holding' ? 'bg-orange-500/10' :
+          bubbleState === 'thinking' || bubbleState === 'connected' ? 'bg-violet-500/10' :
+          'bg-purple-500/10'
+        }`} style={{ animationDelay: '1s' }} />
 
         {/* Draggable header bar - entire top area is draggable */}
         <div

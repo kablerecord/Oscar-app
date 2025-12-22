@@ -19,12 +19,41 @@ import { getCachedContext, getVaultStats } from '@/lib/context/prefetch'
 import { isDevWorkspace, createTimer, analyzeQuestion, logAnalytics, type AnalyticsEvent } from '@/lib/analytics/dev-analytics'
 import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary } from '@/lib/oscar/cross-session-memory'
 
+// ==========================================================================
+// @osqr/core Integration
+// These imports connect oscar-app to the OSQR brain library
+// ==========================================================================
+import { checkInput, checkOutput, getDeclineMessage } from '@/lib/osqr/constitutional-wrapper'
+import { quickRoute, shouldUseFastPath } from '@/lib/osqr/router-wrapper'
+import { hasCommitmentSignals, extractCommitments } from '@/lib/osqr/temporal-wrapper'
+import { featureFlags, throttleConfig } from '@/lib/osqr/config'
+
+// New Phase 2 integrations: Throttle (I-10) & Cross-Project Memory (I-9)
+import {
+  canMakeQuery,
+  getThrottleStatus,
+  processThrottledQuery,
+  getDegradationMessage,
+  getBudgetStatusMessage,
+  recordQueryUsage,
+  hasFeatureAccess,
+  type UserTier,
+} from '@/lib/osqr'
+import {
+  getContextWithCrossProject,
+  findRelatedFromOtherProjects,
+  storeMessageWithContext,
+} from '@/lib/osqr/memory-wrapper'
+import { hasFeature as hasTierFeature, type TierName } from '@/lib/tiers/config'
+
 const RequestSchema = z.object({
   message: z.string().min(1),
   workspaceId: z.string(),
+  projectId: z.string().optional(), // Project context for cross-project memory (I-9)
+  conversationId: z.string().optional(), // Conversation ID for memory tracking
   useKnowledge: z.boolean().default(true),
   includeDebate: z.boolean().default(false), // Debug mode to see panel discussion
-  mode: z.enum(['quick', 'thoughtful', 'contemplate']).default('thoughtful'), // Response complexity mode
+  mode: z.enum(['quick', 'thoughtful', 'contemplate', 'council']).default('thoughtful'), // Response complexity mode
   systemMode: z.boolean().optional(), // Explicit system mode (restrict to OSQR docs only)
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
@@ -96,7 +125,100 @@ export async function POST(req: NextRequest) {
     await recordRequest({ userId, ip, endpoint: 'oscar/ask' })
 
     const body = await req.json()
-    const { message: rawMessage, workspaceId, useKnowledge, includeDebate, mode, systemMode: explicitSystemMode, conversationHistory } = RequestSchema.parse(body)
+    const { message: rawMessage, workspaceId, projectId, conversationId, useKnowledge, includeDebate, mode, systemMode: explicitSystemMode, conversationHistory } = RequestSchema.parse(body)
+
+    // ==========================================================================
+    // THROTTLE CHECK (I-10): Check query budget before processing
+    // This manages daily query limits and graceful degradation
+    // ==========================================================================
+    // Get user tier from workspace (default to config value)
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { tier: true, capabilityLevel: true },
+    })
+    const userTier = (workspace?.tier || throttleConfig.defaultTier) as UserTier
+
+    let throttleResult: { allowed: boolean; model: { id: string } | null; message: string; degraded: boolean } | null = null
+    let budgetStatus: string | null = null
+
+    if (featureFlags.enableThrottle) {
+      // Check if user can make a query
+      const canQuery = canMakeQuery(userId, userTier)
+
+      if (!canQuery) {
+        const degradationMessage = getDegradationMessage(userId, userTier)
+        return NextResponse.json({
+          answer: degradationMessage || "You've reached your daily query limit. Please try again tomorrow or upgrade your plan for more queries.",
+          throttled: true,
+          budgetStatus: getBudgetStatusMessage(userId, userTier),
+          upgradeAvailable: userTier !== 'enterprise',
+        })
+      }
+
+      // Get budget status for response headers
+      budgetStatus = getBudgetStatusMessage(userId, userTier)
+
+      // Process through throttle to get model selection
+      const queryResult = await processThrottledQuery(userId, userTier, {
+        query: rawMessage,
+        estimatedTokens: Math.ceil(rawMessage.length / 4),
+        requiresReasoning: mode === 'contemplate',
+        isCodeGeneration: /\b(code|function|class|implement|write|create|build)\b/i.test(rawMessage),
+      })
+      throttleResult = queryResult
+
+      if (!queryResult.allowed) {
+        return NextResponse.json({
+          answer: queryResult.message,
+          throttled: true,
+          budgetStatus,
+          degraded: queryResult.degraded,
+        })
+      }
+
+      // ==========================================================================
+      // MODE ACCESS ENFORCEMENT: Check tier-based mode restrictions
+      // Starter: Quick only | Pro: Quick + Thoughtful | Master: All modes
+      // ==========================================================================
+      const tierName = (userTier === 'enterprise' ? 'master' : userTier) as TierName
+
+      // Check thoughtful mode access (requires Pro or higher)
+      if (mode === 'thoughtful' && !hasTierFeature(tierName, 'hasThoughtfulMode')) {
+        return NextResponse.json({
+          answer: "Thoughtful mode uses multiple AI models for better answers. It's available on Pro and higher plans. Would you like me to answer in Quick mode instead?",
+          featureLocked: true,
+          feature: 'thoughtfulMode',
+          currentTier: userTier,
+          suggestedMode: 'quick',
+        })
+      }
+
+      // Check contemplate mode access (requires Master)
+      if (mode === 'contemplate' && !hasTierFeature(tierName, 'hasContemplateMode')) {
+        return NextResponse.json({
+          answer: "Contemplate mode enables deep reasoning with extended thinking. It's available on Master plans. Would you like me to answer in Thoughtful mode instead?",
+          featureLocked: true,
+          feature: 'contemplateMode',
+          currentTier: userTier,
+          suggestedMode: hasTierFeature(tierName, 'hasThoughtfulMode') ? 'thoughtful' : 'quick',
+        })
+      }
+
+      // Check council mode access (requires Master)
+      if (mode === 'council' && !hasTierFeature(tierName, 'hasCouncilMode')) {
+        return NextResponse.json({
+          answer: "Council mode brings multiple AI models together for deliberation on complex questions. It's available on Master plans. Would you like me to answer in a different mode?",
+          featureLocked: true,
+          feature: 'councilMode',
+          currentTier: userTier,
+          suggestedMode: hasTierFeature(tierName, 'hasThoughtfulMode') ? 'thoughtful' : 'quick',
+        })
+      }
+
+      if (featureFlags.logThrottleDecisions) {
+        console.log(`[OSQR Throttle] User ${userId} (${userTier}): ${budgetStatus}`)
+      }
+    }
 
     // SYSTEM MODE: Check for /system prefix or explicit toggle
     // This restricts context to OSQR system docs only (architecture, roadmap, etc.)
@@ -106,6 +228,41 @@ export async function POST(req: NextRequest) {
 
     if (systemMode) {
       console.log('[OSQR] System Mode active - restricting to OSQR system docs')
+    }
+
+    // ==========================================================================
+    // CONSTITUTIONAL VALIDATION (I-1): Check input against safety rules
+    // This is the first line of defense from @osqr/core
+    // ==========================================================================
+    if (featureFlags.enableConstitutionalValidation) {
+      const constitutionalResult = await checkInput(message, userId, {
+        sessionId: `session_${workspaceId}`,
+      })
+
+      if (!constitutionalResult.allowed) {
+        const violations = constitutionalResult.violations ?? []
+        console.log('[OSQR Constitutional] Input blocked:', violations.length, 'violations')
+        return NextResponse.json({
+          answer: getDeclineMessage(violations[0]?.type || 'content_policy'),
+          blocked: true,
+          reason: 'constitutional_violation',
+        })
+      }
+    }
+
+    // ==========================================================================
+    // OSQR ROUTER (I-2): Get routing recommendation from @osqr/core
+    // This supplements the existing routeQuestion with OSQR's classification
+    // ==========================================================================
+    let osqrRouting: { tier: string; model: string; shouldUseFastPath: boolean } | null = null
+    if (featureFlags.enableSmartRouting) {
+      const routeResult = quickRoute(message)
+      osqrRouting = {
+        tier: routeResult.tier,
+        model: routeResult.model,
+        shouldUseFastPath: shouldUseFastPath(message),
+      }
+      console.log('[OSQR Router] Classification:', osqrRouting.tier, '→', osqrRouting.model)
     }
 
     // ==========================================================================
@@ -542,11 +699,7 @@ Guidelines:
       })
     }
 
-    // Fetch workspace to get capability level for GKVI context
-    const workspace = await prisma.workspace.findUnique({
-      where: { id: workspaceId },
-      select: { capabilityLevel: true },
-    })
+    // Use the workspace data already fetched for throttle (includes capabilityLevel)
     const userLevel = workspace?.capabilityLevel ?? 0
 
     // Fetch active agents from database
@@ -596,6 +749,35 @@ Guidelines:
     const crossSessionMemory = await getCrossSessionMemory(workspaceId, 5)
     const memoryContext = formatMemoryForPrompt(crossSessionMemory)
 
+    // ==========================================================================
+    // CROSS-PROJECT MEMORY (I-9): Search across all projects for relevant context
+    // This enables Oscar to surface connections between different projects
+    // ==========================================================================
+    let crossProjectContext: string | undefined
+    if (featureFlags.enableCrossProjectMemory && projectId) {
+      try {
+        // Find related memories from other projects
+        const relatedFromOtherProjects = await findRelatedFromOtherProjects(
+          projectId,
+          message,
+          5 // Limit to 5 related items
+        )
+
+        if (relatedFromOtherProjects.length > 0) {
+          const crossProjectLines = relatedFromOtherProjects.map(
+            (m, i) => `${i + 1}. ${m.content} (from ${m.source})`
+          )
+          crossProjectContext = `## Related Context from Other Projects\n${crossProjectLines.join('\n')}`
+
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[OSQR Cross-Project] Found ${relatedFromOtherProjects.length} related items from other projects`)
+          }
+        }
+      } catch (crossProjectError) {
+        console.error('[OSQR Cross-Project] Error fetching cross-project context:', crossProjectError)
+      }
+    }
+
     const contextParts = [autoContext.context]
     if (tilContext) {
       contextParts.push(tilContext)
@@ -603,12 +785,16 @@ Guidelines:
     if (memoryContext) {
       contextParts.push(memoryContext)
     }
+    if (crossProjectContext) {
+      contextParts.push(crossProjectContext)
+    }
     const context = contextParts.filter(Boolean).join('\n\n---\n\n') || undefined
 
     // Log what context sources were used
     if (process.env.NODE_ENV === 'development') {
       console.log('[OSQR] Auto-context sources:', autoContext.sources)
       if (tilContext) console.log('[OSQR] TIL context included')
+      if (crossProjectContext) console.log('[OSQR] Cross-project context included')
     }
 
     // Ask OSQR with user's capability level for GKVI context
@@ -628,13 +814,33 @@ Guidelines:
     // SAFETY POST-PROCESSING: Wrap refusals and add disclaimers
     // ==========================================================================
     const safetyProcessed = processSafetyResponse(response.answer, message)
-    const processedAnswer = safetyProcessed.content
+    let processedAnswer = safetyProcessed.content
 
     if (safetyProcessed.wasModified) {
       logSafetyEvent(
         safetyProcessed.content.includes("I can't help") ? 'refusal_wrapped' : 'disclaimer_added',
         { timestamp: new Date() }
       )
+    }
+
+    // ==========================================================================
+    // CONSTITUTIONAL OUTPUT VALIDATION (I-1): Check AI response before sending
+    // Second layer of defense - ensures AI output meets safety standards
+    // ==========================================================================
+    if (featureFlags.enableConstitutionalValidation) {
+      const outputValidation = await checkOutput(processedAnswer, message, userId)
+
+      if (!outputValidation.allowed) {
+        const violations = outputValidation.violations ?? []
+        console.log('[OSQR Constitutional] Output blocked:', violations.length, 'violations')
+        // Use the suggested revision if available, otherwise use decline message
+        if (outputValidation.suggestedRevision) {
+          processedAnswer = outputValidation.suggestedRevision
+          console.log('[OSQR Constitutional] Using suggested revision')
+        } else {
+          processedAnswer = getDeclineMessage('output_safety')
+        }
+      }
     }
 
     // Parse artifacts from OSQR's response
@@ -774,6 +980,36 @@ Guidelines:
       } catch (error) {
         console.error('[Cross-Session Memory] Save error:', error)
       }
+
+      // I-6: TEMPORAL INTELLIGENCE - Extract commitments from conversation
+      // This tracks promises, deadlines, and follow-ups mentioned in chat
+      if (featureFlags.enableTemporalIntelligence) {
+        try {
+          // Check both user message and AI response for commitment signals
+          const userHasCommitments = hasCommitmentSignals(message)
+          const aiHasCommitments = hasCommitmentSignals(cleanAnswer)
+
+          if (userHasCommitments || aiHasCommitments) {
+            const combinedText = `User: ${message}\n\nAssistant: ${cleanAnswer}`
+            const commitments = await extractCommitments(combinedText, {
+              type: 'text', // 'text' is a valid CommitmentSourceType for chat conversations
+              sourceId: thread.id,
+              extractedAt: new Date(),
+            })
+
+            if (commitments.length > 0) {
+              console.log('[OSQR Temporal] Extracted', commitments.length, 'commitments from conversation')
+              // TODO: Store commitments in database for morning digest
+              // For now, just log them for visibility
+              commitments.forEach((c) => {
+                console.log(`  - ${c.what} (${c.when.rawText}) - Confidence: ${c.confidence}`)
+              })
+            }
+          }
+        } catch (error) {
+          console.error('[OSQR Temporal] Extraction error:', error)
+        }
+      }
     })
 
     // Optionally save panel discussion for transparency/debugging
@@ -825,6 +1061,41 @@ Guidelines:
       }
     }
 
+    // ==========================================================================
+    // THROTTLE: Record query usage after successful response
+    // ==========================================================================
+    if (featureFlags.enableThrottle && throttleResult?.model) {
+      recordQueryUsage(userId, userTier, throttleResult.model.id)
+    }
+
+    // Store message with cross-project context if enabled
+    if (featureFlags.enableCrossProjectMemory && projectId) {
+      storeMessageWithContext(
+        thread.id,
+        'user',
+        message,
+        {
+          projectId,
+          conversationId: conversationId || thread.id,
+          documentId: null,
+          interface: 'web',
+          timestamp: new Date(),
+        }
+      )
+      storeMessageWithContext(
+        thread.id,
+        'assistant',
+        cleanAnswer,
+        {
+          projectId,
+          conversationId: conversationId || thread.id,
+          documentId: null,
+          interface: 'web',
+          timestamp: new Date(),
+        }
+      )
+    }
+
     return NextResponse.json(
       {
         answer: cleanAnswer,
@@ -842,14 +1113,23 @@ Guidelines:
           effectiveMode,
           questionType,
           complexity,
+          // I-2: @osqr/core routing recommendation
+          osqrRouting: osqrRouting || undefined,
         },
         // J-2: Auto-context sources used
         contextSources: autoContext.sources,
+        // I-10: Throttle/budget status
+        budgetStatus: budgetStatus || undefined,
+        degraded: throttleResult?.degraded || false,
+        // I-9: Cross-project context indicator
+        usedCrossProjectContext: !!crossProjectContext,
       },
       {
         headers: {
           'X-RateLimit-Remaining': rateLimitResult.remaining.toString(),
           'X-RateLimit-Reset': rateLimitResult.resetAt.toISOString(),
+          // Add budget status header for UI
+          ...(budgetStatus ? { 'X-Budget-Status': budgetStatus } : {}),
         },
       }
     )

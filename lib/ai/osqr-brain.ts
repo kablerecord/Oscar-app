@@ -48,7 +48,7 @@ import type { ProviderType } from './types'
 // TYPES
 // =============================================================================
 
-export type ResponseMode = 'quick' | 'thoughtful' | 'contemplate'
+export type ResponseMode = 'quick' | 'thoughtful' | 'contemplate' | 'council'
 
 export interface OSQRThinkInput {
   message: string

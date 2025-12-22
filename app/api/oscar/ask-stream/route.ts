@@ -1,0 +1,600 @@
+import { NextRequest } from 'next/server'
+import { OSQR, type OSQRRequest, type ResponseMode } from '@/lib/ai/oscar'
+import { type PanelAgent } from '@/lib/ai/panel'
+import { prisma } from '@/lib/db/prisma'
+import { z } from 'zod'
+import { checkRateLimit, recordRequest } from '@/lib/security'
+import { getServerSession } from 'next-auth'
+import { parseArtifacts } from '@/lib/artifacts'
+import { indexConversation, indexArtifact, indexInBackground } from '@/lib/knowledge/auto-index'
+import { assembleContext, parseSystemMode } from '@/lib/context/auto-context'
+import { extractMSCUpdates, mightContainMSCContent } from '@/lib/msc/auto-updater'
+import { updateIdentityFromConversation } from '@/lib/identity/dimensions'
+import { trackConversation, getTILContext } from '@/lib/til'
+import { isPlanningRequest } from '@/lib/til/planner'
+import { isAuditRequest } from '@/lib/til/self-audit'
+import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
+import { routeQuestion } from '@/lib/ai/model-router'
+// getCachedContext and getVaultStats available for future fast-path optimization
+import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary } from '@/lib/oscar/cross-session-memory'
+
+// @osqr/core Integration
+import { checkInput, checkOutput, getDeclineMessage } from '@/lib/osqr/constitutional-wrapper'
+import { quickRoute, shouldUseFastPath } from '@/lib/osqr/router-wrapper'
+import { hasCommitmentSignals, extractCommitments } from '@/lib/osqr/temporal-wrapper'
+import { featureFlags, throttleConfig } from '@/lib/osqr/config'
+
+// Throttle & Cross-Project Memory
+import {
+  canMakeQuery,
+  getThrottleStatus,
+  processThrottledQuery,
+  getDegradationMessage,
+  getBudgetStatusMessage,
+  recordQueryUsage,
+  hasFeatureAccess,
+  type UserTier,
+} from '@/lib/osqr'
+import {
+  findRelatedFromOtherProjects,
+  storeMessageWithContext,
+} from '@/lib/osqr/memory-wrapper'
+import { hasFeature as hasTierFeature, type TierName } from '@/lib/tiers/config'
+
+const RequestSchema = z.object({
+  message: z.string().min(1),
+  workspaceId: z.string(),
+  projectId: z.string().optional(),
+  conversationId: z.string().optional(),
+  useKnowledge: z.boolean().default(true),
+  includeDebate: z.boolean().default(false),
+  mode: z.enum(['quick', 'thoughtful', 'contemplate', 'council']).default('thoughtful'),
+  systemMode: z.boolean().optional(),
+  conversationHistory: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+  })).optional(),
+})
+
+function getClientIP(req: NextRequest): string {
+  const forwarded = req.headers.get('x-forwarded-for')
+  if (forwarded) return forwarded.split(',')[0].trim()
+  const realIP = req.headers.get('x-real-ip')
+  if (realIP) return realIP
+  return '127.0.0.1'
+}
+
+/**
+ * SSE Stream Format:
+ *
+ * event: metadata
+ * data: { routing, contextSources, threadId, ... }
+ *
+ * event: text
+ * data: { chunk: "Hello" }
+ *
+ * event: text
+ * data: { chunk: " world" }
+ *
+ * event: done
+ * data: { messageId, artifacts, tokensUsed }
+ */
+
+export async function POST(req: NextRequest) {
+  // Create a TransformStream for SSE
+  const encoder = new TextEncoder()
+  const stream = new TransformStream()
+  const writer = stream.writable.getWriter()
+
+  // Helper to send SSE events
+  const sendEvent = async (event: string, data: object) => {
+    await writer.write(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+  }
+
+  const sendError = async (error: string, status: number = 500) => {
+    await sendEvent('error', { error, status })
+    await writer.close()
+  }
+
+  // Process the request in background
+  ;(async () => {
+    try {
+      // 1. Auth check
+      const isDev = process.env.NODE_ENV === 'development'
+      const session = await getServerSession()
+
+      let userId: string
+      if (isDev && !session?.user?.email) {
+        userId = 'dev-user'
+      } else if (!session?.user?.email) {
+        await sendError('Unauthorized', 401)
+        return
+      } else {
+        userId = (session.user as { id?: string }).id || session.user.email
+      }
+
+      const ip = getClientIP(req)
+
+      // 2. Rate limit check
+      const rateLimitResult = await checkRateLimit({
+        userId,
+        ip,
+        endpoint: 'oscar/ask-stream',
+        tier: 'starter', // Conservative default - will be overridden by workspace tier
+      })
+
+      if (!rateLimitResult.allowed) {
+        await sendError('Rate limit exceeded', 429)
+        return
+      }
+
+      await recordRequest({ userId, ip, endpoint: 'oscar/ask-stream' })
+
+      const body = await req.json()
+      const {
+        message: rawMessage,
+        workspaceId,
+        projectId,
+        conversationId,
+        useKnowledge,
+        includeDebate,
+        mode,
+        systemMode: explicitSystemMode,
+        conversationHistory
+      } = RequestSchema.parse(body)
+
+      // 3. Throttle check
+      const workspace = await prisma.workspace.findUnique({
+        where: { id: workspaceId },
+        select: { tier: true, capabilityLevel: true },
+      })
+      const userTier = (workspace?.tier || throttleConfig.defaultTier) as UserTier
+
+      let throttleResult: { allowed: boolean; model: { id: string } | null; message: string; degraded: boolean } | null = null
+      let budgetStatus: string | null = null
+
+      if (featureFlags.enableThrottle) {
+        const canQuery = canMakeQuery(userId, userTier)
+        if (!canQuery) {
+          const degradationMessage = getDegradationMessage(userId, userTier)
+          await sendEvent('metadata', {
+            throttled: true,
+            budgetStatus: getBudgetStatusMessage(userId, userTier),
+          })
+          await sendEvent('text', { chunk: degradationMessage || "You've reached your daily query limit." })
+          await sendEvent('done', {})
+          await writer.close()
+          return
+        }
+
+        budgetStatus = getBudgetStatusMessage(userId, userTier)
+        const queryResult = await processThrottledQuery(userId, userTier, {
+          query: rawMessage,
+          estimatedTokens: Math.ceil(rawMessage.length / 4),
+          requiresReasoning: mode === 'contemplate',
+          isCodeGeneration: /\b(code|function|class|implement|write|create|build)\b/i.test(rawMessage),
+        })
+        throttleResult = queryResult
+
+        if (!queryResult.allowed) {
+          await sendEvent('metadata', { throttled: true, budgetStatus, degraded: queryResult.degraded })
+          await sendEvent('text', { chunk: queryResult.message })
+          await sendEvent('done', {})
+          await writer.close()
+          return
+        }
+
+        // ==========================================================================
+        // MODE ACCESS ENFORCEMENT: Check tier-based mode restrictions
+        // Starter: Quick only | Pro: Quick + Thoughtful | Master: All modes
+        // ==========================================================================
+        const tierName = (userTier === 'enterprise' ? 'master' : userTier) as TierName
+
+        // Check thoughtful mode access (requires Pro or higher)
+        if (mode === 'thoughtful' && !hasTierFeature(tierName, 'hasThoughtfulMode')) {
+          await sendEvent('metadata', { featureLocked: true, feature: 'thoughtfulMode', suggestedMode: 'quick' })
+          await sendEvent('text', { chunk: "Thoughtful mode uses multiple AI models for better answers. It's available on Pro and higher plans." })
+          await sendEvent('done', {})
+          await writer.close()
+          return
+        }
+
+        // Check contemplate mode access (requires Master)
+        if (mode === 'contemplate' && !hasTierFeature(tierName, 'hasContemplateMode')) {
+          const suggestedMode = hasTierFeature(tierName, 'hasThoughtfulMode') ? 'thoughtful' : 'quick'
+          await sendEvent('metadata', { featureLocked: true, feature: 'contemplateMode', suggestedMode })
+          await sendEvent('text', { chunk: "Contemplate mode enables deep reasoning with extended thinking. It's available on Master plans." })
+          await sendEvent('done', {})
+          await writer.close()
+          return
+        }
+
+        // Check council mode access (requires Master)
+        if (mode === 'council' && !hasTierFeature(tierName, 'hasCouncilMode')) {
+          const suggestedMode = hasTierFeature(tierName, 'hasThoughtfulMode') ? 'thoughtful' : 'quick'
+          await sendEvent('metadata', { featureLocked: true, feature: 'councilMode', suggestedMode })
+          await sendEvent('text', { chunk: "Council mode brings multiple AI models together for deliberation. It's available on Master plans." })
+          await sendEvent('done', {})
+          await writer.close()
+          return
+        }
+      }
+
+      // 4. Parse system mode
+      const { systemMode: detectedSystemMode, cleanMessage } = parseSystemMode(rawMessage)
+      const systemMode = explicitSystemMode ?? detectedSystemMode
+      const message = cleanMessage
+
+      // 5. Constitutional input check
+      if (featureFlags.enableConstitutionalValidation) {
+        const constitutionalResult = await checkInput(message, userId, {
+          sessionId: `session_${workspaceId}`,
+        })
+
+        if (!constitutionalResult.allowed) {
+          const violations = constitutionalResult.violations ?? []
+          await sendEvent('metadata', { blocked: true, reason: 'constitutional_violation' })
+          await sendEvent('text', { chunk: getDeclineMessage(violations[0]?.type || 'content_policy') })
+          await sendEvent('done', {})
+          await writer.close()
+          return
+        }
+      }
+
+      // 6. Safety check
+      const safetyResult = performSafetyCheck(message)
+      if (!safetyResult.proceedWithNormalFlow) {
+        logSafetyEvent('crisis_detected', {
+          level: safetyResult.crisis.level,
+          confidence: safetyResult.crisis.confidence,
+        })
+
+        const thread = await prisma.chatThread.create({
+          data: { workspaceId, title: 'Support Conversation', mode: 'panel' },
+        })
+
+        await prisma.chatMessage.create({
+          data: {
+            threadId: thread.id,
+            role: 'assistant',
+            provider: 'osqr-safety',
+            content: safetyResult.interventionResponse || '',
+            metadata: { safetyIntervention: true },
+          },
+        })
+
+        await sendEvent('metadata', { threadId: thread.id, stored: false })
+        await sendEvent('text', { chunk: safetyResult.interventionResponse || '' })
+        await sendEvent('done', {})
+        await writer.close()
+        return
+      }
+
+      // 7. Check for special request types (planning, audit) - these don't stream
+      if (isPlanningRequest(message) || isAuditRequest(message)) {
+        // For these special modes, redirect to non-streaming endpoint
+        await sendEvent('metadata', { redirect: '/api/oscar/ask', reason: 'special_mode' })
+        await writer.close()
+        return
+      }
+
+      // 8. Question routing and analysis
+      const questionAnalysis = routeQuestion(message)
+      const questionType = questionAnalysis.questionType
+      const complexity = questionAnalysis.complexity
+
+      // Determine effective mode (auto-routing)
+      let autoRouted = false
+      let autoRoutedReason = ''
+      let effectiveMode: ResponseMode = mode
+
+      const shouldDowngrade = (
+        (mode === 'thoughtful' || mode === 'contemplate') &&
+        (
+          (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) ||
+          (systemMode && complexity <= 3)
+        )
+      )
+
+      if (shouldDowngrade) {
+        effectiveMode = 'quick'
+        autoRouted = true
+        autoRoutedReason = systemMode
+          ? "Found the answer in indexed documentation."
+          : "Simple question - used Quick mode for faster response."
+      }
+
+      const userLevel = workspace?.capabilityLevel ?? 0
+
+      // 9. Fetch agents
+      const agents = await prisma.agent.findMany({
+        where: { workspaceId, isActive: true },
+        orderBy: { name: 'asc' },
+      })
+
+      if (agents.length === 0 && effectiveMode !== 'quick') {
+        await sendError('No active agents found', 400)
+        return
+      }
+
+      const panelAgents: PanelAgent[] = agents.map((agent) => ({
+        id: agent.id,
+        name: agent.name,
+        provider: agent.provider as 'openai' | 'anthropic',
+        modelName: agent.modelName,
+        systemPrompt: agent.systemPrompt,
+      }))
+
+      // 10. Assemble context
+      const autoContext = await assembleContext(workspaceId, message, {
+        includeProfile: true,
+        includeMSC: true,
+        includeKnowledge: useKnowledge,
+        includeThreads: true,
+        maxKnowledgeChunks: 5,
+        maxThreads: 3,
+        systemMode,
+      })
+
+      const tilContext = await getTILContext(workspaceId, message)
+      const crossSessionMemory = await getCrossSessionMemory(workspaceId, 5)
+      const memoryContext = formatMemoryForPrompt(crossSessionMemory)
+
+      // Cross-project context
+      let crossProjectContext: string | undefined
+      if (featureFlags.enableCrossProjectMemory && projectId) {
+        try {
+          const relatedFromOtherProjects = await findRelatedFromOtherProjects(projectId, message, 5)
+          if (relatedFromOtherProjects.length > 0) {
+            const crossProjectLines = relatedFromOtherProjects.map(
+              (m, i) => `${i + 1}. ${m.content} (from ${m.source})`
+            )
+            crossProjectContext = `## Related Context from Other Projects\n${crossProjectLines.join('\n')}`
+          }
+        } catch (e) {
+          console.error('[Stream] Cross-project context error:', e)
+        }
+      }
+
+      const contextParts = [autoContext.context, tilContext, memoryContext, crossProjectContext].filter(Boolean)
+      const context = contextParts.join('\n\n---\n\n') || undefined
+
+      // Create thread for this conversation
+      const thread = await prisma.chatThread.create({
+        data: { workspaceId, title: message.slice(0, 100), mode: 'panel' },
+      })
+
+      // Save user message
+      await prisma.chatMessage.create({
+        data: { threadId: thread.id, role: 'user', content: message },
+      })
+
+      // 11. Send metadata before streaming starts
+      // This tells the client: "pre-flight is done, text is coming"
+      await sendEvent('metadata', {
+        threadId: thread.id,
+        routing: {
+          questionType,
+          complexity,
+          autoRouted,
+          autoRoutedReason,
+          requestedMode: mode,
+          effectiveMode,
+        },
+        contextSources: autoContext.sources,
+        budgetStatus: budgetStatus || undefined,
+        degraded: throttleResult?.degraded || false,
+        usedCrossProjectContext: !!crossProjectContext,
+      })
+
+      // 12. Stream the response
+      const osqrRequest: OSQRRequest = {
+        userMessage: message,
+        panelAgents,
+        context,
+        includeDebate,
+        mode: effectiveMode,
+        userLevel,
+      }
+
+      let fullResponse = ''
+
+      // Use the streaming method
+      for await (const chunk of OSQR.askStream(osqrRequest)) {
+        fullResponse += chunk
+        await sendEvent('text', { chunk })
+      }
+
+      // 13. Post-process the response
+      // Safety post-processing
+      const safetyProcessed = processSafetyResponse(fullResponse, message)
+      let processedAnswer = safetyProcessed.content
+
+      if (safetyProcessed.wasModified) {
+        logSafetyEvent(
+          safetyProcessed.content.includes("I can't help") ? 'refusal_wrapped' : 'disclaimer_added',
+          { timestamp: new Date() }
+        )
+      }
+
+      // Constitutional output check
+      if (featureFlags.enableConstitutionalValidation) {
+        const outputValidation = await checkOutput(processedAnswer, message, userId)
+        if (!outputValidation.allowed) {
+          if (outputValidation.suggestedRevision) {
+            processedAnswer = outputValidation.suggestedRevision
+          } else {
+            processedAnswer = getDeclineMessage('output_safety')
+          }
+        }
+      }
+
+      // Parse artifacts
+      const parsedResponse = parseArtifacts(processedAnswer)
+      const { text: cleanAnswer, artifacts } = parsedResponse
+
+      // Save OSQR's response
+      const osqrMessage = await prisma.chatMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'assistant',
+          provider: 'mixed',
+          content: cleanAnswer,
+          metadata: {
+            panelSize: panelAgents.length,
+            usedKnowledge: useKnowledge && !!context,
+            hasArtifacts: artifacts.length > 0,
+            contextSources: autoContext.sources,
+            streamed: true,
+          },
+        },
+      })
+
+      // Save artifacts
+      if (artifacts.length > 0) {
+        await Promise.all(
+          artifacts.map((artifact) =>
+            prisma.artifact.create({
+              data: {
+                workspaceId,
+                messageId: osqrMessage.id,
+                threadId: thread.id,
+                type: artifact.type,
+                title: artifact.title,
+                content: artifact.content,
+                language: artifact.language,
+                description: artifact.description,
+                version: 1,
+              },
+            })
+          )
+        )
+      }
+
+      // 14. Send done event with final data
+      await sendEvent('done', {
+        messageId: osqrMessage.id,
+        artifacts: artifacts.length > 0 ? artifacts : undefined,
+      })
+
+      await writer.close()
+
+      // 15. Background tasks (don't block the response)
+      indexInBackground(async () => {
+        await indexConversation({
+          workspaceId,
+          threadId: thread.id,
+          userMessage: message,
+          osqrResponse: cleanAnswer,
+        })
+
+        for (const artifact of artifacts) {
+          await indexArtifact({
+            workspaceId,
+            artifactId: `${thread.id}-${artifact.title}`,
+            title: artifact.title,
+            content: artifact.content,
+            type: artifact.type,
+            description: artifact.description,
+          })
+        }
+
+        if (mightContainMSCContent(message) || mightContainMSCContent(cleanAnswer)) {
+          try {
+            await extractMSCUpdates(workspaceId, message, cleanAnswer)
+          } catch (e) {
+            console.error('[MSC Auto-Update] Error:', e)
+          }
+        }
+
+        try {
+          await updateIdentityFromConversation(workspaceId, {
+            userMessage: message,
+            osqrResponse: cleanAnswer,
+          })
+        } catch (e) {
+          console.error('[Identity Learning] Error:', e)
+        }
+
+        try {
+          await trackConversation(workspaceId, message, cleanAnswer, { mode })
+        } catch (e) {
+          console.error('[TIL] Error:', e)
+        }
+
+        const fullConversation = [
+          ...(conversationHistory || []),
+          { role: 'user' as const, content: message },
+          { role: 'assistant' as const, content: cleanAnswer },
+        ]
+        if (fullConversation.length >= 3) {
+          try {
+            await saveConversationSummary({ workspaceId, threadId: thread.id, messages: fullConversation })
+          } catch (e) {
+            console.error('[Cross-Session Memory] Error:', e)
+          }
+        }
+
+        if (featureFlags.enableTemporalIntelligence) {
+          try {
+            const userHasCommitments = hasCommitmentSignals(message)
+            const aiHasCommitments = hasCommitmentSignals(cleanAnswer)
+            if (userHasCommitments || aiHasCommitments) {
+              const combinedText = `User: ${message}\n\nAssistant: ${cleanAnswer}`
+              await extractCommitments(combinedText, {
+                type: 'text',
+                sourceId: thread.id,
+                extractedAt: new Date(),
+              })
+            }
+          } catch (e) {
+            console.error('[Temporal] Error:', e)
+          }
+        }
+      })
+
+      // Record throttle usage
+      if (featureFlags.enableThrottle && throttleResult?.model) {
+        recordQueryUsage(userId, userTier, throttleResult.model.id)
+      }
+
+      // Store with cross-project context
+      if (featureFlags.enableCrossProjectMemory && projectId) {
+        storeMessageWithContext(thread.id, 'user', message, {
+          projectId,
+          conversationId: conversationId || thread.id,
+          documentId: null,
+          interface: 'web',
+          timestamp: new Date(),
+        })
+        storeMessageWithContext(thread.id, 'assistant', cleanAnswer, {
+          projectId,
+          conversationId: conversationId || thread.id,
+          documentId: null,
+          interface: 'web',
+          timestamp: new Date(),
+        })
+      }
+
+    } catch (error) {
+      console.error('[Stream] Error:', error)
+      try {
+        await sendEvent('error', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          status: 500
+        })
+        await writer.close()
+      } catch {
+        // Writer may already be closed
+      }
+    }
+  })()
+
+  return new Response(stream.readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  })
+}
