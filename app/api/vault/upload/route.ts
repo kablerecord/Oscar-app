@@ -11,7 +11,8 @@ import { createHash } from 'crypto'
 // @osqr/core Document Indexing Integration (I-8)
 // Routes uploaded documents through the unified indexing pipeline
 // ==========================================================================
-import { indexDocumentToVault, DocumentIndexing } from '@/lib/osqr'
+import { indexDocumentToVault } from '@/lib/osqr'
+import { detectDocumentType } from '@/lib/osqr/document-indexing-wrapper'
 import { featureFlags } from '@/lib/osqr/config'
 
 // Generate SHA-256 hash of content for duplicate detection
@@ -390,7 +391,7 @@ Respond in this JSON format:
 
         try {
           // Detect document type from filename (default to plaintext if unknown)
-          const docType = DocumentIndexing.detectDocumentType(fileName) || 'plaintext' as const
+          const docType = detectDocumentType(fileName) || 'plaintext' as const
 
           // Index through OSQR pipeline
           const osqrResult = await indexDocumentToVault(

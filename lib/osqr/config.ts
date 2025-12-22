@@ -1,48 +1,16 @@
 /**
  * OSQR Core Configuration
  *
- * Configuration for the @osqr/core brain library.
+ * Configuration for the OSQR brain components.
  * This file centralizes all oscar-app specific settings.
+ *
+ * NOTE: @osqr/core package is not yet available. This is a stub implementation.
  */
-
-import { Throttle } from '@osqr/core'
-import { getPrismaBudgetAdapter } from './budget-persistence'
 
 // ============================================================================
-// Persistence Adapter Initialization
+// Router Configuration
 // ============================================================================
 
-let persistenceInitialized = false
-
-/**
- * Initialize the budget persistence adapter.
- * This connects osqr/core's throttle system to Prisma for persistent storage.
- * Called lazily on first throttle operation.
- */
-export function initializeBudgetPersistence(): void {
-  if (persistenceInitialized) return
-
-  try {
-    const adapter = getPrismaBudgetAdapter()
-    Throttle.setPersistenceAdapter(adapter)
-    persistenceInitialized = true
-    console.log('[OSQR] Budget persistence adapter initialized (Prisma)')
-  } catch (error) {
-    console.error('[OSQR] Failed to initialize budget persistence:', error)
-    // Continue with in-memory storage as fallback
-  }
-}
-
-/**
- * Check if persistence is initialized.
- */
-export function isBudgetPersistenceInitialized(): boolean {
-  return persistenceInitialized
-}
-
-/**
- * Router configuration for oscar-app
- */
 export const routerConfig = {
   escalationThreshold: 0.7,
   highConfidenceThreshold: 0.95,
@@ -118,35 +86,27 @@ export const documentIndexingConfig = {
  * Throttle configuration
  */
 export const throttleConfig = {
-  // Default to 'pro' tier for development
   defaultTier: 'pro' as const,
-  // Grace period before enforcing limits (ms)
   warmupPeriodMs: 60000,
-  // Show warning when this percentage of budget remains
   warningThreshold: 0.2,
 };
 
 /**
- * Environment-based feature flags
- *
- * All integrations verified and enabled as of 2025-12-19.
- * New features added: Document Indexing (I-8), Cross-Project Memory (I-9), Throttle (I-10)
+ * Feature flags - @osqr/core features disabled until package is available
  */
 export const featureFlags = {
-  // Core features - all enabled after type verification
-  enableConstitutionalValidation: true, // I-1: Constitutional Framework - ENABLED
-  enableRouterMRP: true, // I-2: Router/MRP Integration - ENABLED
-  enableSmartRouting: true, // I-2: Router/MRP Integration - ENABLED
-  enableMemoryVault: true, // I-3: Memory Vault Integration - ENABLED
-  enableCouncilMode: true, // I-4: Council Mode Integration - ENABLED
-  enableGuidance: true, // I-5: Project Guidance Integration - ENABLED
-  enableTemporalIntelligence: true, // I-6: Temporal Intelligence - ENABLED
-  enableBubbleInterface: true, // I-7: Bubble Interface - ENABLED
-
-  // New features - Phase 2 integration
-  enableDocumentIndexing: true, // I-8: Document Indexing Subsystem - ENABLED
-  enableCrossProjectMemory: true, // I-9: Cross-Project Memory Extension - ENABLED
-  enableThrottle: true, // I-10: Throttle Architecture - ENABLED
+  // Core features - DISABLED (no @osqr/core package)
+  enableConstitutionalValidation: false,
+  enableRouterMRP: false,
+  enableSmartRouting: false,
+  enableMemoryVault: false,
+  enableCouncilMode: false,
+  enableGuidance: false,
+  enableTemporalIntelligence: false,
+  enableBubbleInterface: false,
+  enableDocumentIndexing: false,
+  enableCrossProjectMemory: false,
+  enableThrottle: false,
 
   // Debug flags
   logConstitutionalViolations: process.env.NODE_ENV === 'development',

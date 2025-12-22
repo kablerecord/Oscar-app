@@ -1,128 +1,45 @@
 /**
- * Prisma Budget Persistence Adapter
+ * Budget Persistence - Stub Implementation
  *
- * Implements the @osqr/core BudgetPersistenceAdapter interface
- * to store budget data in the database instead of in-memory.
- *
- * This ensures budgets persist across server restarts and
- * provides a single source of truth for usage tracking.
+ * NOTE: @osqr/core package is not yet available.
+ * This file provides stub implementations.
  */
 
-import { prisma } from '@/lib/db/prisma'
-import type { BudgetPersistenceAdapter } from '@osqr/core'
-import type { DailyBudget, Tier } from '@osqr/core'
+export interface BudgetPersistenceAdapter {
+  getDailyBudget(userId: string, date: string): Promise<unknown | null>;
+  saveDailyBudget(budget: unknown): Promise<void>;
+  getUserTimezone(userId: string): Promise<string>;
+  setUserTimezone(userId: string, timezone: string): Promise<void>;
+  deleteOldBudgets(userId: string, beforeDate: string): Promise<void>;
+}
 
-/**
- * Prisma-based budget persistence adapter.
- * Stores budget data in PostgreSQL via Prisma.
- */
 export class PrismaBudgetAdapter implements BudgetPersistenceAdapter {
-  /**
-   * Get a daily budget for a user on a specific date.
-   */
-  async getDailyBudget(userId: string, date: string): Promise<DailyBudget | null> {
-    const record = await prisma.dailyBudget.findUnique({
-      where: {
-        userId_date: { userId, date },
-      },
-    })
-
-    if (!record) {
-      return null
-    }
-
-    return {
-      userId: record.userId,
-      tier: record.tier as Tier,
-      date: record.date,
-      premiumQueriesUsed: record.premiumQueriesUsed,
-      premiumQueriesLimit: record.premiumQueriesLimit,
-      economyQueriesUsed: record.economyQueriesUsed,
-      economyQueriesLimit: Infinity, // Always infinite for economy tier
-      overagePurchased: record.overagePurchased,
-      referralBonus: record.referralBonus,
-      resetAt: record.resetAt,
-    }
+  async getDailyBudget(_userId: string, _date: string): Promise<unknown | null> {
+    return null;
   }
 
-  /**
-   * Save or update a daily budget.
-   * Uses upsert based on userId + date.
-   */
-  async saveDailyBudget(budget: DailyBudget): Promise<void> {
-    await prisma.dailyBudget.upsert({
-      where: {
-        userId_date: { userId: budget.userId, date: budget.date },
-      },
-      create: {
-        userId: budget.userId,
-        tier: budget.tier,
-        date: budget.date,
-        premiumQueriesUsed: budget.premiumQueriesUsed,
-        premiumQueriesLimit: budget.premiumQueriesLimit,
-        economyQueriesUsed: budget.economyQueriesUsed,
-        overagePurchased: budget.overagePurchased,
-        referralBonus: budget.referralBonus,
-        resetAt: budget.resetAt,
-      },
-      update: {
-        tier: budget.tier,
-        premiumQueriesUsed: budget.premiumQueriesUsed,
-        premiumQueriesLimit: budget.premiumQueriesLimit,
-        economyQueriesUsed: budget.economyQueriesUsed,
-        overagePurchased: budget.overagePurchased,
-        referralBonus: budget.referralBonus,
-        resetAt: budget.resetAt,
-      },
-    })
+  async saveDailyBudget(_budget: unknown): Promise<void> {
+    // No-op stub
   }
 
-  /**
-   * Get the user's timezone setting.
-   * Returns 'UTC' if not set.
-   */
-  async getUserTimezone(userId: string): Promise<string> {
-    const record = await prisma.userTimezone.findUnique({
-      where: { userId },
-    })
-
-    return record?.timezone ?? 'UTC'
+  async getUserTimezone(_userId: string): Promise<string> {
+    return 'UTC';
   }
 
-  /**
-   * Set the user's timezone for midnight reset calculations.
-   */
-  async setUserTimezone(userId: string, timezone: string): Promise<void> {
-    await prisma.userTimezone.upsert({
-      where: { userId },
-      create: { userId, timezone },
-      update: { timezone },
-    })
+  async setUserTimezone(_userId: string, _timezone: string): Promise<void> {
+    // No-op stub
   }
 
-  /**
-   * Delete old budget records for a user (cleanup).
-   * Called when a new day starts.
-   */
-  async deleteOldBudgets(userId: string, beforeDate: string): Promise<void> {
-    await prisma.dailyBudget.deleteMany({
-      where: {
-        userId,
-        date: { lt: beforeDate },
-      },
-    })
+  async deleteOldBudgets(_userId: string, _beforeDate: string): Promise<void> {
+    // No-op stub
   }
 }
 
-// Singleton instance
-let adapterInstance: PrismaBudgetAdapter | null = null
+let adapterInstance: PrismaBudgetAdapter | null = null;
 
-/**
- * Get the Prisma budget adapter singleton.
- */
 export function getPrismaBudgetAdapter(): PrismaBudgetAdapter {
   if (!adapterInstance) {
-    adapterInstance = new PrismaBudgetAdapter()
+    adapterInstance = new PrismaBudgetAdapter();
   }
-  return adapterInstance
+  return adapterInstance;
 }

@@ -1,15 +1,11 @@
 /**
- * Memory Vault Wrapper for oscar-app
+ * Memory Vault Wrapper - Stub Implementation
  *
- * Wraps the @osqr/core Memory Vault for use in oscar-app.
- * This provides cross-session memory, semantic search, and cross-project awareness.
- *
- * Cross-Project Extension: Queries search across all projects by default,
- * treating organizational structures as metadata rather than knowledge boundaries.
+ * NOTE: @osqr/core package is not yet available.
+ * This file provides stub implementations.
  */
 
-import { MemoryVault } from '@osqr/core';
-import { vaultConfig, featureFlags } from './config';
+import { featureFlags } from './config';
 
 export interface MemorySearchResult {
   content: string;
@@ -25,7 +21,6 @@ export interface ContextBundle {
   retrievalTimeMs: number;
 }
 
-// Cross-project types
 export interface CrossProjectResult {
   memories: Array<{
     memory: MemorySearchResult;
@@ -52,216 +47,70 @@ export interface SourceContext {
   timestamp: Date;
 }
 
-/**
- * Initialize memory vault for a user/workspace.
- */
-export function initializeVault(workspaceId: string): void {
-  if (!featureFlags.enableMemoryVault) return;
-
-  try {
-    MemoryVault.initializeVault(workspaceId);
-  } catch (error) {
-    console.error('[MemoryVault] Initialization error:', error);
-  }
+export function initializeVault(_workspaceId: string): void {
+  // No-op stub
 }
 
-/**
- * Retrieve relevant context for a query.
- */
 export async function getContextForQuery(
-  query: string,
-  workspaceId: string,
-  options?: {
+  _query: string,
+  _workspaceId: string,
+  _options?: {
     maxMemories?: number;
-    categories?: MemoryVault.MemoryCategory[];
+    categories?: string[];
     minRelevance?: number;
   }
 ): Promise<ContextBundle> {
-  if (!featureFlags.enableMemoryVault) {
-    return {
-      memories: [],
-      episodicContext: [],
-      retrievalTimeMs: 0,
-    };
-  }
-
-  const startTime = Date.now();
-
-  try {
-    // retrieveContextForUser returns RetrievedMemory[] directly
-    const retrievedMemories = await MemoryVault.retrieveContextForUser(workspaceId, query, {
-      maxTokens: (options?.maxMemories || vaultConfig.defaultRetrievalLimit) * 100,
-      categories: options?.categories,
-      minRelevance: options?.minRelevance || vaultConfig.minUtilityThreshold,
-    });
-
-    // Get episodic context (recent messages from conversation history)
-    const messages = MemoryVault.getConversationHistory(workspaceId, 5);
-
-    return {
-      memories: retrievedMemories.map((m: MemoryVault.RetrievedMemory) => ({
-        content: 'content' in m.memory ? (m.memory as MemoryVault.SemanticMemory).content : (m.memory as MemoryVault.EpisodicSummary).summary,
-        relevanceScore: m.relevanceScore,
-        category: 'category' in m.memory ? (m.memory as MemoryVault.SemanticMemory).category : 'episodic',
-        createdAt: 'createdAt' in m.memory ? (m.memory as MemoryVault.SemanticMemory).createdAt : (m.memory as MemoryVault.EpisodicSummary).timestamp,
-        source: 'source' in m.memory ? String((m.memory as MemoryVault.SemanticMemory).source) : 'conversation',
-      })),
-      episodicContext: messages.map((m: MemoryVault.Message) => m.content),
-      retrievalTimeMs: Date.now() - startTime,
-    };
-  } catch (error) {
-    console.error('[MemoryVault] Retrieval error:', error);
-    return {
-      memories: [],
-      episodicContext: [],
-      retrievalTimeMs: Date.now() - startTime,
-    };
-  }
+  return {
+    memories: [],
+    episodicContext: [],
+    retrievalTimeMs: 0,
+  };
 }
 
-/**
- * Store a conversation message.
- */
 export function storeMessage(
-  conversationId: string,
-  role: 'user' | 'assistant',
-  content: string
+  _conversationId: string,
+  _role: 'user' | 'assistant',
+  _content: string
 ): void {
-  if (!featureFlags.enableMemoryVault) return;
-
-  try {
-    // storeMessage expects Omit<Message, 'id'>
-    const message: Omit<MemoryVault.Message, 'id'> = {
-      role,
-      content,
-      timestamp: new Date(),
-      tokens: Math.ceil(content.length / 4), // Rough estimate
-      toolCalls: null,
-      utilityScore: null,
-    };
-    MemoryVault.storeMessage(conversationId, message);
-  } catch (error) {
-    console.error('[MemoryVault] Store message error:', error);
-  }
+  // No-op stub
 }
 
-/**
- * Search for specific memories.
- */
 export async function searchMemories(
-  workspaceId: string,
-  query: string,
-  filters?: MemoryVault.MemoryFilters
+  _workspaceId: string,
+  _query: string,
+  _filters?: Record<string, unknown>
 ): Promise<MemorySearchResult[]> {
-  if (!featureFlags.enableMemoryVault) return [];
-
-  try {
-    const results = await MemoryVault.searchUserMemories(workspaceId, query, filters);
-    return results.map((m: MemoryVault.SemanticMemory) => ({
-      content: m.content,
-      relevanceScore: m.utilityScore,
-      category: m.category,
-      createdAt: m.createdAt,
-      source: String(m.source),
-    }));
-  } catch (error) {
-    console.error('[MemoryVault] Search error:', error);
-    return [];
-  }
+  return [];
 }
 
-/**
- * Format memories for inclusion in a prompt.
- */
-export function formatMemoriesForPrompt(memories: MemorySearchResult[]): string {
-  if (memories.length === 0) return '';
-
-  const lines = memories.map((m, i) => `${i + 1}. ${m.content} (${m.category})`);
-
-  return `## Relevant Past Context\n${lines.join('\n')}`;
+export function formatMemoriesForPrompt(_memories: MemorySearchResult[]): string {
+  return '';
 }
 
-/**
- * Format episodic context for inclusion in a prompt.
- */
-export function formatEpisodicForPrompt(episodic: string[]): string {
-  if (episodic.length === 0) return '';
-
-  return `## Recent Conversation Summaries\n${episodic.join('\n---\n')}`;
+export function formatEpisodicForPrompt(_episodic: string[]): string {
+  return '';
 }
 
-/**
- * Get full formatted context for a prompt.
- */
 export async function getFormattedContext(
-  query: string,
-  workspaceId: string
+  _query: string,
+  _workspaceId: string
 ): Promise<string> {
-  const context = await getContextForQuery(query, workspaceId);
-
-  const parts: string[] = [];
-
-  if (context.memories.length > 0) {
-    parts.push(formatMemoriesForPrompt(context.memories));
-  }
-
-  if (context.episodicContext.length > 0) {
-    parts.push(formatEpisodicForPrompt(context.episodicContext));
-  }
-
-  return parts.join('\n\n');
+  return '';
 }
 
-// ============================================================================
-// Cross-Project Memory Functions
-// ============================================================================
-
-/**
- * Store a message with project context for cross-project awareness.
- */
 export function storeMessageWithContext(
-  conversationId: string,
-  role: 'user' | 'assistant',
-  content: string,
-  context: SourceContext
+  _conversationId: string,
+  _role: 'user' | 'assistant',
+  _content: string,
+  _context: SourceContext
 ): void {
-  if (!featureFlags.enableMemoryVault) return;
-
-  try {
-    // First store the message normally
-    const message: Omit<MemoryVault.Message, 'id'> = {
-      role,
-      content,
-      timestamp: new Date(),
-      tokens: Math.ceil(content.length / 4),
-      toolCalls: null,
-      utilityScore: null,
-    };
-    const storedMessage = MemoryVault.storeMessage(conversationId, message);
-
-    // Then add source context for cross-project tracking
-    if (storedMessage) {
-      MemoryVault.addSourceContext(storedMessage.id, {
-        projectId: context.projectId,
-        conversationId: context.conversationId,
-        documentId: context.documentId,
-        interface: context.interface,
-        timestamp: context.timestamp,
-      });
-    }
-  } catch (error) {
-    console.error('[MemoryVault] Store message with context error:', error);
-  }
+  // No-op stub
 }
 
-/**
- * Query memories across all projects.
- * This is the main cross-project search function.
- */
 export async function queryCrossProject(
-  workspaceId: string,
-  query: string,
-  options?: {
+  _workspaceId: string,
+  _query: string,
+  _options?: {
     projectIds?: string[];
     includeConversations?: boolean;
     includeDocuments?: boolean;
@@ -270,215 +119,55 @@ export async function queryCrossProject(
     detectContradictions?: boolean;
   }
 ): Promise<CrossProjectResult> {
-  if (!featureFlags.enableMemoryVault) {
-    return {
-      memories: [],
-      commonThemes: [],
-      contradictions: [],
-      projectSummaries: new Map(),
-    };
-  }
-
-  try {
-    const result = await MemoryVault.queryCrossProject({
-      query,
-      userId: workspaceId,
-      projectIds: options?.projectIds,
-      includeConversations: options?.includeConversations ?? true,
-      includeDocuments: options?.includeDocuments ?? true,
-      timeRange: options?.timeRange,
-      limit: options?.limit || 20,
-      detectContradictions: options?.detectContradictions ?? true,
-    });
-
-    return {
-      memories: result.memories.map((m) => ({
-        memory: {
-          content: m.memory.content,
-          relevanceScore: m.relevance,
-          category: m.memory.category,
-          createdAt: m.memory.createdAt,
-          source: String(m.memory.source),
-        },
-        relevance: m.relevance,
-        project: m.project,
-      })),
-      commonThemes: result.commonThemes,
-      contradictions: result.contradictions.map((c) => ({
-        memoryId: c.memoryId,
-        contradictingMemoryId: c.contradictingMemoryId,
-        topic: c.topic,
-        claimA: c.claimA,
-        claimB: c.claimB,
-        confidence: c.confidence,
-      })),
-      projectSummaries: result.projectSummaries,
-    };
-  } catch (error) {
-    console.error('[MemoryVault] Cross-project query error:', error);
-    return {
-      memories: [],
-      commonThemes: [],
-      contradictions: [],
-      projectSummaries: new Map(),
-    };
-  }
+  return {
+    memories: [],
+    commonThemes: [],
+    contradictions: [],
+    projectSummaries: new Map(),
+  };
 }
 
-/**
- * Find related memories from other projects.
- * Useful for surfacing cross-project connections.
- */
 export async function findRelatedFromOtherProjects(
-  currentProjectId: string,
-  query: string,
-  limit: number = 5
+  _currentProjectId: string,
+  _query: string,
+  _limit?: number
 ): Promise<MemorySearchResult[]> {
-  if (!featureFlags.enableMemoryVault) {
-    return [];
-  }
-
-  try {
-    const results = await MemoryVault.findRelatedFromOtherProjects(
-      currentProjectId,
-      query,
-      limit
-    );
-
-    return results.map((m) => ({
-      content: m.content,
-      relevanceScore: m.utilityScore,
-      category: m.category,
-      createdAt: m.createdAt,
-      source: String(m.source),
-    }));
-  } catch (error) {
-    console.error('[MemoryVault] Find related error:', error);
-    return [];
-  }
+  return [];
 }
 
-/**
- * Format cross-project results for inclusion in a prompt.
- */
 export function formatCrossProjectForPrompt(
-  results: CrossProjectResult,
-  currentProjectId?: string
+  _results: CrossProjectResult,
+  _currentProjectId?: string
 ): string {
-  if (results.memories.length === 0) return '';
-
-  const parts: string[] = [];
-
-  // Group by project
-  const byProject = new Map<string, typeof results.memories>();
-  for (const mem of results.memories) {
-    const projectKey = mem.project || 'General';
-    if (!byProject.has(projectKey)) {
-      byProject.set(projectKey, []);
-    }
-    byProject.get(projectKey)!.push(mem);
-  }
-
-  // Format each project's memories
-  for (const [projectId, memories] of byProject) {
-    const isCurrentProject = projectId === currentProjectId;
-    const header = isCurrentProject
-      ? '### Current Project Context'
-      : `### Related from "${projectId}"`;
-
-    const lines = memories.map(
-      (m, i) => `${i + 1}. ${m.memory.content} (${m.memory.category})`
-    );
-
-    parts.push(`${header}\n${lines.join('\n')}`);
-  }
-
-  // Add common themes if any
-  if (results.commonThemes.length > 0) {
-    parts.push(`\n### Common Themes\n${results.commonThemes.join(', ')}`);
-  }
-
-  // Note any contradictions
-  if (results.contradictions.length > 0) {
-    const contradictionNotes = results.contradictions.map(
-      (c) =>
-        `- **${c.topic}**: "${c.claimA}" vs "${c.claimB}" (${Math.round(c.confidence * 100)}% confidence)`
-    );
-    parts.push(`\n### Potential Contradictions\n${contradictionNotes.join('\n')}`);
-  }
-
-  return `## Cross-Project Memory Context\n\n${parts.join('\n\n')}`;
+  return '';
 }
 
-/**
- * Get context for a query with cross-project awareness.
- * Enhanced version of getContextForQuery that includes cross-project results.
- */
 export async function getContextWithCrossProject(
-  query: string,
-  workspaceId: string,
-  options?: {
+  _query: string,
+  _workspaceId: string,
+  _options?: {
     currentProjectId?: string;
     maxMemories?: number;
-    categories?: MemoryVault.MemoryCategory[];
+    categories?: string[];
     minRelevance?: number;
     includeCrossProject?: boolean;
   }
 ): Promise<ContextBundle & { crossProjectContext?: string }> {
-  // Get standard context
-  const standardContext = await getContextForQuery(query, workspaceId, {
-    maxMemories: options?.maxMemories,
-    categories: options?.categories,
-    minRelevance: options?.minRelevance,
-  });
-
-  // If cross-project is disabled or not requested, return standard
-  if (!options?.includeCrossProject || !featureFlags.enableMemoryVault) {
-    return standardContext;
-  }
-
-  // Get cross-project results
-  const crossProjectResults = await queryCrossProject(workspaceId, query, {
-    limit: 10,
-    detectContradictions: true,
-  });
-
-  // Format for prompt
-  const crossProjectContext = formatCrossProjectForPrompt(
-    crossProjectResults,
-    options?.currentProjectId
-  );
-
   return {
-    ...standardContext,
-    crossProjectContext: crossProjectContext || undefined,
+    memories: [],
+    episodicContext: [],
+    retrievalTimeMs: 0,
   };
 }
 
-/**
- * Get cross-project statistics.
- */
 export function getCrossProjectStats(): {
   memoriesWithContext: number;
   totalCrossReferences: number;
   unresolvedContradictions: number;
 } {
-  if (!featureFlags.enableMemoryVault) {
-    return {
-      memoriesWithContext: 0,
-      totalCrossReferences: 0,
-      unresolvedContradictions: 0,
-    };
-  }
-
-  try {
-    return MemoryVault.getCrossProjectStats();
-  } catch (error) {
-    console.error('[MemoryVault] Cross-project stats error:', error);
-    return {
-      memoriesWithContext: 0,
-      totalCrossReferences: 0,
-      unresolvedContradictions: 0,
-    };
-  }
+  return {
+    memoriesWithContext: 0,
+    totalCrossReferences: 0,
+    unresolvedContradictions: 0,
+  };
 }
