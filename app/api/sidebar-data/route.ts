@@ -149,29 +149,45 @@ export async function GET(req: NextRequest) {
       weeklyBreakdown[dayName] = (weeklyBreakdown[dayName] || 0) + day._count.id
     })
 
-    // Calculate streak - count consecutive days with activity going backwards from today
+    // Calculate streak - get all activity days in a single query, then count consecutive
     let currentStreak = 0
+    const yearAgo = new Date()
+    yearAgo.setDate(yearAgo.getDate() - 365)
+    yearAgo.setHours(0, 0, 0, 0)
+
+    // Get all distinct dates with activity in one query
+    const activityDays = await prisma.usageRecord.groupBy({
+      by: ['date'],
+      where: {
+        userId: session.user.id,
+        date: {
+          gte: yearAgo,
+        },
+      },
+      _count: {
+        id: true,
+      },
+    })
+
+    // Create a Set of date strings for O(1) lookup
+    const activityDatesSet = new Set(
+      activityDays.map(day => {
+        const d = new Date(day.date)
+        d.setHours(0, 0, 0, 0)
+        return d.toISOString().split('T')[0]
+      })
+    )
+
+    // Count consecutive days starting from today
     const checkDate = new Date()
     checkDate.setHours(0, 0, 0, 0)
 
-    // Check up to 365 days back
     for (let i = 0; i < 365; i++) {
-      const dayStart = new Date(checkDate)
-      dayStart.setDate(dayStart.getDate() - i)
-      const dayEnd = new Date(dayStart)
-      dayEnd.setDate(dayEnd.getDate() + 1)
+      const dayToCheck = new Date(checkDate)
+      dayToCheck.setDate(dayToCheck.getDate() - i)
+      const dateStr = dayToCheck.toISOString().split('T')[0]
 
-      const hadActivity = await prisma.usageRecord.count({
-        where: {
-          userId: session.user.id,
-          date: {
-            gte: dayStart,
-            lt: dayEnd,
-          },
-        },
-      })
-
-      if (hadActivity > 0) {
+      if (activityDatesSet.has(dateStr)) {
         currentStreak++
       } else if (i > 0) {
         // If no activity and not today, break the streak

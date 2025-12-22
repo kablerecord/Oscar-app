@@ -63,6 +63,49 @@ OSQR offers three query modes. Users can select these explicitly or let OSQR aut
 
 **Example:** "What's 2x3?" → No need for 8 LLMs. Quick mode handles it.
 
+#### Quick Mode Fast Path (Implemented Dec 2024)
+
+For **simple questions in Quick mode** (complexity ≤ 2), we skip heavy context assembly to dramatically reduce latency.
+
+**The Problem:**
+Every query was running 10-15 database operations before Claude was even called:
+- `assembleContext()` - vault search, profile, MSC items, recent threads
+- `getTILContext()` - temporal intelligence
+- `getCrossSessionMemory()` - past conversation summaries
+
+This added ~15 seconds of overhead for questions like "hi" or "what is 2x2".
+
+**The Solution:**
+```typescript
+const isSimpleQuestion = effectiveMode === 'quick' && complexity <= 2
+
+if (isSimpleQuestion) {
+  // Fast path: skip context, go straight to Claude
+  autoContext = { context: '', sources: {...}, raw: {} }
+} else {
+  // Full context assembly for complex questions
+  autoContext = await assembleContext(...)
+  tilContext = await getTILContext(...)
+  crossSessionMemory = await getCrossSessionMemory(...)
+}
+```
+
+**Performance Impact:**
+| Metric | Before | After |
+|--------|--------|-------|
+| Simple question latency | ~20 seconds | ~3 seconds |
+| Context assembly time | ~15 seconds | ~1ms |
+
+**What determines "simple":**
+- `effectiveMode === 'quick'` - user selected Quick mode
+- `complexity <= 2` - determined by `routeQuestion()` in `lib/ai/model-router.ts`
+
+**Trade-off:** Simple questions don't get vault context, profile, or memory. This is intentional—"what is 2x2" doesn't need to know about your past conversations.
+
+**Complex questions still get full context.** Asking "help me plan my launch based on our discussions" will trigger the full context assembly because complexity > 2.
+
+**See also:** `app/api/oscar/ask-stream/route.ts` for implementation.
+
 ---
 
 ### Thoughtful Mode

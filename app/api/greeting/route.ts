@@ -65,9 +65,9 @@ Context:
 Return ONLY the greeting text, nothing else. 1-2 sentences max.`
 
   try {
-    // Add timeout to prevent slow greetings
+    // Add timeout to prevent slow greetings - 5 seconds should be enough for gpt-4o-mini
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 1500) // 1.5 second timeout
+    const timeout = setTimeout(() => controller.abort(), 5000)
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
@@ -86,9 +86,13 @@ Return ONLY the greeting text, nothing else. 1-2 sentences max.`
       return [greeting]
     }
   } catch (error) {
-    // Silently fail - will use static greeting
-    if (error instanceof Error && error.name !== 'AbortError') {
-      console.error('AI greeting generation failed:', error)
+    // Silently fail for timeouts - will use static greeting
+    // Only log non-abort errors
+    if (error instanceof Error) {
+      if (error.name !== 'AbortError') {
+        console.error('AI greeting generation failed:', error.message)
+      }
+      // AbortError means timeout - expected, don't log
     }
   }
 
