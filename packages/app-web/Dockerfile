@@ -20,6 +20,10 @@ COPY packages/app-web/ ./packages/app-web/
 # Install all dependencies with workspace linking
 RUN pnpm install --filter @osqr/app-web... --frozen-lockfile
 
+# Debug: verify @osqr/core is linked correctly
+RUN ls -la packages/app-web/node_modules/@osqr/ || echo "No @osqr folder"
+RUN ls -la packages/core/dist/ | head -5 || echo "No dist folder"
+
 # Generate Prisma client
 RUN cd packages/app-web && pnpm prisma generate
 
