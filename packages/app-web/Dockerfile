@@ -10,13 +10,14 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-# Copy package files from monorepo
+# Copy package files from monorepo (including core package)
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/core/package.json ./packages/core/
 COPY packages/app-web/package.json ./packages/app-web/
 COPY packages/app-web/prisma ./packages/app-web/prisma/
 
-# Install dependencies for app-web only
-RUN pnpm install --filter @osqr/app-web --frozen-lockfile
+# Install dependencies for app-web and its workspace dependencies
+RUN pnpm install --filter @osqr/app-web... --frozen-lockfile
 
 # Generate Prisma client
 RUN cd packages/app-web && pnpm prisma generate
@@ -25,7 +26,11 @@ RUN cd packages/app-web && pnpm prisma generate
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
 COPY --from=deps /app/packages/app-web/node_modules ./packages/app-web/node_modules
+
+# Copy core package source first (app-web depends on it)
+COPY packages/core/ ./packages/core/
 
 # Copy app-web source
 COPY packages/app-web/ ./packages/app-web/
