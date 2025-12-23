@@ -3,7 +3,7 @@
 **Status:** Planned for v2.0 (Phase 3 - Intelligence Layer)
 **Category:** Response Modes / Multi-Model Intelligence
 **Owner:** Kable Record
-**Tier:** OSQR Master exclusive ($149/mo)
+**Tier:** OSQR Master exclusive ($349/mo)
 **Target:** June-August 2026 (based on current build pace)
 
 ---
@@ -247,8 +247,8 @@ This integrates with the existing `model-router.ts` question type detection.
 | Tier | Council Access |
 |------|----------------|
 | Starter ($20/mo) | None |
-| Pro ($49/mo) | None |
-| **Master ($149/mo)** | **Full access** |
+| Pro ($99/mo) | None |
+| **Master ($349/mo)** | **Full access** |
 | Master Annual ($119/mo) | Full access + High Depth unlocked |
 | Enterprise | Full access + Custom SLA |
 

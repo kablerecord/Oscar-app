@@ -180,8 +180,8 @@ This is adversarial truth-seeking for power users. Contemplate is collaborative 
 
 | Tier | Models in Council | Council Mode UI | Default Synthesizer |
 |------|-------------------|-----------------|---------------------|
-| **Pro** ($49/mo) | 2 models | Blurred (teaser) | Claude |
-| **Master** ($149/mo) | 6-8 models | Full access | Claude |
+| **Pro** ($99/mo) | 2 models | Blurred (teaser) | Claude |
+| **Master** ($349/mo) | 6-8 models | Full access | Claude |
 
 ### The 3-4x Multiplier
 

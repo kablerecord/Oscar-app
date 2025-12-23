@@ -1,0 +1,15 @@
+/**
+ * OSQR Design System - CSS Entry Point
+ *
+ * Import this file to get all CSS custom properties,
+ * animations, and utility classes.
+ */
+
+/* CSS Custom Properties (Design Tokens) */
+@import './variables.css';
+
+/* Animation Keyframes & Utility Classes */
+@import './animations.css';
+
+/* Utility Classes */
+@import './utilities.css';

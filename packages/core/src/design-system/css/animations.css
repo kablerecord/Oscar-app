@@ -1,0 +1,369 @@
+/**
+ * OSQR Design System - Animation Keyframes
+ *
+ * All animation definitions for presence states and UI effects.
+ */
+
+/* ============================================
+   PRESENCE STATE ANIMATIONS
+   ============================================ */
+
+/* Idle State - Subtle blue pulse */
+@keyframes subtle-pulse {
+  0%, 100% {
+    box-shadow: 0 10px 25px -3px rgba(59, 130, 246, 0.3),
+                0 4px 6px -4px rgba(139, 92, 246, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 10px 35px -3px rgba(59, 130, 246, 0.45),
+                0 4px 8px -4px rgba(139, 92, 246, 0.35);
+    transform: scale(1.005);
+  }
+}
+
+/* Thinking State - Purple pulse */
+@keyframes thinking-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+  }
+}
+
+/* Connected State - Slow breathing */
+@keyframes connected-breathing {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 25px rgba(139, 92, 246, 0.4);
+  }
+}
+
+/* Holding State - Amber attention pulse */
+@keyframes pulse-glow-amber {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(245, 158, 11, 0.4),
+                0 0 40px rgba(249, 115, 22, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 35px rgba(245, 158, 11, 0.7),
+                0 0 60px rgba(249, 115, 22, 0.4);
+  }
+}
+
+/* ============================================
+   DECORATIVE ANIMATIONS
+   ============================================ */
+
+/* Text shimmer effect */
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+/* Floating blobs */
+@keyframes float {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+  }
+  33% {
+    transform: translate(30px, -30px) scale(1.1);
+  }
+  66% {
+    transform: translate(-20px, 20px) scale(0.9);
+  }
+}
+
+/* Ping dot for notifications */
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Fade in */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Fade out */
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* Slide up */
+@keyframes slide-up {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Slide down */
+@keyframes slide-down {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Scale in */
+@keyframes scale-in {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Spin (loading) */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   ANIMATION UTILITY CLASSES
+   ============================================ */
+
+/* Presence animations */
+.animate-subtle-pulse {
+  animation: subtle-pulse var(--osqr-pulse-idle, 2000ms) ease-in-out infinite;
+}
+
+.animate-thinking-pulse {
+  animation: thinking-pulse var(--osqr-pulse-thinking, 2000ms) ease-in-out infinite;
+}
+
+.animate-connected-breathing {
+  animation: connected-breathing var(--osqr-pulse-connected, 4000ms) ease-in-out infinite;
+}
+
+.animate-pulse-glow-amber {
+  animation: pulse-glow-amber var(--osqr-pulse-holding, 1500ms) ease-in-out infinite;
+}
+
+/* Decorative animations */
+.animate-shimmer {
+  animation: shimmer 2s linear infinite;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
+  background-size: 200% 100%;
+}
+
+.animate-float {
+  animation: float 20s ease-in-out infinite;
+}
+
+.animate-ping {
+  animation: ping 1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in var(--osqr-duration-normal, 300ms) var(--osqr-easing-smooth);
+}
+
+.animate-fade-out {
+  animation: fade-out var(--osqr-duration-normal, 300ms) var(--osqr-easing-smooth);
+}
+
+.animate-slide-up {
+  animation: slide-up var(--osqr-duration-normal, 300ms) var(--osqr-easing-smooth);
+}
+
+.animate-slide-down {
+  animation: slide-down var(--osqr-duration-normal, 300ms) var(--osqr-easing-smooth);
+}
+
+.animate-scale-in {
+  animation: scale-in var(--osqr-duration-fast, 150ms) var(--osqr-easing-smooth);
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ============================================
+   BUBBLE STATE CLASSES
+   ============================================ */
+
+.bubble--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bubble--idle {
+  box-shadow: var(--osqr-glow-idle);
+}
+
+.bubble--thinking {
+  box-shadow: var(--osqr-glow-thinking);
+}
+
+.bubble--waiting {
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.2);
+}
+
+.bubble--connected {
+  box-shadow: var(--osqr-glow-thinking);
+}
+
+.bubble--holding {
+  box-shadow: var(--osqr-glow-holding);
+}
+
+.bubble--expanded {
+  box-shadow: var(--osqr-shadow-xl);
+}
+
+/* ============================================
+   REDUCED MOTION ALTERNATIVES
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Disable all animated presence states */
+  .animate-subtle-pulse,
+  .animate-thinking-pulse,
+  .animate-connected-breathing,
+  .animate-pulse-glow-amber,
+  .animate-shimmer,
+  .animate-float,
+  .animate-ping,
+  .animate-spin {
+    animation: none !important;
+  }
+
+  /* Reduce transition times */
+  .animate-fade-in,
+  .animate-fade-out,
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-scale-in {
+    animation-duration: 0ms !important;
+  }
+
+  /* Static glow fallbacks */
+  .bubble--idle {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+
+  .bubble--thinking {
+    box-shadow: 0 0 25px rgba(139, 92, 246, 0.4);
+  }
+
+  .bubble--connected {
+    box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+  }
+
+  .bubble--holding {
+    box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
+  }
+
+  /* Reduce all transitions */
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ============================================
+   TRANSITION UTILITIES
+   ============================================ */
+
+.transition-all {
+  transition-property: all;
+  transition-timing-function: var(--osqr-easing-smooth);
+  transition-duration: var(--osqr-duration-normal);
+}
+
+.transition-colors {
+  transition-property: color, background-color, border-color, fill, stroke;
+  transition-timing-function: var(--osqr-easing-smooth);
+  transition-duration: var(--osqr-duration-fast);
+}
+
+.transition-opacity {
+  transition-property: opacity;
+  transition-timing-function: var(--osqr-easing-smooth);
+  transition-duration: var(--osqr-duration-normal);
+}
+
+.transition-transform {
+  transition-property: transform;
+  transition-timing-function: var(--osqr-easing-smooth);
+  transition-duration: var(--osqr-duration-normal);
+}
+
+.transition-shadow {
+  transition-property: box-shadow;
+  transition-timing-function: var(--osqr-easing-smooth);
+  transition-duration: var(--osqr-duration-normal);
+}
+
+/* Duration modifiers */
+.duration-fast {
+  transition-duration: var(--osqr-duration-fast);
+}
+
+.duration-normal {
+  transition-duration: var(--osqr-duration-normal);
+}
+
+.duration-slow {
+  transition-duration: var(--osqr-duration-slow);
+}
+
+/* Easing modifiers */
+.ease-default {
+  transition-timing-function: var(--osqr-easing-default);
+}
+
+.ease-smooth {
+  transition-timing-function: var(--osqr-easing-smooth);
+}
+
+.ease-bounce {
+  transition-timing-function: var(--osqr-easing-bounce);
+}

@@ -491,31 +491,34 @@ Meta-OSQR is a self-refinement capability where OSQR audits its own system — a
 > **Note:** OSQR launches with Pro and Master only. Lite tier introduced later after 1,000+ users.
 > See [ROADMAP.md](./ROADMAP.md) for full monetization strategy.
 
-### OSQR Pro - $49/mo (Founder Price, future $79/mo) ⭐ CORE TIER
+### OSQR Pro - $99/mo (Founder Price, future $149/mo) ⭐ CORE TIER
 *"For high-performers who want elite clarity and multi-model thinking."*
 
 - Multi-model panel (Claude + GPT-4o)
 - Quick, Thoughtful & Contemplate modes
 - Full Personal Knowledge Vault
 - Unlimited Refine → Fire
-- 25 documents in vault
+- 500 documents in vault
 - 100 panel queries/day
-- OSQR's Daily Calibration Questions (full sequence)
-- Master Summary Checklist
-- Advanced memory
-- Full chat memory
-- **90-Day Transformation Guarantee (annual only)**
+- 30-day chat history analysis
+- Cross-interface continuity
+- 10GB storage
+- 100 image analyses/month
+- **90-Day Guarantee**
 
-### OSQR Master - $149/mo (Founder Price, future $249/mo)
+### OSQR Master - $249/mo (Founder Price, future $349/mo) | $199/mo annual
 *"For founders, operators, and elite thinkers who want OS-level intelligence."*
 
 - Everything in Pro
-- Advanced memory & personalized intelligence
+- Council Mode (multi-model deliberation)
+- 1,500 documents in vault
+- 300 queries/day
+- Unlimited chat history analysis
 - Priority fast-lane processing
-- 100 documents in vault
+- 100GB storage
+- Unlimited image analyses
 - Weekly automated reviews
 - Custom Agent Builder (coming)
-- Council Mode (coming)
 - VS Code Extension (coming)
 - Early access to new models & features
 - Priority support

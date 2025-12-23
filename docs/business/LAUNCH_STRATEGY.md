@@ -265,7 +265,7 @@ This is where OSQR goes from "tool" to **movement**.
 
 | Benefit | Description |
 |---------|-------------|
-| **Founder Pricing Lock** | $49/mo Pro or $149/mo Master forever (even when prices rise) |
+| **Founder Pricing Lock** | $99/mo Pro or $249/mo Master forever (even when prices rise) |
 | **Early Access Badge** | Visible in-app badge showing Founding User status |
 | **Private Community** | Access to Founding Users Discord/community |
 | **Feature Voting** | Priority input on roadmap decisions |
@@ -365,7 +365,7 @@ For Tier 3 and 4 applicants:
    - What's frustrating about current AI tools?
    - What would you build/do with a better AI assistant?
    - How did you hear about OSQR?
-   - Would you pay $49/mo for this? Why/why not?
+   - Would you pay $99/mo for this? Why/why not?
 
 2. **Quick review** — 2-minute assessment
    - Check LinkedIn/Twitter (if provided)
@@ -447,7 +447,7 @@ I want to know:
 - Where is OSQR better than ChatGPT/Claude?
 - Where is it worse?
 - What's missing?
-- Would you pay $49/mo for this?
+- Would you pay $99/mo for this?
 
 I'll send a feedback form in 7 days. But feel free to message me anytime.
 
@@ -515,7 +515,7 @@ Your access:
 - Status: Founding User (permanent)
 
 What you get:
-- Founder Pricing: $49/mo locked forever (rises to $79 at public launch)
+- Founder Pricing: $99/mo locked forever (rises to $149 at public launch)
 - Founding User badge (visible in-app)
 - Access to Founding Users community
 - Direct input on the roadmap

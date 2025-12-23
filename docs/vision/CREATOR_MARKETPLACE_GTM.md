@@ -370,7 +370,7 @@ Iterates until it feels like *them*.
 - At scale: Thousands of plugins × thousands of users × $10-50/month
 
 **From subscriptions:**
-- Users pay OSQR subscription ($49-149/month)
+- Users pay OSQR subscription ($99-249/month)
 - Plugin revenue is additional
 
 **The plugin marketplace makes OSQR subscription more valuable, which increases subscription revenue.**

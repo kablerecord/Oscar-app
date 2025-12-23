@@ -558,7 +558,7 @@ This roadmap defines **WHAT** to build. The Development Philosophy document defi
 |---------|-------|------------------|
 | **V1.0** | Core OSQR | Web app, PKV, multi-model routing, Refine→Fire |
 | **V1.1** | AI Feature Parity | Voice input, image analysis, image generation, web search, code execution |
-| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction |
+| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction, Auto-Organization, Secretary Checklist, Import Interviews |
 | **V2.0** | Creator Marketplace | Marketplace launch, creator onboarding, plugin ecosystem |
 | **V3.0** | VS Code OSQR | Full VS Code extension, Builder Plugin, Queue System |
 | **V4.0** | Privacy Phone | OSQR-native phone, intelligence utility model, US manufacturing |
@@ -1009,7 +1009,37 @@ WellnessEntry {
 - [ ] User behavior models
 - [ ] Privacy settings UI
 
-### 3.1 Cross-Referencing Engine (Master Plan: Part 2B.5)
+### 3.1 Intelligent Routing - Answer Space Classifier BLOCKED
+
+> **Full Spec:** [docs/architecture/INTELLIGENT_ROUTING_IMPLEMENTATION.md](docs/architecture/INTELLIGENT_ROUTING_IMPLEMENTATION.md)
+> **Source Specs:** `Documents/OSQR_Intelligent_Routing_Spec.docx`, `Documents/OSQR_Intelligent_Routing_Addendum.docx`
+
+**Status:** Blocked - awaiting chat history analysis
+**Priority:** Post-training, Pre-V1.5
+
+**The Core Insight:** Route questions by answer space cardinality (how many valid answers exist), not by question type or complexity.
+
+| Answer Space | Example | Mode |
+|--------------|---------|------|
+| Singular | "What's 2+2?" | Quick (1 model) |
+| Bounded | "React or Vue?" | Thoughtful (2 models) |
+| Expansive | "Brand strategy?" | Council (6-8 models) |
+
+**Blocking Dependency:** Train Oscar on Kable's chat history data first. The classifier should be built from real usage patterns, not spec heuristics alone.
+
+**Implementation Phases:**
+- [ ] **Phase 1:** Answer Space Classifier (`lib/ai/answer-space-classifier.ts`)
+- [ ] **Phase 2:** Routing Integration (wire into existing flow)
+- [ ] **Phase 3:** Observability & Success Signals (for learning system)
+- [ ] **Deferred:** Mid-response escalation, Refined Fire, per-user learning
+
+**Current Infrastructure:**
+- Model Registry, Question Type Detection, Complexity Estimation
+- 4 Response Modes, Auto-Downgrading, Routing Notification UI
+- Uses different classification model (question type vs. answer space)
+- Missing: Answer Space Classification, Learning System, Success Signals
+
+### 3.2 Cross-Referencing Engine (Master Plan: Part 2B.5)
 Current: Basic semantic search
 Needed:
 - [ ] **Connect dots across documents** automatically
@@ -1017,7 +1047,7 @@ Needed:
 - [ ] **"You mentioned X in Y document"** callbacks
 - [ ] **Knowledge graph visualization** (future)
 
-### 3.2 Memory-Based Features (Master Plan: Part 2B.14-16)
+### 3.3 Memory-Based Features (Master Plan: Part 2B.14-16)
 - [ ] **Memory-Informed Query Refinement**
   - Use past context to improve current question
 - [ ] **Memory-Based Proactive Warnings**
@@ -1025,7 +1055,68 @@ Needed:
 - [ ] **Memory-Based Pattern Recognition**
   - Surface recurring themes/concerns
 
-### 3.3 Model Personality Tagging & Registry (Master Plan: Part 2A.6) ✅ FOUNDATION COMPLETE
+### 3.3.1 Auto-Organization Subsystem ⭐ V1.5
+
+> **Full Spec:** [docs/features/OSQR_AUTO_ORGANIZATION_SPEC.md](docs/features/OSQR_AUTO_ORGANIZATION_SPEC.md)
+
+**Status:** Spec complete, ready for implementation
+
+**What it is:** OSQR automatically organizes conversations into chats and projects without user intervention. Users retain full control to override, but most never need to.
+
+**Core Principle:**
+> Organization is a fallback for when retrieval fails. If Oscar always surfaces the right information at the right time, users don't need to browse—they just talk to Oscar.
+
+**Implementation:**
+- [ ] **Auto-chat naming** - OSQR names conversations based on content
+- [ ] **Auto-project creation** - Detect when topics cluster into a project
+- [ ] **Auto-linking** - Connect related chats/documents
+- [ ] **Organization indicator** - Small UI showing OSQR's decisions
+- [ ] **Override controls** - Users can rename/reassign if desired
+
+### 3.3.2 Secretary Checklist (Insights System Extension) ⭐ V1.5
+
+> **Full Spec:** [docs/features/OSQR_SECRETARY_CHECKLIST_ADDENDUM.md](docs/features/OSQR_SECRETARY_CHECKLIST_ADDENDUM.md)
+
+**Status:** Spec complete, ready for implementation
+
+**What it is:** OSQR continuously runs the mental checklist a world-class executive assistant uses to keep their executive on track.
+
+**Core Principle:**
+> Anything a diligent assistant would do if they were paying attention to everything you said — OSQR should do automatically.
+
+**Checklist Categories:**
+- [ ] **Follow-ups** - Open decisions, abandoned discussions, paused implementations
+- [ ] **Commitments** - Things you said you'd do, promises made
+- [ ] **Contradictions** - When you say things that conflict with past statements
+- [ ] **Calendar awareness** - Upcoming events, preparation reminders
+- [ ] **Pattern alerts** - Recurring issues, blind spots, habits
+
+### 3.3.3 Import Interview Subsystem ⭐ V1.5
+
+> **Full Spec:** [docs/features/OSQR_AI_HISTORY_INTERVIEW_SPEC.md](docs/features/OSQR_AI_HISTORY_INTERVIEW_SPEC.md)
+
+**Status:** Spec complete, ready for implementation
+
+**What it is:** When users import content (AI chat history, documents, notes), OSQR can extract a lot on its own, but a few well-chosen questions dramatically increase understanding.
+
+**Core Principle:**
+> Oscar should be as good as possible without asking questions. But a few well-thought-out questions raise confidence significantly.
+
+**Import Types & Interview Value:**
+| Import Type | Base Confidence | Post-Interview | Priority |
+|-------------|-----------------|----------------|----------|
+| AI chat history | ~60% | ~90% | **Highest** |
+| Email archive | ~50% | ~85% | High |
+| Notes (Notion, Obsidian) | ~70% | ~90% | Medium |
+| Documents folder | ~65% | ~85% | Medium |
+
+**Implementation:**
+- [ ] **Confidence assessment** - Determine when interview is worth it
+- [ ] **Question generation** - Smart questions based on gaps
+- [ ] **Interview UI** - Conversational flow for answering
+- [ ] **Confidence integration** - Store answers in PKV
+
+### 3.4 Model Personality Tagging & Registry (Master Plan: Part 2A.6) ✅ FOUNDATION COMPLETE
 
 > **Full Spec:** [docs/features/MULTI-MODEL-ARCHITECTURE.md](docs/features/MULTI-MODEL-ARCHITECTURE.md)
 
@@ -1125,7 +1216,7 @@ A live, real-time, multi-agent thinking room where 2-6 AI models think in parall
 - [ ] Hardened backend + rate limiting for compute-intensive queries
 
 **Target:** v2.0 release (Phase 3 completion)
-**Tier:** OSQR Master exclusive ($149/mo)
+**Tier:** OSQR Master exclusive ($349/mo)
 
 **High-level implementation:**
 ```
@@ -1231,7 +1322,7 @@ AI capabilities improve quarterly. Photos stored today can be retroactively anal
 - [ ] Users trust OSQR with text before trusting it with family photos
 
 **Target:** v3.0 or later (after Council Mode and core intelligence features)
-**Tier:** Pro ($49/mo) for storage, Master ($149/mo) for advanced analysis
+**Tier:** Pro ($99/mo) for storage, Master ($349/mo) for advanced analysis
 
 **Why Phase 4.8 (not earlier):**
 1. Core OSQR value must be proven first (intelligence, memory, routing)
@@ -1532,8 +1623,8 @@ OSQR launches with **Pro and Master tiers only**. No Lite/Free tier at launch.
 
 | Tier | Launch Price | Future Price | Core Value |
 |------|-------------|--------------|------------|
-| **OSQR Pro** | $49/mo | $79/mo | Elite clarity + multi-model thinking |
-| **OSQR Master** | $149/mo | $249/mo | OS-level intelligence + all features |
+| **OSQR Pro** | $99/mo | $149/mo | Elite clarity + multi-model thinking |
+| **OSQR Master** | $249/mo | $249/mo | OS-level intelligence + all features |
 | **Enterprise** | — | $4,000+/mo | Organization-level OS (see [Appendix G](#appendix-g-enterprise-tier-vision-future)) |
 
 **No Lite tier at launch.** Lite will be introduced after premium brand is established.
@@ -1576,7 +1667,7 @@ Early adopters get **lifetime rate lock**:
 
 | Phase | Timing | Action |
 |-------|--------|--------|
-| Phase 1 | Launch | Pro $49, Master $149 |
+| Phase 1 | Launch | Pro $99, Master $249 |
 | Phase 2 | After 1,000 users | Pro $79, Master $199-249 |
 | Phase 3 | Council Mode ships | Master $249+ |
 | Phase 4 | Mass market | Introduce Lite $19/mo |

@@ -1,0 +1,190 @@
+/**
+ * OSQR Design System - CSS Custom Properties
+ *
+ * Auto-generated from design tokens.
+ * DO NOT EDIT DIRECTLY - regenerate from tokens if needed.
+ */
+
+:root {
+  /* ============================================
+     COLORS
+     ============================================ */
+
+  /* Background (slate palette) */
+  --osqr-color-background-primary: #0f172a;
+  --osqr-color-background-secondary: #1e293b;
+  --osqr-color-background-tertiary: #334155;
+  --osqr-color-background-overlay: rgba(15, 23, 42, 0.95);
+
+  /* Text */
+  --osqr-color-text-primary: #f1f5f9;
+  --osqr-color-text-secondary: #cbd5e1;
+  --osqr-color-text-muted: #94a3b8;
+  --osqr-color-text-subtle: #64748b;
+
+  /* Accent (blue) */
+  --osqr-color-accent-primary: #3b82f6;
+  --osqr-color-accent-hover: #2563eb;
+  --osqr-color-accent-light: #60a5fa;
+  --osqr-color-accent-subtle: #1e3a5f;
+
+  /* Secondary (purple) */
+  --osqr-color-secondary-primary: #8b5cf6;
+  --osqr-color-secondary-light: #a78bfa;
+  --osqr-color-secondary-subtle: rgba(139, 92, 246, 0.2);
+
+  /* Presence states (mood colors) */
+  --osqr-color-presence-idle: rgba(59, 130, 246, 0.3);
+  --osqr-color-presence-thinking: rgba(139, 92, 246, 0.5);
+  --osqr-color-presence-waiting: rgba(139, 92, 246, 0.2);
+  --osqr-color-presence-connected: rgba(139, 92, 246, 0.4);
+  --osqr-color-presence-holding: rgba(245, 158, 11, 0.4);
+  --osqr-color-presence-holding-peak: rgba(245, 158, 11, 0.7);
+
+  /* Insight categories */
+  --osqr-color-category-contradiction: #fbbf24;
+  --osqr-color-category-clarify: #60a5fa;
+  --osqr-color-category-next-step: #4ade80;
+  --osqr-color-category-recall: #c084fc;
+
+  /* Borders */
+  --osqr-color-border-default: #334155;
+  --osqr-color-border-subtle: rgba(51, 65, 85, 0.5);
+  --osqr-color-border-focus: #3b82f6;
+
+  /* Semantic */
+  --osqr-color-semantic-success: #4ade80;
+  --osqr-color-semantic-warning: #fbbf24;
+  --osqr-color-semantic-error: #f87171;
+  --osqr-color-semantic-info: #60a5fa;
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+
+  /* Font families */
+  --osqr-font-family-primary: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --osqr-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+
+  /* Font sizes */
+  --osqr-font-size-xs: 10px;
+  --osqr-font-size-sm: 12px;
+  --osqr-font-size-base: 14px;
+  --osqr-font-size-md: 16px;
+  --osqr-font-size-lg: 18px;
+  --osqr-font-size-xl: 20px;
+  --osqr-font-size-2xl: 24px;
+
+  /* Font weights */
+  --osqr-font-weight-normal: 400;
+  --osqr-font-weight-medium: 500;
+  --osqr-font-weight-semibold: 600;
+  --osqr-font-weight-bold: 700;
+
+  /* Line heights */
+  --osqr-line-height-tight: 1.25;
+  --osqr-line-height-normal: 1.5;
+  --osqr-line-height-relaxed: 1.75;
+
+  /* ============================================
+     SPACING
+     ============================================ */
+
+  --osqr-spacing-0: 0px;
+  --osqr-spacing-1: 4px;
+  --osqr-spacing-1-5: 6px;
+  --osqr-spacing-2: 8px;
+  --osqr-spacing-2-5: 10px;
+  --osqr-spacing-3: 12px;
+  --osqr-spacing-4: 16px;
+  --osqr-spacing-5: 20px;
+  --osqr-spacing-6: 24px;
+  --osqr-spacing-8: 32px;
+  --osqr-spacing-10: 40px;
+  --osqr-spacing-12: 48px;
+  --osqr-spacing-16: 64px;
+
+  /* ============================================
+     SHADOWS
+     ============================================ */
+
+  /* Elevation */
+  --osqr-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --osqr-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --osqr-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --osqr-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --osqr-shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+
+  /* Glow effects */
+  --osqr-glow-idle: 0 0 20px rgba(59, 130, 246, 0.3);
+  --osqr-glow-idle-peak: 0 10px 35px -3px rgba(59, 130, 246, 0.45), 0 4px 8px -4px rgba(139, 92, 246, 0.35);
+  --osqr-glow-thinking: 0 0 20px rgba(139, 92, 246, 0.3);
+  --osqr-glow-thinking-peak: 0 0 30px rgba(139, 92, 246, 0.5);
+  --osqr-glow-holding: 0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(249, 115, 22, 0.2);
+  --osqr-glow-holding-peak: 0 0 35px rgba(245, 158, 11, 0.7), 0 0 60px rgba(249, 115, 22, 0.4);
+
+  /* ============================================
+     BORDER RADIUS
+     ============================================ */
+
+  --osqr-radius-none: 0px;
+  --osqr-radius-sm: 4px;
+  --osqr-radius-md: 8px;
+  --osqr-radius-lg: 12px;
+  --osqr-radius-xl: 16px;
+  --osqr-radius-2xl: 24px;
+  --osqr-radius-3xl: 28px;
+  --osqr-radius-full: 9999px;
+
+  /* ============================================
+     ANIMATIONS
+     ============================================ */
+
+  /* Duration */
+  --osqr-duration-instant: 0ms;
+  --osqr-duration-fast: 150ms;
+  --osqr-duration-normal: 300ms;
+  --osqr-duration-slow: 500ms;
+  --osqr-duration-slower: 700ms;
+
+  /* Easing */
+  --osqr-easing-default: ease-out;
+  --osqr-easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --osqr-easing-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Pulse durations */
+  --osqr-pulse-idle: 2000ms;
+  --osqr-pulse-holding: 1500ms;
+  --osqr-pulse-thinking: 2000ms;
+  --osqr-pulse-connected: 4000ms;
+
+  /* ============================================
+     BREAKPOINTS (for reference in JS)
+     ============================================ */
+
+  --osqr-breakpoint-sm: 640px;
+  --osqr-breakpoint-md: 768px;
+  --osqr-breakpoint-lg: 1024px;
+  --osqr-breakpoint-xl: 1280px;
+  --osqr-breakpoint-2xl: 1536px;
+}
+
+/* ============================================
+   HIGH CONTRAST MODE (Accessibility)
+   ============================================ */
+
+:root[data-high-contrast="true"] {
+  --osqr-color-text-primary: #ffffff;
+  --osqr-color-text-secondary: #ffffff;
+  --osqr-color-text-muted: #e2e8f0;
+  --osqr-color-border-default: #ffffff;
+  --osqr-color-accent-primary: #60a5fa;
+}
+
+/* ============================================
+   DARK THEME (Default - placeholder for future light theme)
+   ============================================ */
+
+:root[data-theme="dark"] {
+  /* Dark theme is default in OSQR - no overrides needed */
+}

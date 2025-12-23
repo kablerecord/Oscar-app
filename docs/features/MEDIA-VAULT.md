@@ -3,7 +3,7 @@
 **Status:** Planned for v3.0+ (Phase 4.8)
 **Category:** Personal Knowledge Vault / Life OS
 **Owner:** Kable Record
-**Tier:** Pro ($49/mo) for storage, Master ($149/mo) for advanced analysis
+**Tier:** Pro ($99/mo) for storage, Master ($349/mo) for advanced analysis
 **Target:** After Council Mode and core intelligence features are stable
 
 ---
@@ -560,8 +560,8 @@ Complete media deletion includes:
 ### Pricing Implications
 
 **Option A: Include in tier pricing**
-- Pro ($49/mo): 10 GB storage, 100 analyses/month
-- Master ($149/mo): 100 GB storage, unlimited analyses
+- Pro ($99/mo): 10 GB storage, 100 analyses/month
+- Master ($349/mo): 100 GB storage, unlimited analyses
 
 **Option B: Usage-based add-on**
 - Base storage: $0.10/GB/month
@@ -578,10 +578,10 @@ Complete media deletion includes:
 
 ### Tier Value Props
 
-**Pro ($49/mo):**
+**Pro ($99/mo):**
 > "Your life's photos, searchable and connected to your goals."
 
-**Master ($149/mo):**
+**Master ($349/mo):**
 > "AI that understands your visual history and surfaces insights across your entire life."
 
 ### Upsell Flow

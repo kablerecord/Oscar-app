@@ -182,8 +182,8 @@ Email integration is a paid add-on feature. Two options under consideration:
 
 **Option A - Bundle into tiers:**
 - Lite: No connections
-- Pro ($49): 2 connections included
-- Master ($149): Unlimited connections
+- Pro ($99): 2 connections included
+- Master ($249): Unlimited connections
 
 **Option B - Separate add-on:**
 - $10/month per connection
