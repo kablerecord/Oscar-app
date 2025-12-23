@@ -1,4 +1,8 @@
 import type { NextConfig } from "next";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -22,6 +26,12 @@ const nextConfig: NextConfig = {
     config.resolve.fallback = {
       ...config.resolve.fallback,
       '@chroma-core/default-embed': false,
+    };
+
+    // Explicitly resolve @osqr/core to the workspace package
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@osqr/core': path.resolve(__dirname, '../core/dist'),
     };
 
     return config;
