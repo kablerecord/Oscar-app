@@ -5,45 +5,32 @@ FROM node:20-alpine AS base
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Install dependencies only when needed
-FROM base AS deps
+# Build stage - install deps and build
+FROM base AS builder
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-# Copy package files from monorepo (including core package)
+# Copy workspace config files
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY packages/core/package.json ./packages/core/
-COPY packages/app-web/package.json ./packages/app-web/
-COPY packages/app-web/prisma ./packages/app-web/prisma/
 
-# Install dependencies for app-web and its workspace dependencies
+# Copy all package sources (needed for workspace resolution)
+COPY packages/core/ ./packages/core/
+COPY packages/app-web/ ./packages/app-web/
+
+# Install all dependencies with workspace linking
 RUN pnpm install --filter @osqr/app-web... --frozen-lockfile
 
 # Generate Prisma client
 RUN cd packages/app-web && pnpm prisma generate
 
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
-COPY --from=deps /app/packages/app-web/node_modules ./packages/app-web/node_modules
-
-# Copy core package source first (app-web depends on it)
-COPY packages/core/ ./packages/core/
-
-# Copy app-web source
-COPY packages/app-web/ ./packages/app-web/
-
-WORKDIR /app/packages/app-web
-
 # Set dummy DATABASE_URL for build (Prisma needs it at build time)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
 # Build the application
+WORKDIR /app/packages/app-web
 RUN pnpm build
 
-# Production image, copy all the files and run next
+# Production image
 FROM base AS runner
 WORKDIR /app
 
