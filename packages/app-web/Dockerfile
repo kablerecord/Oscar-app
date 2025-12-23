@@ -46,9 +46,10 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files from builder
-COPY --from=builder /app/packages/app-web/public ./public
+# In pnpm monorepo, standalone output preserves the packages structure
 COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/static ./.next/static
+COPY --from=builder /app/packages/app-web/public ./packages/app-web/public
+COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/static ./packages/app-web/.next/static
 
 USER nextjs
 
@@ -59,4 +60,5 @@ ENV HOSTNAME="0.0.0.0"
 # Use dumb-init as PID 1 to properly handle signals
 # This fixes the SIGTERM issue on Railway
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "server.js"]
+# In pnpm monorepo, standalone server.js is at packages/app-web/server.js
+CMD ["node", "packages/app-web/server.js"]
