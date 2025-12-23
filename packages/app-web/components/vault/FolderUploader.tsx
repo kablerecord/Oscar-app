@@ -46,6 +46,7 @@ interface FolderUploaderProps {
   projectId?: string
   onComplete?: (stats: UploadStats) => void
   onError?: (error: string) => void
+  onStart?: () => void
 }
 
 const SUPPORTED_EXTENSIONS = ['.txt', '.md', '.pdf', '.doc', '.docx', '.json']
@@ -73,6 +74,7 @@ export function FolderUploader({
   projectId,
   onComplete,
   onError,
+  onStart,
 }: FolderUploaderProps) {
   const [files, setFiles] = useState<FileEntry[]>([])
   const [isDragging, setIsDragging] = useState(false)
@@ -294,6 +296,11 @@ export function FolderUploader({
     setStartTime(Date.now())
     setEstimatedTimeRemaining(null)
     abortControllerRef.current = new AbortController()
+
+    // Notify parent that upload started
+    if (onStart) {
+      onStart()
+    }
 
     const filesRef = { current: [...files] }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,7 +17,9 @@ import {
   Square,
   CheckSquare,
   Minus,
+  RefreshCw,
 } from 'lucide-react'
+import { useVaultContext } from './VaultPageClient'
 
 interface Document {
   id: string
@@ -39,6 +41,8 @@ interface DocumentListProps {
     totalPages: number
   }
   workspaceId: string
+  autoRefresh?: boolean // Enable auto-refresh polling
+  autoRefreshInterval?: number // Interval in ms (default 5000)
 }
 
 // Map source types to icons
@@ -84,6 +88,8 @@ export function DocumentList({
   initialDocuments,
   initialPagination,
   workspaceId,
+  autoRefresh = false,
+  autoRefreshInterval = 5000,
 }: DocumentListProps) {
   const [documents, setDocuments] = useState(initialDocuments || [])
   const [pagination, setPagination] = useState(initialPagination)
@@ -92,10 +98,17 @@ export function DocumentList({
   const [selectedDoc, setSelectedDoc] = useState<string | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [isAutoRefreshing, setIsAutoRefreshing] = useState(autoRefresh)
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
 
-  const fetchDocuments = async (page: number, searchTerm?: string) => {
-    setLoading(true)
-    setSelectedIds(new Set()) // Clear selection on page change
+  // Get vault context for upload state (if available)
+  const vaultContext = useVaultContext()
+
+  const fetchDocuments = useCallback(async (page: number, searchTerm?: string, silent?: boolean) => {
+    if (!silent) {
+      setLoading(true)
+      setSelectedIds(new Set()) // Clear selection on page change
+    }
     try {
       const params = new URLSearchParams({
         workspaceId,
@@ -110,11 +123,49 @@ export function DocumentList({
 
       setDocuments(data.documents || [])
       setPagination(data.pagination || initialPagination)
+      setLastRefresh(new Date())
     } catch (error) {
       console.error('Failed to fetch documents:', error)
     } finally {
-      setLoading(false)
+      if (!silent) {
+        setLoading(false)
+      }
     }
+  }, [workspaceId, pagination.limit, initialPagination])
+
+  // Auto-enable refresh when uploads are happening (via context)
+  useEffect(() => {
+    if (vaultContext?.isUploading && !isAutoRefreshing) {
+      setIsAutoRefreshing(true)
+    }
+  }, [vaultContext?.isUploading, isAutoRefreshing])
+
+  // Refresh when context signals a refresh (after upload completes)
+  useEffect(() => {
+    if (vaultContext?.refreshKey) {
+      fetchDocuments(pagination.page, search, true)
+    }
+  }, [vaultContext?.refreshKey, pagination.page, search, fetchDocuments])
+
+  // Auto-refresh effect
+  useEffect(() => {
+    if (!isAutoRefreshing) return
+
+    const interval = setInterval(() => {
+      fetchDocuments(pagination.page, search, true) // silent refresh
+    }, autoRefreshInterval)
+
+    return () => clearInterval(interval)
+  }, [isAutoRefreshing, autoRefreshInterval, pagination.page, search, fetchDocuments])
+
+  // Toggle auto-refresh
+  const toggleAutoRefresh = () => {
+    setIsAutoRefreshing((prev) => !prev)
+  }
+
+  // Manual refresh
+  const handleManualRefresh = () => {
+    fetchDocuments(pagination.page, search, true)
   }
 
   const handleSearch = (e: React.FormEvent) => {
@@ -216,22 +267,55 @@ export function DocumentList({
 
   return (
     <div className="space-y-4">
-      {/* Search */}
-      <form onSubmit={handleSearch} className="flex gap-2">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            type="text"
-            placeholder="Search documents..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 w-64"
-          />
+      {/* Search and Refresh Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <Input
+              type="text"
+              placeholder="Search documents..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 w-64"
+            />
+          </div>
+          <Button type="submit" variant="outline" disabled={loading}>
+            Search
+          </Button>
+        </form>
+
+        {/* Refresh controls */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleManualRefresh}
+            title="Refresh now"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          <Button
+            variant={isAutoRefreshing ? 'default' : 'outline'}
+            size="sm"
+            onClick={toggleAutoRefresh}
+            className={isAutoRefreshing ? 'bg-green-600 hover:bg-green-700' : ''}
+          >
+            {isAutoRefreshing ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+          </Button>
+          {isAutoRefreshing && (
+            <span className="text-xs text-slate-400">
+              Every {autoRefreshInterval / 1000}s
+            </span>
+          )}
         </div>
-        <Button type="submit" variant="outline" disabled={loading}>
-          Search
-        </Button>
-      </form>
+      </div>
+
+      {/* Document count and last refresh */}
+      <div className="flex items-center justify-between text-sm text-slate-400">
+        <span>{pagination.total} documents</span>
+        <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
+      </div>
 
       {/* Bulk actions bar - shows when documents exist */}
       {documents.length > 0 && (

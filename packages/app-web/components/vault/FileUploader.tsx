@@ -49,6 +49,7 @@ interface FileUploaderProps {
     chunksIndexed: number
   }) => void
   onError?: (error: string) => void
+  onStart?: () => void
   compact?: boolean
 }
 
@@ -81,6 +82,7 @@ export function FileUploader({
   projectId,
   onComplete,
   onError,
+  onStart,
   compact = false,
 }: FileUploaderProps) {
   const [file, setFile] = useState<File | null>(null)
@@ -132,6 +134,11 @@ export function FileUploader({
     if (!file) return
 
     abortControllerRef.current = new AbortController()
+
+    // Notify parent that upload started
+    if (onStart) {
+      onStart()
+    }
 
     const formData = new FormData()
     formData.append('file', file)
