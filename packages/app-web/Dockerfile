@@ -17,8 +17,8 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/core/ ./packages/core/
 COPY packages/app-web/ ./packages/app-web/
 
-# Install all dependencies with workspace linking
-RUN pnpm install --filter @osqr/app-web... --frozen-lockfile
+# Install all dependencies with workspace linking from root
+RUN pnpm install --frozen-lockfile
 
 # Generate Prisma client
 RUN cd packages/app-web && pnpm prisma generate
@@ -26,13 +26,11 @@ RUN cd packages/app-web && pnpm prisma generate
 # Set dummy DATABASE_URL for build (Prisma needs it at build time)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
-# Build the application
-WORKDIR /app/packages/app-web
+# Debug: verify workspace linking
+RUN ls -la packages/app-web/node_modules/@osqr/ && ls -la packages/core/dist/ | head -3
 
-# Debug: Show what the alias will resolve to
-RUN echo "CWD: $(pwd)" && ls -la ../core/dist/ | head -5
-
-RUN pnpm build
+# Build the application from root using pnpm filter
+RUN pnpm --filter @osqr/app-web build
 
 # Production image
 FROM base AS runner
