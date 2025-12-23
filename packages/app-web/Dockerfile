@@ -28,6 +28,10 @@ ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
 # Build the application
 WORKDIR /app/packages/app-web
+
+# Debug: Show what the alias will resolve to
+RUN echo "CWD: $(pwd)" && ls -la ../core/dist/ | head -5
+
 RUN pnpm build
 
 # Production image
