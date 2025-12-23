@@ -85,9 +85,9 @@ export class MarkdownExtractor extends BaseExtractor {
     const text = await this.getText(document);
 
     return {
-      title: frontmatter?.title || this.extractFirstHeading(content) || null,
-      author: frontmatter?.author || null,
-      createdAt: frontmatter?.date ? new Date(frontmatter.date) : document.ctime,
+      title: (frontmatter?.title as string) || this.extractFirstHeading(content) || null,
+      author: (frontmatter?.author as string) || null,
+      createdAt: frontmatter?.date ? new Date(frontmatter.date as string) : document.ctime,
       modifiedAt: document.mtime,
       wordCount: this.countWords(text),
       language: this.detectLanguage(text),

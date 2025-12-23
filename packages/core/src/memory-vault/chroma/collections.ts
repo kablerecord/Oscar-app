@@ -5,7 +5,7 @@
  * Provides typed interfaces for CRUD operations on collections.
  */
 
-import type { Collection, IncludeEnum } from 'chromadb';
+import type { Collection } from 'chromadb';
 import {
   getChromaClient,
   getChromaConfig,
@@ -161,7 +161,7 @@ export interface QueryOptions {
   queryText?: string;
   limit?: number;
   where?: Record<string, unknown>;
-  include?: IncludeEnum[];
+  include?: string[];
 }
 
 export interface QueryResult {
@@ -286,7 +286,7 @@ export async function deleteDocuments(
 export async function getDocuments(
   collection: Collection,
   ids: string[],
-  include: IncludeEnum[] = ['documents', 'metadatas', 'embeddings']
+  include: string[] = ['documents', 'metadatas', 'embeddings']
 ): Promise<QueryResult[]> {
   if (ids.length === 0) return [];
 
@@ -294,7 +294,7 @@ export async function getDocuments(
     async () => {
       return await collection.get({
         ids,
-        include,
+        include: include as ("documents" | "embeddings" | "metadatas")[],
       });
     },
     'QUERY_FAILED',
@@ -313,7 +313,7 @@ export async function queryByEmbedding(
   options: {
     limit?: number;
     where?: Record<string, unknown>;
-    include?: IncludeEnum[];
+    include?: string[];
   } = {}
 ): Promise<QueryResult[]> {
   const {
@@ -328,7 +328,7 @@ export async function queryByEmbedding(
         queryEmbeddings: [embedding],
         nResults: limit,
         where: where as Record<string, string | number | boolean>,
-        include,
+        include: include as ("documents" | "embeddings" | "metadatas" | "distances")[],
       });
     },
     'QUERY_FAILED',
@@ -347,7 +347,7 @@ export async function queryAll(
     where?: Record<string, unknown>;
     limit?: number;
     offset?: number;
-    include?: IncludeEnum[];
+    include?: string[];
   } = {}
 ): Promise<QueryResult[]> {
   const {
@@ -363,7 +363,7 @@ export async function queryAll(
         where: where as Record<string, string | number | boolean>,
         limit,
         offset,
-        include,
+        include: include as ("documents" | "embeddings" | "metadatas")[],
       });
     },
     'QUERY_FAILED',
@@ -391,7 +391,7 @@ function convertQueryResults(
   result: {
     ids: string[] | string[][];
     documents?: (string | null)[] | (string | null)[][] | null;
-    metadatas?: (Record<string, string | number | boolean> | null)[] | (Record<string, string | number | boolean> | null)[][] | null;
+    metadatas?: unknown;
     embeddings?: number[][] | number[][][] | null;
     distances?: number[] | number[][] | null;
   }
@@ -403,10 +403,11 @@ function convertQueryResults(
         ? (result.documents as (string | null)[][])[0]
         : (result.documents as (string | null)[]))
     : [];
-  const metadatas = result.metadatas
-    ? (Array.isArray(result.metadatas[0]) && !('$contains' in (result.metadatas[0] || {}))
-        ? (result.metadatas as (Record<string, string | number | boolean> | null)[][])[0]
-        : (result.metadatas as (Record<string, string | number | boolean> | null)[]))
+  const rawMetadatas = result.metadatas as (Record<string, unknown> | null)[] | (Record<string, unknown> | null)[][] | null;
+  const metadatas = rawMetadatas
+    ? (Array.isArray(rawMetadatas[0]) && !('$contains' in (rawMetadatas[0] || {}))
+        ? (rawMetadatas as (Record<string, unknown> | null)[][])[0]
+        : (rawMetadatas as (Record<string, unknown> | null)[]))
     : [];
   const embeddings = result.embeddings
     ? (Array.isArray(result.embeddings[0]) && Array.isArray(result.embeddings[0][0])

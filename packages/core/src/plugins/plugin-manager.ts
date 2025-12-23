@@ -393,7 +393,7 @@ export function findPluginsWithCapability(
   capability: keyof import('./types').PluginManifest['capabilities']
 ): LoadedPlugin[] {
   return Array.from(loadedPlugins.values()).filter((plugin) => {
-    const caps = plugin.manifest.capabilities as Record<string, unknown>;
+    const caps = plugin.manifest.capabilities as unknown as Record<string, unknown>;
     const value = caps[capability];
 
     // Boolean capabilities
