@@ -1,8 +1,5 @@
 import type { NextConfig } from "next";
 import path from "path";
-import { fileURLToPath } from "url";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -29,9 +26,10 @@ const nextConfig: NextConfig = {
     };
 
     // Explicitly resolve @osqr/core to the workspace package
+    // In Docker, cwd is /app/packages/app-web, so ../core/dist resolves correctly
     config.resolve.alias = {
       ...config.resolve.alias,
-      '@osqr/core': path.resolve(__dirname, '../core/dist'),
+      '@osqr/core': path.resolve(process.cwd(), '../core/dist'),
     };
 
     return config;
