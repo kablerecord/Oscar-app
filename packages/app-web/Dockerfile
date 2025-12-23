@@ -7,9 +7,9 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
-COPY prisma ./prisma/
+# Copy package files from monorepo subdirectory
+COPY packages/app-web/package.json packages/app-web/package-lock.json* ./
+COPY packages/app-web/prisma ./prisma/
 
 # Install dependencies
 RUN npm ci
@@ -21,7 +21,8 @@ RUN npx prisma generate
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# Copy app-web source
+COPY packages/app-web/ .
 
 # Set dummy DATABASE_URL for build (Prisma needs it at build time)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
