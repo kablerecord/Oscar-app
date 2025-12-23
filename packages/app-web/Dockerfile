@@ -21,7 +21,7 @@ COPY packages/app-web/ ./packages/app-web/
 RUN pnpm install --frozen-lockfile
 
 # Build @osqr/core first (dist/ is gitignored, so we need to build it)
-RUN cd packages/core && pnpm rebuild
+RUN cd packages/core && pnpm exec tsc
 
 # Generate Prisma client
 RUN cd packages/app-web && pnpm prisma generate
