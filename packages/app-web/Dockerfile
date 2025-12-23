@@ -20,14 +20,14 @@ COPY packages/app-web/ ./packages/app-web/
 # Install all dependencies with workspace linking from root
 RUN pnpm install --frozen-lockfile
 
+# Build @osqr/core first (dist/ is gitignored, so we need to build it)
+RUN cd packages/core && pnpm rebuild
+
 # Generate Prisma client
 RUN cd packages/app-web && pnpm prisma generate
 
 # Set dummy DATABASE_URL for build (Prisma needs it at build time)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
-
-# Debug: verify workspace linking
-RUN ls -la packages/app-web/node_modules/@osqr/ && ls -la packages/core/dist/ | head -3
 
 # Build the application from root using pnpm filter
 RUN pnpm --filter @osqr/app-web build
