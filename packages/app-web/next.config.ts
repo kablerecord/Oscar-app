@@ -4,10 +4,6 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // Transpile the workspace @osqr/core package
   transpilePackages: ['@osqr/core'],
-  // Enable turbopack - set root for monorepo builds
-  turbopack: {
-    root: process.cwd(),
-  },
   // TypeScript: ignore pre-existing implicit any errors (TODO: fix incrementally)
   typescript: {
     ignoreBuildErrors: true,
