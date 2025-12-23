@@ -148,11 +148,11 @@ pnpm --filter @osqr/marketing dev
 
 | Tier | Monthly | Yearly | Future Price | Status |
 |------|---------|--------|--------------|--------|
-| Lite | $19 | N/A | $29 | Hidden until 1,000 users |
+| Lite | $19 | N/A | $29 | Hidden until 500 paid users |
 | Pro | $99 | $948 ($79/mo) | $149 | Active |
 | Master | $249 | $2,388 ($199/mo) | $349 | Active |
 
-**Founder pricing:** First 500 users lock in current rates forever.
+**Founder pricing:** First 500 paid users lock in current rates forever.
 
 ---
 
@@ -206,3 +206,64 @@ pnpm --filter @osqr/marketing dev
 2. **Reference `osqr/` for specs** - But implement in `packages/core/`
 3. **Keep pricing in sync** - Both `app-web` and `marketing` have pricing pages
 4. **Use pnpm** - Not npm or yarn (monorepo requirement)
+
+---
+
+## AI Provider Integration
+
+**Location:** `packages/app-web/lib/ai/providers/`
+
+| Provider | Env Var | Models | Status |
+|----------|---------|--------|--------|
+| OpenAI | `OPENAI_API_KEY` | GPT-4o, GPT-4o-mini | Active |
+| Anthropic | `ANTHROPIC_API_KEY` | Claude Opus 4, Sonnet 4, Haiku | Active |
+| Google | `GOOGLE_AI_API_KEY` | Gemini 2.0 Flash Pro | Active |
+| xAI | `XAI_API_KEY` | Grok 2 | Active |
+| Groq | `GROQ_API_KEY` | Llama 3.3 70B | Ready (not in use yet) |
+
+**Routing:** See `lib/ai/model-router.ts` for question type detection and model selection.
+
+**Modes:**
+- Quick: Claude Sonnet 4 only (2-8 sec)
+- Thoughtful: 3 diverse models in parallel → synthesis (20-40 sec)
+- Contemplate: 4 models + 2 roundtables → deep synthesis (60-90 sec)
+
+---
+
+## Founder Spot Tracking
+
+**Limit:** 500 founder spots (locked-in pricing forever)
+
+**API:** `GET /api/founder-spots` returns:
+```json
+{
+  "remainingSpots": 500,
+  "isFounderPeriod": true,
+  "percentageFilled": 0
+}
+```
+
+**Implementation:** `lib/admin/platform-metrics.ts` → `getFounderSpotStatus()`
+
+**Lite Tier:** Hidden until 500 paid users reached (see `lib/tiers/config.ts` line 54)
+
+---
+
+## Railway Deployment (app-web)
+
+**Config:** `railway.json` at repo root points to `packages/app-web/Dockerfile`
+
+**Important:** The Dockerfile uses paths like `COPY packages/app-web/...` because Railway builds from repo root with `dockerfilePath` pointing to the subdirectory.
+
+**Domains:**
+- `app.osqr.app` (custom domain)
+- `oscar-app-production.up.railway.app`
+
+---
+
+## Pre-Launch Checklist
+
+See `docs/process/BLOCKED.md` for:
+- AI Provider Billing checklist (all 5 providers)
+- Cost estimates per user tier
+- Blocked items needing resolution

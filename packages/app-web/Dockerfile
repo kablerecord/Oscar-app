@@ -2,33 +2,41 @@
 
 FROM node:20-alpine AS base
 
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
-# Copy package files from monorepo subdirectory
-COPY packages/app-web/package.json packages/app-web/package-lock.json* ./
-COPY packages/app-web/prisma ./prisma/
+# Copy package files from monorepo
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY packages/app-web/package.json ./packages/app-web/
+COPY packages/app-web/prisma ./packages/app-web/prisma/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies for app-web only
+RUN pnpm install --filter @osqr/app-web --frozen-lockfile
 
 # Generate Prisma client
-RUN npx prisma generate
+RUN cd packages/app-web && pnpm prisma generate
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/packages/app-web/node_modules ./packages/app-web/node_modules
+
 # Copy app-web source
-COPY packages/app-web/ .
+COPY packages/app-web/ ./packages/app-web/
+
+WORKDIR /app/packages/app-web
 
 # Set dummy DATABASE_URL for build (Prisma needs it at build time)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 
 # Build the application
-RUN npm run build
+RUN pnpm build
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -44,9 +52,9 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files from builder
-COPY --from=builder /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder /app/packages/app-web/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/static ./.next/static
 
 USER nextjs
 
