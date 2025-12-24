@@ -27,6 +27,8 @@ export default function MobileThreadPage() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+  const [isLoadingWorkspace, setIsLoadingWorkspace] = useState(true)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const conversationIdRef = useRef<string>(crypto.randomUUID())
@@ -38,6 +40,32 @@ export default function MobileThreadPage() {
       router.replace('/mobile/signin')
     }
   }, [session, status, router])
+
+  // Fetch user's workspace ID
+  useEffect(() => {
+    if (!session) return
+
+    const fetchWorkspace = async () => {
+      try {
+        const response = await fetch('/api/mobile/workspace')
+        if (response.ok) {
+          const data = await response.json()
+          setWorkspaceId(data.workspaceId)
+        } else if (response.status === 401) {
+          router.replace('/mobile/signin')
+        } else {
+          setError('Unable to load your workspace. Please try again.')
+        }
+      } catch (err) {
+        console.error('Error fetching workspace:', err)
+        setError('Unable to connect. Please check your connection.')
+      } finally {
+        setIsLoadingWorkspace(false)
+      }
+    }
+
+    fetchWorkspace()
+  }, [session, router])
 
   // Monitor online status
   useEffect(() => {
@@ -61,7 +89,7 @@ export default function MobileThreadPage() {
   }, [messages, isLoading])
 
   const sendMessage = useCallback(async (content: string, inputType: 'text' | 'voice') => {
-    if (!content.trim() || isLoading || !isOnline) return
+    if (!content.trim() || isLoading || !isOnline || !workspaceId) return
 
     setError(null)
 
@@ -91,7 +119,7 @@ export default function MobileThreadPage() {
         },
         body: JSON.stringify({
           message: content.trim(),
-          workspaceId: 'mobile', // Special workspace ID for mobile
+          workspaceId, // Use user's actual workspace ID
           conversationId: conversationIdRef.current,
           mode: 'quick', // Mobile uses quick mode by default
           useKnowledge: true,
@@ -126,7 +154,7 @@ export default function MobileThreadPage() {
       const osqrMessage: Message = {
         id: crypto.randomUUID(),
         role: 'osqr',
-        content: data.response || data.content || 'I understand. What else would you like to discuss?',
+        content: data.answer || data.response || data.content || 'I understand. What else would you like to discuss?',
         timestamp: new Date(),
       }
 
@@ -146,13 +174,32 @@ export default function MobileThreadPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [messages, isLoading, isOnline, router])
+  }, [messages, isLoading, isOnline, router, workspaceId])
 
-  // Show loading while checking auth
-  if (status === 'loading' || !session) {
+  // Show loading while checking auth or fetching workspace
+  if (status === 'loading' || !session || isLoadingWorkspace) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 animate-pulse" />
+      </div>
+    )
+  }
+
+  // Show error if workspace couldn't be loaded
+  if (!workspaceId && !isLoadingWorkspace) {
+    return (
+      <div className="flex-1 flex flex-col items-center justify-center px-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-red-500/20 flex items-center justify-center mb-4">
+          <span className="text-red-400 text-2xl">!</span>
+        </div>
+        <p className="text-slate-300 mb-2">Unable to load your workspace</p>
+        <p className="text-slate-500 text-sm mb-4">Please sign in again or try the web app</p>
+        <button
+          onClick={() => router.replace('/mobile/signin')}
+          className="px-4 py-2 bg-purple-500 hover:bg-purple-600 rounded-lg text-white text-sm"
+        >
+          Sign in again
+        </button>
       </div>
     )
   }
@@ -220,7 +267,7 @@ export default function MobileThreadPage() {
       {/* Input bar */}
       <MobileInputBar
         onSend={sendMessage}
-        disabled={!isOnline}
+        disabled={!isOnline || !workspaceId}
         isLoading={isLoading}
       />
 

@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import path from "path";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -25,12 +24,8 @@ const nextConfig: NextConfig = {
       '@chroma-core/default-embed': false,
     };
 
-    // Explicitly resolve @osqr/core to the workspace package
-    // In Docker, cwd is /app/packages/app-web, so ../core/dist resolves correctly
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      '@osqr/core': path.resolve(process.cwd(), '../core/dist'),
-    };
+    // Note: @osqr/core is in transpilePackages, so Next.js handles resolution
+    // The package exports in @osqr/core/package.json define how subpaths resolve
 
     return config;
   },

@@ -42,17 +42,20 @@ This is a mobile-first web interface that demonstrates the OSQR iOS app experien
 This demo uses the existing OSQR API:
 
 ```
+GET /api/mobile/workspace
+Returns: { workspaceId: string, workspaceName: string, tier: string }
+
 POST /api/oscar/ask
 {
   message: string,
-  workspaceId: "mobile",
+  workspaceId: "<user's workspace ID>",  // Fetched from /api/mobile/workspace
   mode: "quick",
   useKnowledge: true,
   conversationHistory: [...]
 }
 ```
 
-No new API endpoints were created - the mobile interface is just another client for the existing OSQR backend.
+The mobile interface uses the same backend as the web app, with the user's actual workspace ID for proper data isolation.
 
 ## PWA Support
 
