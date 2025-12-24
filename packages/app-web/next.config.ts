@@ -8,6 +8,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Empty turbopack config to silence Next.js 16 warning (using webpack config)
+  turbopack: {},
   // Configure Webpack for fallback builds
   webpack: (config, { isServer }) => {
     // Externalize optional chromadb dependencies that aren't needed for in-memory mode
