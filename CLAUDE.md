@@ -261,6 +261,23 @@ pnpm --filter @osqr/marketing dev
 
 ---
 
+## Insights System (V1.5)
+
+**Build Plan:** `docs/features/INSIGHTS_BUILD_PLAN.md`
+
+When user says "build the insights system" or similar, read that doc first. It has:
+- What's already built in `lib/til/`
+- Three phases with checkboxes
+- Links to all spec docs
+- Estimated 3-4 sessions to complete MVP
+
+**Specs:**
+- `docs/features/OSQR_SECRETARY_CHECKLIST_ADDENDUM.md` - 12 detection categories
+- `docs/features/OSQR_AI_HISTORY_INTERVIEW_SPEC.md` - ChatGPT/Claude import
+- `docs/features/OSQR_AUTO_ORGANIZATION_SPEC.md` - Auto-titling, project linking
+
+---
+
 ## Pre-Launch Checklist
 
 See `docs/process/BLOCKED.md` for:

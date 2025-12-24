@@ -28,9 +28,8 @@ import * as crypto from 'crypto'
 
 // Configuration
 const TARGET_EMAIL = process.env.OSQR_INDEX_TARGET_EMAIL || 'kablerecord@gmail.com'
-const GITHUB_REPO = 'kablerecord/oscar-app' // Update this to your actual repo
+const GITHUB_REPO = 'kablerecord/oscar-app'
 const GITHUB_BRANCH = 'main'
-const GITHUB_BASE_PATH = 'packages/app-web' // Path within repo to index
 
 // Files/patterns to ALWAYS exclude
 const IGNORE_PATTERNS = [
@@ -54,32 +53,56 @@ const IGNORE_PATTERNS = [
   /\.d\.ts$/,
   /credentials/i,
   /secret/i,
+  /\.ico$/,
+  /\.png$/,
+  /\.jpg$/,
+  /\.jpeg$/,
+  /\.gif$/,
+  /\.svg$/,
+  /\.woff/,
+  /\.ttf$/,
+  /\.eot$/,
+  /\.map$/,
 ]
 
-// File types to index
-const INDEXABLE_EXTENSIONS = ['.md', '.ts', '.tsx']
+// File types to index - expanded to include more useful files
+const INDEXABLE_EXTENSIONS = ['.md', '.ts', '.tsx', '.js', '.jsx', '.json', '.prisma', '.css', '.yaml', '.yml']
 
-// Paths to index (relative to GITHUB_BASE_PATH)
+// Full paths to index from repo root - comprehensive coverage
 const PATHS_TO_INDEX = [
+  // Root documentation
+  'CLAUDE.md',
   'README.md',
   'ARCHITECTURE.md',
   'ROADMAP.md',
-  'CLAUDE.md',
-  'docs',
-  'lib/ai',
-  'lib/knowledge',
-  'lib/context',
-  'lib/msc',
-  'lib/identity',
-  'lib/til',
-  'lib/tiers',
-  'app/api/oscar',
-]
+  'turbo.json',
+  'pnpm-workspace.yaml',
 
-// Also index root-level docs
-const ROOT_DOCS_TO_INDEX = [
-  'CLAUDE.md',
-  'README.md',
+  // Root docs folder
+  'docs',
+
+  // packages/app-web - the main Next.js app (FULL coverage)
+  'packages/app-web/app',           // All pages and API routes
+  'packages/app-web/components',    // All React components
+  'packages/app-web/lib',           // All business logic
+  'packages/app-web/prisma',        // Database schema
+  'packages/app-web/docs',          // App-specific docs
+  'packages/app-web/README.md',
+  'packages/app-web/package.json',
+  'packages/app-web/tsconfig.json',
+  'packages/app-web/next.config.ts',
+  'packages/app-web/tailwind.config.ts',
+
+  // packages/core - the OSQR brain/engine
+  'packages/core/src',              // Core source code
+  'packages/core/specs',            // Specifications
+  'packages/core/README.md',
+  'packages/core/package.json',
+
+  // websites/marketing - the marketing site
+  'websites/marketing/src',         // Marketing site source
+  'websites/marketing/README.md',
+  'websites/marketing/package.json',
 ]
 
 interface GitHubFile {
@@ -107,9 +130,11 @@ function shouldIgnore(filePath: string): boolean {
 
 function getFileCategory(relativePath: string): IndexableFile['category'] {
   if (relativePath.endsWith('.md')) return 'documentation'
-  if (relativePath.includes('lib/')) return 'core-lib'
-  if (relativePath.includes('app/api/')) return 'api'
-  if (relativePath.includes('schema') || relativePath.endsWith('.prisma')) return 'schema'
+  if (relativePath.includes('/lib/')) return 'core-lib'
+  if (relativePath.includes('/api/')) return 'api'
+  if (relativePath.includes('prisma') || relativePath.endsWith('.prisma')) return 'schema'
+  if (relativePath.includes('/components/')) return 'core-lib'
+  if (relativePath.includes('/src/')) return 'core-lib'
   return 'config'
 }
 
@@ -119,15 +144,26 @@ function getFilePriority(relativePath: string): IndexableFile['priority'] {
     /ARCHITECTURE\.md$/,
     /ROADMAP\.md$/,
     /CLAUDE\.md$/,
-    /lib\/ai\//,
-    /lib\/til\//,
-    /app\/api\/oscar\//,
+    /\/lib\/ai\//,
+    /\/lib\/til\//,
+    /\/api\/oscar\//,
+    /schema\.prisma$/,
+    /packages\/core\//,
+    /\/specs\//,
+    /docs\//,
+  ]
+
+  const mediumPriorityPatterns = [
+    /\/lib\//,
+    /\/components\//,
+    /\/api\//,
+    /\/src\//,
   ]
 
   if (highPriorityPatterns.some(p => p.test(relativePath))) {
     return 'high'
   }
-  if (relativePath.includes('lib/')) {
+  if (mediumPriorityPatterns.some(p => p.test(relativePath))) {
     return 'medium'
   }
   return 'low'
@@ -183,14 +219,14 @@ async function fetchFileContent(downloadUrl: string, token?: string): Promise<st
 
 async function discoverFiles(
   basePath: string,
-  token?: string,
-  relativeTo: string = ''
+  token?: string
 ): Promise<IndexableFile[]> {
   const files: IndexableFile[] = []
   const contents = await fetchGitHubContents(basePath, token)
 
   for (const item of contents) {
-    const relativePath = relativeTo ? `${relativeTo}/${item.path.split('/').pop()}` : item.path.replace(`${GITHUB_BASE_PATH}/`, '')
+    // Use the full GitHub path as the relative path (from repo root)
+    const relativePath = item.path
 
     if (shouldIgnore(item.path) || shouldIgnore(relativePath)) {
       continue
@@ -198,7 +234,7 @@ async function discoverFiles(
 
     if (item.type === 'dir') {
       // Recursively fetch directory contents
-      const subFiles = await discoverFiles(item.path, token, relativePath)
+      const subFiles = await discoverFiles(item.path, token)
       files.push(...subFiles)
     } else if (item.type === 'file' && item.download_url) {
       const ext = '.' + item.path.split('.').pop()?.toLowerCase()
@@ -392,24 +428,14 @@ export async function POST(request: NextRequest) {
 
     const allFiles: IndexableFile[] = []
 
-    // Index root-level docs
-    for (const doc of ROOT_DOCS_TO_INDEX) {
+    // Index all configured paths from repo root
+    for (const pathToIndex of PATHS_TO_INDEX) {
       try {
-        const files = await discoverFiles(doc, githubToken, '')
+        const files = await discoverFiles(pathToIndex, githubToken)
         allFiles.push(...files)
+        console.log(`[OSQR Index] Discovered ${files.length} files in ${pathToIndex}`)
       } catch (err) {
-        console.log(`[OSQR Index] Skipping root doc ${doc}: ${err}`)
-      }
-    }
-
-    // Index paths within packages/app-web
-    for (const relativePath of PATHS_TO_INDEX) {
-      const fullPath = `${GITHUB_BASE_PATH}/${relativePath}`
-      try {
-        const files = await discoverFiles(fullPath, githubToken, relativePath)
-        allFiles.push(...files)
-      } catch (err) {
-        console.log(`[OSQR Index] Skipping path ${relativePath}: ${err}`)
+        console.log(`[OSQR Index] Skipping path ${pathToIndex}: ${err}`)
       }
     }
 
