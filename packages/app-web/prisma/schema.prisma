@@ -10,6 +10,19 @@ datasource db {
   extensions = [uuid_ossp(map: "uuid-ossp", schema: "extensions"), vector]
 }
 
+// =============================================================================
+// NOTE: Enterprise Multi-User Support (V1.5+)
+// =============================================================================
+// Current schema is single-user per workspace (ownerId on Workspace).
+// Enterprise multi-user (Organization/Team model) is documented but NOT built.
+//
+// See: docs/enterprise/specs/ENTERPRISE_TIER_SPEC.md for proposed schema
+// See: docs/enterprise/ENTERPRISE_INTEGRATION_STATUS.md for full context
+//
+// Resume trigger: V1.5 cycle OR enterprise prospect ready for pilot
+// Workaround for pilot: Shared login credentials
+// =============================================================================
+
 model User {
   id                 String                  @id @default(cuid())
   email              String                  @unique
@@ -521,4 +534,138 @@ model PrivacyOptOutRecord {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ============================================
+// Decision Tracking (VS Code Extension Support)
+// ============================================
+
+// Tracks decisions marked by users across all interfaces
+model Decision {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  userId         String
+  messageId      String?  // Optional link to source message
+  conversationId String?  // Thread/conversation where decision was made
+  text           String   // The decision text
+  source         String   // 'web' | 'vscode' | 'mobile'
+  tags           String[] // User-defined tags
+  context        Json?    // Additional context (git branch, file path, etc.)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([workspaceId])
+  @@index([userId])
+  @@index([source])
+  @@index([createdAt])
+}
+
+// ============================================
+// Token Usage Tracking (VS Code Extension Support)
+// ============================================
+
+// Monthly token usage per user per source
+model TokenUsage {
+  id           String   @id @default(cuid())
+  userId       String
+  month        String   // YYYY-MM format
+  source       String   // 'web' | 'vscode' | 'mobile'
+  tokensUsed   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, month, source])
+  @@index([userId])
+  @@index([month])
+}
+
+// ============================================
+// Deep Research System (V1.5)
+// ============================================
+// @see docs/features/OSQR_DEEP_RESEARCH_SPEC.md
+
+// Research sessions track individual research requests
+model ResearchSession {
+  id              String   @id @default(cuid())
+  userId          String
+  workspaceId     String
+  projectId       String?
+
+  // Query
+  originalQuery   String   // User's original question
+  refinedQuery    String?  // OSQR-refined version
+  template        String   @default("general") // general, competitor_analysis, market_sizing, etc.
+  depth           String   @default("standard") // quick, standard, comprehensive, tribunal
+
+  // Status
+  status          String   @default("pending") // pending, scoping, in_progress, completed, failed, cancelled
+  phase           Int?     // 1-4 for Tribunal mode
+  progress        Int?     // 0-100 percentage
+
+  // Results (stored as JSON)
+  reports         Json?    // Array of ModelReport objects
+  critiques       Json?    // Array of ModelCritique objects (Tribunal only)
+  synthesis       Json?    // ResearchSynthesis object
+
+  // Metadata
+  modelsUsed      String[] // ['claude', 'gpt4o', 'gemini']
+  tokenCost       Int?     // Total tokens used
+  executionTime   Int?     // Milliseconds
+  backgroundJob   Boolean  @default(false) // Whether running in background
+  inngestEventId  String?  // Inngest event ID for background jobs
+
+  // Staleness tracking
+  stalenessDecay  Int      @default(180) // Days until stale
+  refreshAt       DateTime? // When to prompt for refresh
+
+  // Failure tracking
+  failedModels    Json?    // Array of ModelFailure objects
+  error           String?  // Error message if failed
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  completedAt     DateTime?
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([projectId])
+  @@index([status])
+  @@index([template])
+  @@index([depth])
+  @@index([createdAt])
+  @@index([refreshAt])
+}
+
+// Monthly Tribunal usage tracking per user
+// Master tier: 3 sessions included, packs can be purchased
+model TribunalUsage {
+  id              String   @id @default(cuid())
+  userId          String
+  month           String   // YYYY-MM format
+
+  sessionsUsed    Int      @default(0)
+  sessionsIncluded Int     @default(3) // Monthly allocation
+  packsPurchased  Int      @default(0) // Number of pack sessions purchased
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([userId, month])
+  @@index([userId])
+  @@index([month])
+}
+
+// Tribunal pack purchases (Stripe integration)
+model TribunalPackPurchase {
+  id              String   @id @default(cuid())
+  userId          String
+  packSize        Int      // 1, 5, or 10
+  price           Int      // Price in cents
+  stripePaymentId String?  // Stripe payment intent ID
+  status          String   @default("pending") // pending, completed, failed, refunded
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([status])
 }

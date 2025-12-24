@@ -558,7 +558,7 @@ This roadmap defines **WHAT** to build. The Development Philosophy document defi
 |---------|-------|------------------|
 | **V1.0** | Core OSQR | Web app, PKV, multi-model routing, Refine→Fire |
 | **V1.1** | AI Feature Parity | Voice input, image analysis, image generation, web search, code execution |
-| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction, Auto-Organization, Secretary Checklist, Import Interviews |
+| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction, Auto-Organization, Secretary Checklist, Import Interviews, **Deep Research System**, **Tribunal Mode** |
 | **V2.0** | Creator Marketplace | Marketplace launch, creator onboarding, plugin ecosystem |
 | **V3.0** | VS Code OSQR | Full VS Code extension, Builder Plugin, Queue System |
 | **V4.0** | Privacy Phone | OSQR-native phone, intelligence utility model, US manufacturing |
@@ -1115,6 +1115,171 @@ Needed:
 - [ ] **Question generation** - Smart questions based on gaps
 - [ ] **Interview UI** - Conversational flow for answering
 - [ ] **Confidence integration** - Store answers in PKV
+
+### 3.3.4 Deep Research System ⭐ V1.5 FLAGSHIP — SCAFFOLDED
+
+> **Full Spec:** [docs/features/OSQR_DEEP_RESEARCH_SPEC.md](docs/features/OSQR_DEEP_RESEARCH_SPEC.md)
+
+**Status:** ✅ SCAFFOLDED — Ready for Implementation
+
+**What's Already Built:**
+- [x] Full specification (v1.2) with all decisions resolved
+- [x] TypeScript type definitions (`lib/research/types.ts`)
+- [x] Module skeleton with templates, tribunal, background, storage
+- [x] Prisma migration created (not yet applied)
+- [x] API endpoint definitions
+- [x] All technical decisions documented
+
+**What's Needed to Start:**
+- Tavily API key (web search)
+- Inngest account (background jobs)
+- Apply Prisma migration
+
+<details>
+<summary><strong>📋 Resume Instructions</strong> (click to expand)</summary>
+
+When ready to implement, use this prompt:
+
+```
+Resume Deep Research System - Phase 1.
+
+Spec: docs/features/OSQR_DEEP_RESEARCH_SPEC.md
+Skeleton: packages/app-web/lib/research/
+Migration: prisma/migrations/20241224000000_add_deep_research_system/
+
+Start with:
+1. Apply Prisma migration
+2. Set up Tavily API integration
+3. Build single-model research flow (Pro tier)
+4. General Research template only
+5. Summary-first delivery UI
+6. Basic PKV storage
+
+Key files:
+- lib/research/types.ts - All interfaces defined
+- lib/research/templates/index.ts - Template registry
+- lib/research/tribunal/index.ts - Tribunal orchestrator skeleton
+- lib/research/storage/index.ts - PKV integration skeleton
+```
+
+</details>
+
+**What it is:** OSQR's Deep Research System transforms research from ephemeral outputs into permanent, compounding intelligence. Unlike ChatGPT/Claude where research disappears into history, OSQR research becomes indexed, cross-referenced, and available for future insights.
+
+**Core Differentiator:**
+> Research you do today becomes smarter context for questions you ask six months from now.
+
+**Mode Hierarchy:**
+
+| Mode | What Happens | Tier |
+|------|--------------|------|
+| **Quick** | Single model, fast | Pro, Master |
+| **Standard** | Single model, full research | Pro, Master |
+| **Comprehensive** | 3 models parallel + synthesis | Master |
+| **Tribunal** | 3 models research → critique → revise → synthesize | Master |
+
+**Tribunal Mode (Master Only):**
+The flagship feature. Automates what power users do manually: run multiple AI models, have them critique each other, and synthesize the best insights.
+
+```
+Phase 1: Independent Research (3 models parallel)
+     ↓
+Phase 2: Cross-Critique (each reviews others)
+     ↓
+Phase 3: Revision (incorporate insights)
+     ↓
+Phase 4: Final Synthesis + consensus/dissent analysis
+```
+
+**Research Templates:**
+
+| Template | Staleness | Pro | Master |
+|----------|-----------|-----|--------|
+| General Research | 180 days | ✓ | ✓ |
+| Competitor Analysis | 90 days | ✓ | ✓ |
+| Market Sizing | 180 days | ✓ | ✓ |
+| Technical Evaluation | 120 days | ✓ | ✓ |
+| Enterprise Account Plan | 90 days | — | ✓ |
+| Legal/Compliance | 90 days | — | ✓ |
+| Investment Research | 30 days | — | ✓ |
+
+**Key Features:**
+- **Summary-first delivery** - Users want OSQR to *have* knowledge, not read reports
+- **Carousel UI** (Master) - Swipe between model perspectives
+- **Background execution** - Leave and return, notification on completion
+- **Session tracking** - 3 Tribunal sessions/month included, packs for overage
+- **Staleness detection** - Auto-prompt to refresh stale research
+
+**Tribunal Pricing:**
+- 3 sessions included with Master tier
+- Single session: $5
+- 5-pack: $20 (20% savings)
+- 10-pack: $35 (30% savings)
+
+**Implementation Phases:**
+
+**Phase 1: Core Research Flow**
+- [x] Create `/lib/research/` module structure ✅ SCAFFOLDED
+- [x] Define TypeScript interfaces (ResearchDocument, ResearchQuery) ✅ SCAFFOLDED
+- [x] Prisma schema: ResearchSession, TribunalUsage ✅ MIGRATION CREATED
+- [ ] Research initiation API (`/api/oscar/research`)
+- [ ] Scoping questions conversational flow
+- [ ] Single-model research execution (Pro tier)
+- [ ] Summary-first delivery UI component
+- [ ] Basic PKV storage for research outputs
+- [ ] General Research template
+
+**Phase 2: Multi-Model & Templates**
+- [ ] Parallel model execution (Master tier)
+- [ ] Basic synthesis generation (reuse existing synthesis.ts)
+- [ ] Carousel UI component for model comparison
+- [ ] Enhanced PKV storage with all model outputs
+- [ ] Competitor Analysis template
+- [ ] Market Sizing template
+- [ ] Technical Evaluation template
+- [ ] Template selection UI modal
+
+**Phase 3: Tribunal Mode**
+- [ ] Tribunal orchestration flow (4-phase pipeline)
+- [ ] Cross-critique logic (each model reviews others)
+- [ ] Revision round execution
+- [ ] Advanced synthesis with consensus/dissent detection
+- [ ] Detailed progress indicator component
+- [ ] Background execution system (job queue)
+- [ ] Completion notification (bubble pulse)
+- [ ] Session tracking and enforcement (3/month)
+- [ ] Tribunal pack purchase flow (Stripe)
+- [ ] Enterprise Account Plan template
+
+**Phase 4: Intelligence Integration (V2.0)**
+- [ ] Staleness detection with special triggers
+- [ ] Auto-refresh option (Master)
+- [ ] Insight generation from research
+- [ ] Cross-project research discovery
+- [ ] Deal Workspace object (research → deal pipeline)
+
+**Dependencies:**
+- Multi-Model Router (✅ exists)
+- Council Mode infrastructure (✅ exists)
+- Synthesis Layer (✅ exists)
+- Document Indexing Subsystem (✅ exists)
+- Background job queue (needs implementation)
+
+**Cost Analysis:**
+| Mode | Est. Tokens | Est. Cost |
+|------|-------------|-----------|
+| Quick | ~2K | $0.02-0.05 |
+| Standard | ~8K | $0.10-0.25 |
+| Comprehensive | ~35K | $1.00-2.00 |
+| Tribunal | ~120K | $3.00-5.00 |
+
+**Why This Matters:**
+- Creates compounding value (research gets smarter over time)
+- Clear differentiation from ChatGPT/Claude
+- Strong Master tier premium feature
+- Natural upsell path (Pro users see "Tribunal available on Master")
+
+---
 
 ### 3.4 Model Personality Tagging & Registry (Master Plan: Part 2A.6) ✅ FOUNDATION COMPLETE
 
@@ -2503,8 +2668,42 @@ Collaboration features naturally unlock a **Team tier** ($XX/month/seat). Pricin
 
 ## Appendix G: Enterprise Tier Vision (Future)
 
-> **Status:** Strategic vision. Do not build until v2+ is stable.
-> **Timeframe:** 12-24 months out. Revisit when individual tiers have proven product-market fit.
+> **Status:** Strategic vision. Documented in detail as of Dec 2024.
+> **Timeframe:** V1.5 for basic multi-user (if enterprise prospect ready), V2.0+ for full features.
+>
+> **UPDATE December 2024:** First enterprise prospect (Roberts Resorts) identified.
+> Enterprise documentation completed and moved to `docs/enterprise/`.
+> See `docs/enterprise/ENTERPRISE_ROADMAP_POSITION.md` for stopping point context.
+
+### Enterprise Implementation Status (December 2024)
+
+**What's Working:**
+- Document indexing pipeline (core feature)
+- Multi-model router (Claude, GPT-4, Gemini, Grok)
+- Session persistence
+
+**What's Documented but Not Built:**
+- Multi-user support (Organization/Team model) — see `docs/enterprise/specs/ENTERPRISE_TIER_SPEC.md`
+- Admin dashboard — see `docs/enterprise/specs/ENTERPRISE_ADMIN_SPEC.md`
+- Security documentation — see `docs/enterprise/specs/SECURITY_DOCUMENTATION.md`
+
+**Enterprise Scope by Version:**
+
+| Version | Features | Status |
+|---------|----------|--------|
+| V1.5 | Basic multi-user, security one-pager | Documented, not built |
+| V2.0 | Admin dashboard, RBAC, usage reporting | Spec placeholders |
+| V3.0+ | SSO, SOC2, dedicated infrastructure | Strategic vision |
+
+**Key Reference Documents:**
+- `docs/enterprise/ENTERPRISE_INTEGRATION_STATUS.md` - Master status
+- `docs/enterprise/ENTERPRISE_ROADMAP_POSITION.md` - Stopping point context
+- `docs/enterprise/specs/ENTERPRISE_FEATURE_REQUIREMENTS.md` - Sales → Engineering bridge
+- `docs/enterprise/roberts-resorts/` - First prospect materials
+
+**Resume Trigger:** Enterprise prospect ready for pilot OR V1.5 cycle begins
+
+---
 
 ### What Enterprise Is
 
