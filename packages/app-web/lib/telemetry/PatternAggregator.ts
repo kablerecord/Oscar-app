@@ -261,8 +261,9 @@ export class PatternAggregator {
 
       // Calculate sessions per week
       const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+      type TelemetryEvent = (typeof events)[number]
       const recentSessions = events.filter(
-        e => e.eventType === 'session_start' && new Date(e.timestamp) > weekAgo
+        (e: TelemetryEvent) => e.eventType === 'session_start' && new Date(e.timestamp) > weekAgo
       ).length
 
       return {

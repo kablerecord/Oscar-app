@@ -54,7 +54,7 @@ async function main() {
       // Generate embeddings for batch
       const response = await openai.embeddings.create({
         model: 'text-embedding-ada-002', // Same as main app for consistency
-        input: batch.map(c => c.content.slice(0, 8000)), // Truncate to avoid token limit
+        input: batch.map((c: { content: string }) => c.content.slice(0, 8000)), // Truncate to avoid token limit
       })
 
       // Update each chunk with its embedding

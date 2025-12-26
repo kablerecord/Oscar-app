@@ -107,7 +107,7 @@ async function main() {
 
     try {
       // Generate embeddings for batch
-      const texts = chunks.map(c => c.content)
+      const texts = chunks.map((c: { content: string }) => c.content)
       const embeddings = await generateEmbeddingsBatch(texts)
 
       // Update each chunk with its embedding

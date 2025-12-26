@@ -453,8 +453,9 @@ export async function synthesizeCouncilResponses(
     const result = await Council.synthesize(query, modelResponses);
 
     // Calculate average confidence from responses
+    type ModelResponse = (typeof modelResponses)[number];
     const avgConfidence =
-      modelResponses.reduce((sum, r) => sum + r.confidence.normalizedScore, 0) /
+      modelResponses.reduce((sum: number, r: ModelResponse) => sum + r.confidence.normalizedScore, 0) /
       modelResponses.length;
 
     return {

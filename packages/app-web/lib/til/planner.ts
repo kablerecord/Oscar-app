@@ -144,12 +144,13 @@ async function getRoadmapContext(workspaceId: string): Promise<RoadmapContext> {
     orderBy: { isPinned: 'desc' },
   })
 
+  type MSCItem = (typeof mscItems)[number]
   const goals = mscItems
-    .filter((i) => i.category === 'goal')
-    .map((i) => i.content)
+    .filter((i: MSCItem) => i.category === 'goal')
+    .map((i: MSCItem) => i.content)
   const projects = mscItems
-    .filter((i) => i.category === 'project')
-    .map((i) => i.content)
+    .filter((i: MSCItem) => i.category === 'project')
+    .map((i: MSCItem) => i.content)
 
   // Use velocity calibration for remaining roadmap estimates
   const remaining = velocityCalibration.remaining_roadmap as Record<string, unknown>

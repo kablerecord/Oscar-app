@@ -354,11 +354,12 @@ export async function assembleUIP(userId: string): Promise<AssembledUIP | null> 
   const explanationStyle: 'theory-first' | 'example-first' | 'balanced' = 'balanced'
 
   // Calculate overall confidence
-  const confidences = profile.dimensions.map((d) =>
+  type DimensionScore = (typeof profile.dimensions)[number]
+  const confidences = profile.dimensions.map((d: DimensionScore) =>
     calculateDecayedConfidence(d.confidence, d.decayRate, d.lastDecayedAt)
   )
   const overallConfidence = confidences.length > 0
-    ? confidences.reduce((a, b) => a + b, 0) / confidences.length
+    ? confidences.reduce((a: number, b: number) => a + b, 0) / confidences.length
     : 0
 
   return {
@@ -549,5 +550,5 @@ export async function processSignalsForUser(
     },
     select: { id: true },
   })
-  await markSignalsProcessed(recentSignals.map((s) => s.id))
+  await markSignalsProcessed(recentSignals.map((s: { id: string }) => s.id))
 }

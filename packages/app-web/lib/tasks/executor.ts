@@ -212,11 +212,12 @@ registerTaskHandler('summary-update', async (task, ctx) => {
 
   ctx.updateProgress(50, 'Compiling summary')
 
+  type MSCItem = (typeof mscItems)[number]
   const completedGoals = mscItems.filter(
-    (i) => i.category === 'goal' && i.status === 'completed'
+    (i: MSCItem) => i.category === 'goal' && i.status === 'completed'
   ).length
   const activeProjects = mscItems.filter(
-    (i) => i.category === 'project' && i.status === 'in_progress'
+    (i: MSCItem) => i.category === 'project' && i.status === 'in_progress'
   ).length
 
   ctx.updateProgress(100, 'Summary complete')

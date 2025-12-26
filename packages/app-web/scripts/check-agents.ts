@@ -14,7 +14,7 @@ async function main() {
       where: { workspaceId: workspace.id, isActive: true }
     })
     console.log('Active agents:', agents.length)
-    agents.forEach(a => console.log(' -', a.name, a.provider))
+    agents.forEach((a: { name: string; provider: string }) => console.log(' -', a.name, a.provider))
   }
 }
 main().finally(() => prisma.$disconnect())

@@ -616,14 +616,14 @@ export function inferCognitiveStyle(
 // ============================================
 
 export interface InferredDimensions {
-  [UIPDomain.IDENTITY_CONTEXT]: { value: IdentityContextValue; confidence: number; sources: UIPSource[] }
-  [UIPDomain.GOALS_VALUES]: { value: GoalsValuesValue; confidence: number; sources: UIPSource[] }
-  [UIPDomain.COGNITIVE_STYLE]: { value: CognitiveStyleValue; confidence: number; sources: UIPSource[] }
-  [UIPDomain.COMMUNICATION_PREFS]: { value: CommunicationPrefsValue; confidence: number; sources: UIPSource[] }
-  [UIPDomain.EXPERTISE_CALIBRATION]: { value: ExpertiseCalibrationValue; confidence: number; sources: UIPSource[] }
-  [UIPDomain.BEHAVIORAL_PATTERNS]: { value: BehavioralPatternsValue; confidence: number; sources: UIPSource[] }
-  [UIPDomain.RELATIONSHIP_STATE]: { value: RelationshipStateValue; confidence: number; sources: UIPSource[] }
-  [UIPDomain.DECISION_FRICTION]: { value: DecisionFrictionValue; confidence: number; sources: UIPSource[] }
+  IDENTITY_CONTEXT: { value: IdentityContextValue; confidence: number; sources: UIPSource[] }
+  GOALS_VALUES: { value: GoalsValuesValue; confidence: number; sources: UIPSource[] }
+  COGNITIVE_STYLE: { value: CognitiveStyleValue; confidence: number; sources: UIPSource[] }
+  COMMUNICATION_PREFS: { value: CommunicationPrefsValue; confidence: number; sources: UIPSource[] }
+  EXPERTISE_CALIBRATION: { value: ExpertiseCalibrationValue; confidence: number; sources: UIPSource[] }
+  BEHAVIORAL_PATTERNS: { value: BehavioralPatternsValue; confidence: number; sources: UIPSource[] }
+  RELATIONSHIP_STATE: { value: RelationshipStateValue; confidence: number; sources: UIPSource[] }
+  DECISION_FRICTION: { value: DecisionFrictionValue; confidence: number; sources: UIPSource[] }
 }
 
 /**

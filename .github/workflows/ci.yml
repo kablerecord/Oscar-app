@@ -38,6 +38,9 @@ jobs:
       - name: Run core tests
         run: pnpm --filter @osqr/core test:run
 
+      - name: Generate Prisma client
+        run: pnpm --filter @osqr/app-web prisma generate
+
       - name: Lint
         run: pnpm lint
 

@@ -141,9 +141,10 @@ export async function shouldAskQuestion(userId: string): Promise<ElicitationDeci
   const gaps = await identifyGaps(profile.id, profile.dimensions)
 
   // Get next question for this phase
+  type ElicitationResponse = (typeof profile.elicitationResponses)[number]
   const question = selectNextQuestion(
     phase,
-    profile.elicitationResponses.map((r) => r.questionId),
+    profile.elicitationResponses.map((r: ElicitationResponse) => r.questionId),
     gaps
   )
 
@@ -473,7 +474,8 @@ export async function shouldAskGapQuestion(userId: string): Promise<ElicitationD
   }
 
   // Find significant gaps (confidence < 0.4)
-  const significantGaps = profile.dimensions.filter((d) => {
+  type Dimension = (typeof profile.dimensions)[number]
+  const significantGaps = profile.dimensions.filter((d: Dimension) => {
     const effective = calculateDecayedConfidence(
       d.confidence,
       d.decayRate,
@@ -488,12 +490,13 @@ export async function shouldAskGapQuestion(userId: string): Promise<ElicitationD
 
   // Find a question for the lowest-confidence domain
   const lowestGap = significantGaps.sort(
-    (a, b) =>
+    (a: Dimension, b: Dimension) =>
       calculateDecayedConfidence(a.confidence, a.decayRate, a.lastDecayedAt) -
       calculateDecayedConfidence(b.confidence, b.decayRate, b.lastDecayedAt)
   )[0]
 
-  const askedIds = profile.elicitationResponses.map((r) => r.questionId)
+  type ElicitationResponseItem = (typeof profile.elicitationResponses)[number]
+  const askedIds = profile.elicitationResponses.map((r: ElicitationResponseItem) => r.questionId)
   const question = ELICITATION_QUESTIONS.find(
     (q) => q.domain === lowestGap.domain && !askedIds.includes(q.id)
   )

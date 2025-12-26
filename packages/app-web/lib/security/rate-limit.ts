@@ -136,7 +136,7 @@ export async function checkTokenLimit(params: {
     },
   })
 
-  const tokensUsed = tokenRecords.reduce((sum, r) => sum + r.tokensUsed, 0)
+  const tokensUsed = tokenRecords.reduce((sum: number, r: { tokensUsed: number }) => sum + r.tokensUsed, 0)
   const tokenLimit = config.monthlyTokenLimit
   const remaining = Math.max(0, tokenLimit - tokensUsed)
   const percentage = tokenLimit > 0 ? Math.round((tokensUsed / tokenLimit) * 100) : 0

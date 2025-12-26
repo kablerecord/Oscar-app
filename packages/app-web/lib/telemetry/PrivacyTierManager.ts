@@ -161,7 +161,7 @@ export class PrivacyTierManager {
         privacyTier: (setting?.privacyTier || this.DEFAULT_TIER) as PrivacyTier,
         consentTimestamp: setting?.consentTimestamp || new Date(),
         consentVersion: setting?.consentVersion || this.CURRENT_POLICY_VERSION,
-        optOutHistory: optOutRecords.map(r => ({
+        optOutHistory: optOutRecords.map((r: { toTier: string; createdAt: Date; reason: string | null }) => ({
           tier: r.toTier as PrivacyTier,
           timestamp: r.createdAt,
           reason: r.reason || undefined,
