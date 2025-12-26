@@ -165,11 +165,13 @@ describe('MRP', () => {
       const builder = createMrpBuilder(createRequest());
 
       // Wait a tiny bit to ensure measurable latency
-      await new Promise(resolve => setTimeout(resolve, 10));
+      // Note: setTimeout(10) may execute in 8-12ms due to timer imprecision
+      await new Promise(resolve => setTimeout(resolve, 15));
 
       const mrp = builder.build();
 
-      expect(mrp.totalLatencyMs).toBeGreaterThanOrEqual(10);
+      // Use lower threshold to account for timer imprecision in CI environments
+      expect(mrp.totalLatencyMs).toBeGreaterThanOrEqual(8);
     });
 
     it('should generate default justification', () => {
