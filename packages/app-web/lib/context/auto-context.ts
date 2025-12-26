@@ -1,5 +1,5 @@
 import { prisma } from '../db/prisma'
-import { searchKnowledge } from '../knowledge/search'
+import { smartSearch } from '../knowledge/search'
 import { getProfileContext } from '../profile/context'
 import { generateIdentityContext } from '../identity/dimensions'
 
@@ -137,20 +137,30 @@ export async function assembleContext(
   }
 
   // 4. Knowledge Search - relevant documents
+  // Uses smartSearch with topic cache for instant relevance checks
   // In system mode, restrict to system scope (OSQR docs only)
   if (includeKnowledge && query) {
-    const effectiveScope = knowledgeScope || (systemMode ? 'system' : undefined)
-    const knowledge = await searchKnowledge({
+    // smartSearch uses topic cache to avoid expensive DB queries when no relevant docs exist
+    // skipCacheCheck: true forces search even if cache says no matches (for system mode)
+    const searchResult = await smartSearch({
       workspaceId,
       query,
       topK: maxKnowledgeChunks,
-      scope: effectiveScope,
+      skipCacheCheck: systemMode, // Always search in system mode
     })
-    if (knowledge) {
+
+    if (searchResult.searched && searchResult.context) {
       const header = systemMode ? '## OSQR System Knowledge' : '## Relevant Knowledge'
-      sections.push(`${header}\n${knowledge}`)
+      sections.push(`${header}\n${searchResult.context}`)
       sources.knowledge = true
-      raw.knowledgeChunks = knowledge
+      raw.knowledgeChunks = searchResult.context
+
+      // Log cache hit info for debugging
+      if (searchResult.matchedTopics.length > 0) {
+        console.log(`[Auto-Context] Knowledge search matched topics: ${searchResult.matchedTopics.slice(0, 5).join(', ')}`)
+      }
+    } else if (!searchResult.searched) {
+      console.log('[Auto-Context] Skipped knowledge search - no matching topics in cache')
     }
   }
 

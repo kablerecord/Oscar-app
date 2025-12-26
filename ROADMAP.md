@@ -756,6 +756,34 @@ interface GlobalKnowledgeIndex {
 - Differentiates OSQR from generic ChatGPT/Claude
 - Users get your system delivered by superintelligence
 
+### 1.8.1 Auto-Context & Topic Cache ✅ COMPLETE
+*Intelligent knowledge retrieval without latency penalty*
+
+**Current State (Dec 2025):**
+- [x] Pattern detection for system queries (50+ patterns in `isOSQRSystemQuery()`)
+- [x] Topic cache infrastructure (`lib/knowledge/topic-cache.ts`)
+- [x] `smartSearch()` function with cache pre-check
+- [x] Indexer updates topic cache when documents added
+- [x] **Wired into Oscar ask route** — `assembleContext()` now uses `smartSearch()`
+
+**What's Built:**
+- **Pattern Detection** — Zero-cost regex check (~0.1ms) determines if query might need knowledge search
+- **Topic Cache** — In-memory cache of document topics, enables O(1) "do I have docs about X?" checks
+- **Smart Search** — Combines pattern + cache check before expensive DB queries (50-200ms)
+
+**How It Works:**
+1. User asks a question
+2. `assembleContext()` calls `smartSearch()` (in `lib/context/auto-context.ts`)
+3. `smartSearch()` checks topic cache first (<1ms)
+4. If no matching topics → skip expensive DB search
+5. If matching topics → proceed with `searchKnowledge()` using appropriate scope
+6. System mode (`/system` prefix) always searches (bypasses cache check)
+
+**Logs to watch:**
+- `[Auto-Context] Knowledge search matched topics: ...` — topics that triggered search
+- `[Auto-Context] Skipped knowledge search - no matching topics in cache` — cache saved a query
+- `[TopicCache] Refreshing cache for workspace ...` — cache refresh (every 5 min or first access)
+
 ### 1.9 Tier Upgrade Ceremony
 *Premium "crossing the threshold" moment when users upgrade to paid tiers*
 

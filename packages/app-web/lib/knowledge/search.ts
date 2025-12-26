@@ -2,6 +2,7 @@ import { prisma } from '../db/prisma'
 import { vectorSearch, hybridSearch } from './vector-search'
 import { searchByConcept } from '../osqr/document-indexing-wrapper'
 import { featureFlags } from '../osqr/config'
+import { checkQueryRelevance, findMatchingTopics } from './topic-cache'
 
 type KnowledgeScope = 'all' | 'system' | 'user'
 
@@ -21,10 +22,14 @@ interface SearchResult {
 }
 
 /**
- * Detect if a query is asking about OSQR itself
+ * Detect if a query is asking about OSQR itself or topics in the research library
+ *
+ * This is a zero-cost check (regex only, ~0.1ms) that determines whether
+ * to search system docs vs user docs vs both.
  */
 function isOSQRSystemQuery(query: string): boolean {
   const systemPatterns = [
+    // OSQR core concepts
     /osqr/i,
     /jarvis/i,
     /roadmap/i,
@@ -41,6 +46,73 @@ function isOSQRSystemQuery(query: string): boolean {
     /knowledge.?base/i,
     /identity.?dimension/i,
     /autonomy/i,
+    /uip|user intelligence/i,
+    /constitutional/i,
+    /throttle|rate.?limit/i,
+    /pricing|tier/i,
+
+    // Research library topics (from docs/research/)
+    /\bmcp\b/i,                    // Model Context Protocol
+    /model context protocol/i,
+    /n8n/i,                        // n8n automation
+    /context.*(engineering|rot)/i, // Context engineering/rot
+    /multi.?agent/i,               // Multi-agent systems
+    /\bbmad\b/i,                   // BMAD methodology
+    /llm.*(fine.?tun|optim)/i,     // LLM fine-tuning/optimization
+    /deepseek/i,                   // DeepSeek R1
+    /langchain/i,                  // LangChain
+    /agentic.*(workflow|software)/i, // Agentic patterns
+    /memory.?bank/i,               // Memory bank patterns
+    /gatekeeper.?pattern/i,        // Gatekeeper architecture
+    /openvino/i,                   // OpenVINO optimization
+    /open.?source.?llm/i,          // Open source LLMs
+    /self.?heal/i,                 // Self-healing workflows
+    /attention.*(need|mechanism)/i, // Attention papers
+
+    // Feature specs (from docs/features/)
+    /render.?system/i,
+    /bubble.?component/i,
+    /council.?mode/i,
+    /capture.?router/i,
+    /deep.?research/i,
+    /spoken.?architecture/i,
+
+    // Business/strategy (from docs/business/, docs/strategy/)
+    /launch.?strategy/i,
+    /podcast.?seed/i,
+    /creator.?marketplace/i,
+    /enterprise.?(tier|feature|integration)/i,
+
+    // Vision docs
+    /browser.?extension/i,
+    /ios.?build/i,
+    /privacy.?phone/i,
+    /vscode.?(companion|extension)/i,
+
+    // Self-discovery & Spoken Architecture (from docs/vision/)
+    /self.?discovery/i,
+    /\bpieces?\b.*saas/i,           // "pieces of a SaaS", "universal pieces"
+    /saas.*\bpieces?\b/i,           // "SaaS pieces"
+    /question.?tree/i,
+    /piece.?template/i,
+    /piece.?(inventory|dependenc|extraction)/i,
+    /universal.?(piece|component|block)/i,
+    /recursive.?loop/i,
+    /codebase.?structure/i,
+    /feature.?inventory/i,
+    /pattern.?recognition/i,
+    /build.?process/i,
+    /piece.?generation/i,
+    /interview.?flow/i,
+    /agentic.?capabilit/i,
+    /self.?modification/i,
+    /self.?improvement/i,
+    /knowledge.?accumulation/i,
+    /\bconvergence\b/i,
+    /what.?pieces/i,
+    /extract.*pieces/i,
+    /understand.*exists/i,
+    /phase\s*[1-7]/i,               // "Phase 1", "Phase 2", etc.
   ]
   return systemPatterns.some((pattern) => pattern.test(query))
 }
@@ -253,3 +325,87 @@ const STOP_WORDS = new Set([
 
 // Re-export vector search functions
 export { vectorSearch, hybridSearch } from './vector-search'
+
+// Re-export topic cache functions for convenience
+export { checkQueryRelevance, findMatchingTopics, hasTopicsMatching, hasAnyTopicMatching } from './topic-cache'
+
+/**
+ * Smart search with topic-cache pre-check
+ *
+ * Uses the topic cache to determine if a search is worth doing,
+ * avoiding expensive database queries when user has no relevant docs.
+ *
+ * @example
+ * ```typescript
+ * const result = await smartSearch({
+ *   workspaceId: 'ws_123',
+ *   query: 'How does MCP work?',
+ *   topK: 5,
+ * })
+ *
+ * if (result.searched) {
+ *   console.log(`Found ${result.matchedTopics.length} matching topics`)
+ *   console.log(result.context)
+ * } else {
+ *   console.log('No relevant docs found in topic cache, skipped search')
+ * }
+ * ```
+ */
+export async function smartSearch(options: {
+  workspaceId: string
+  query: string
+  topK?: number
+  skipCacheCheck?: boolean  // Force search even if cache says no matches
+}): Promise<{
+  searched: boolean
+  context: string | undefined
+  matchedTopics: string[]
+  scope: 'system' | 'user' | 'all'
+  confidence: 'high' | 'medium' | 'low'
+}> {
+  const { workspaceId, query, topK = 5, skipCacheCheck = false } = options
+
+  // Step 1: Quick topic cache check (< 1ms)
+  if (!skipCacheCheck) {
+    const relevance = await checkQueryRelevance(workspaceId, query)
+
+    if (!relevance.shouldSearch) {
+      // Topic cache says no relevant docs - skip expensive search
+      return {
+        searched: false,
+        context: undefined,
+        matchedTopics: [],
+        scope: 'all',
+        confidence: relevance.confidence,
+      }
+    }
+
+    // Topic cache says we have relevant docs - proceed with search
+    const context = await searchKnowledge({
+      workspaceId,
+      query,
+      topK,
+      scope: relevance.scope,
+    })
+
+    return {
+      searched: true,
+      context,
+      matchedTopics: relevance.matchedTopics,
+      scope: relevance.scope,
+      confidence: relevance.confidence,
+    }
+  }
+
+  // Skip cache check - do full search
+  const context = await searchKnowledge({ workspaceId, query, topK })
+  const matchedTopics = await findMatchingTopics(workspaceId, query)
+
+  return {
+    searched: true,
+    context,
+    matchedTopics,
+    scope: 'all',
+    confidence: 'medium',
+  }
+}

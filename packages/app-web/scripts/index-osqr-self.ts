@@ -27,6 +27,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { prisma } from '../lib/db/prisma'
 import { TextChunker } from '../lib/knowledge/chunker'
+import { addToCache, invalidateCache } from '../lib/knowledge/topic-cache'
 
 // ============================================
 // Configuration
@@ -59,11 +60,12 @@ const IGNORE_PATTERNS = [
 ]
 
 // File types to index
-const INDEXABLE_EXTENSIONS = ['.md', '.ts', '.tsx', '.json']
+const INDEXABLE_EXTENSIONS = ['.md', '.ts', '.tsx', '.json', '.prisma', '.css', '.yaml', '.yml']
 
 // Priority docs that should always be indexed
 const PRIORITY_DOCS = [
   'README.md',
+  'CLAUDE.md',
   'ARCHITECTURE.md',
   'ROADMAP.md',
   'PROGRESS.md',
@@ -75,26 +77,67 @@ const PRIORITY_DOCS = [
   'ASSUMPTIONS.md',
   'BLOCKED.md',
   'TESTING-CHECKLIST.md',
-  'docs/JARVIS_CAPABILITIES.md',
 ]
 
-// Key code directories
+// Key code directories - COMPREHENSIVE coverage for full codebase awareness
 const CODE_DIRECTORIES = [
-  'lib/ai',
-  'lib/knowledge',
-  'lib/context',
-  'lib/msc',
-  'lib/identity',
-  'lib/til',
-  'lib/autonomy',
-  'lib/security',
-  'lib/artifacts',
-  'app/api/oscar',
-  'app/api/msc',
-  'app/api/knowledge',
-  'app/api/profile',
-  'app/api/til',
-  'app/api/autonomy',
+  // All of lib/ (business logic)
+  'lib',
+  // All of app/ (pages and API routes)
+  'app',
+  // All of components/ (React UI)
+  'components',
+  // Database schema
+  'prisma',
+  // Scripts
+  'scripts',
+  // Docs within app-web
+  'docs',
+]
+
+// Monorepo root (two levels up from packages/app-web)
+const MONOREPO_ROOT = path.resolve(OSQR_ROOT, '../..')
+
+// Additional paths from monorepo root
+const MONOREPO_PATHS = [
+  // Root documentation (all .md files at root)
+  'CLAUDE.md',
+  'README.md',
+  'ARCHITECTURE.md',
+  'ROADMAP.md',
+  'PROGRESS.md',
+  'KNOWLEDGE-BASE.md',
+  'QUICKSTART.md',
+  'SETUP.md',
+  'ASSUMPTIONS.md',
+  'BLOCKED.md',
+  'BUILD-LOG.md',
+  'TESTING-CHECKLIST.md',
+  'PRIVACY-PHILOSOPHY.md',
+  'AUTONOMOUS-GUIDELINES.md',
+  'OSQR-LINK.md',
+  'MIGRATION-LOG.md',
+  // docs folder (comprehensive documentation)
+  'docs',
+  // Documents folder (additional specs)
+  'Documents',
+  // .claude folder (commands and agents)
+  '.claude',
+  // packages/core - the OSQR brain
+  'packages/core/src',
+  'packages/core/specs',
+  'packages/core/README.md',
+  // packages/shared if it exists
+  'packages/shared',
+  // Marketing site
+  'websites/marketing/src',
+  // E2E tests
+  'e2e',
+  // Root config files
+  'turbo.json',
+  'pnpm-workspace.yaml',
+  'package.json',
+  'playwright.config.ts',
 ]
 
 // ============================================
@@ -148,6 +191,12 @@ function getFilePriority(relativePath: string, filename: string): IndexableFile[
 
 function discoverFiles(dir: string, basePath: string = ''): IndexableFile[] {
   const files: IndexableFile[] = []
+
+  if (!fs.existsSync(dir)) {
+    console.log(`   ⚠️  Directory not found: ${dir}`)
+    return files
+  }
+
   const entries = fs.readdirSync(dir, { withFileTypes: true })
 
   for (const entry of entries) {
@@ -168,6 +217,84 @@ function discoverFiles(dir: string, basePath: string = ''): IndexableFile[] {
       if (shouldRecurse || !basePath) {
         files.push(...discoverFiles(fullPath, relativePath))
       }
+    } else if (entry.isFile()) {
+      const ext = path.extname(entry.name)
+      if (INDEXABLE_EXTENSIONS.includes(ext)) {
+        files.push({
+          path: fullPath,
+          relativePath,
+          filename: entry.name,
+          extension: ext,
+          category: getFileCategory(relativePath),
+          priority: getFilePriority(relativePath, entry.name),
+        })
+      }
+    }
+  }
+
+  return files
+}
+
+// Discover files from monorepo root paths
+function discoverMonorepoFiles(): IndexableFile[] {
+  const files: IndexableFile[] = []
+
+  for (const relativePath of MONOREPO_PATHS) {
+    const fullPath = path.join(MONOREPO_ROOT, relativePath)
+
+    if (!fs.existsSync(fullPath)) {
+      // Only warn for expected paths, not optional ones
+      if (!relativePath.includes('shared')) {
+        console.log(`   ⚠️  Monorepo path not found: ${relativePath}`)
+      }
+      continue
+    }
+
+    const stat = fs.statSync(fullPath)
+
+    if (stat.isDirectory()) {
+      // Recursively discover all files in directory
+      const dirFiles = discoverAllInDirectory(fullPath, relativePath)
+      files.push(...dirFiles)
+    } else if (stat.isFile()) {
+      const ext = path.extname(fullPath)
+      if (INDEXABLE_EXTENSIONS.includes(ext)) {
+        const filename = path.basename(fullPath)
+        files.push({
+          path: fullPath,
+          relativePath,
+          filename,
+          extension: ext,
+          category: getFileCategory(relativePath),
+          priority: getFilePriority(relativePath, filename),
+        })
+      }
+    }
+  }
+
+  return files
+}
+
+// Recursively discover ALL files in a directory (no CODE_DIRECTORIES filter)
+function discoverAllInDirectory(dir: string, basePath: string): IndexableFile[] {
+  const files: IndexableFile[] = []
+
+  if (!fs.existsSync(dir)) {
+    return files
+  }
+
+  const entries = fs.readdirSync(dir, { withFileTypes: true })
+
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name)
+    const relativePath = `${basePath}/${entry.name}`
+
+    if (shouldIgnore(fullPath) || shouldIgnore(relativePath)) {
+      continue
+    }
+
+    if (entry.isDirectory()) {
+      files.push(...discoverAllInDirectory(fullPath, relativePath))
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name)
       if (INDEXABLE_EXTENSIONS.includes(ext)) {
@@ -275,6 +402,16 @@ async function indexFile(
       })
     }
 
+    // Update topic cache for instant lookups
+    await addToCache(
+      workspaceId,
+      existing.id,
+      `[OSQR] ${file.relativePath}`,
+      content,
+      true, // isSystem
+      file.category
+    )
+
     return { chunks: chunks.length }
   }
 
@@ -315,6 +452,16 @@ async function indexFile(
     })
   }
 
+  // Update topic cache for instant lookups
+  await addToCache(
+    workspaceId,
+    document.id,
+    document.title,
+    content,
+    true, // isSystem
+    file.category
+  )
+
   return { chunks: chunks.length }
 }
 
@@ -341,10 +488,19 @@ async function main() {
   console.log(`👤 Target account: ${TARGET_EMAIL}`)
   console.log(`📁 Workspace: ${workspace.name}\n`)
 
-  console.log(`📂 Scanning: ${OSQR_ROOT}\n`)
+  console.log(`📂 Scanning: ${OSQR_ROOT}`)
+  console.log(`📂 Plus monorepo paths from: ${MONOREPO_ROOT}\n`)
 
-  // Discover files
-  const files = discoverFiles(OSQR_ROOT)
+  // Discover files from app-web
+  const appWebFiles = discoverFiles(OSQR_ROOT)
+  console.log(`   Found ${appWebFiles.length} files in packages/app-web`)
+
+  // Discover files from monorepo root
+  const monorepoFiles = discoverMonorepoFiles()
+  console.log(`   Found ${monorepoFiles.length} files in monorepo paths`)
+
+  // Combine and deduplicate
+  const files = [...appWebFiles, ...monorepoFiles]
 
   // Sort by priority
   files.sort((a, b) => {
