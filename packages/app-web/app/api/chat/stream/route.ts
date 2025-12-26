@@ -230,10 +230,11 @@ ${contextString ? contextString + '\n\n' : ''}Guidelines:
         select: { role: true, content: true },
       })
 
+      type RecentMessage = (typeof recentMessages)[number]
       const conversationHistory = recentMessages
         .reverse()
         .slice(0, -1) // Exclude the message we just added
-        .map((m) => ({
+        .map((m: RecentMessage) => ({
           role: m.role as 'user' | 'assistant',
           content: m.content,
         }))

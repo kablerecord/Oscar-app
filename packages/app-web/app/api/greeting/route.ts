@@ -181,10 +181,11 @@ export async function GET(req: NextRequest) {
     })
 
     // Extract key profile info
+    type ProfileAnswer = (typeof profileAnswers)[number]
     const profileContext = {
-      workingOn: profileAnswers.find(a => a.questionId === 'v1-working-on')?.answer,
-      goal: profileAnswers.find(a => a.questionId === 'v1-goal')?.answer,
-      challenge: profileAnswers.find(a => a.questionId === 'v1-constraint')?.answer,
+      workingOn: profileAnswers.find((a: ProfileAnswer) => a.questionId === 'v1-working-on')?.answer,
+      goal: profileAnswers.find((a: ProfileAnswer) => a.questionId === 'v1-goal')?.answer,
+      challenge: profileAnswers.find((a: ProfileAnswer) => a.questionId === 'v1-constraint')?.answer,
     }
 
     // Get recent MSC items (pinned items, goals, etc.)
@@ -232,8 +233,9 @@ export async function GET(req: NextRequest) {
     })
 
     // Get unique days with activity
+    type UsageRecord = (typeof recentUsage)[number]
     const activeDays = new Set(
-      recentUsage.map(r => {
+      recentUsage.map((r: UsageRecord) => {
         const d = new Date(r.date)
         return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
       })
@@ -312,19 +314,21 @@ export async function GET(req: NextRequest) {
 
     if (!isNewUser && (recentConversations.length > 0 || profileContext.workingOn || profileContext.goal)) {
       // Build context for AI greeting
+      type RecentConversation = (typeof recentConversations)[number]
+      type PinnedItem = (typeof pinnedItems)[number]
       const recentTopics = recentConversations
-        .map(c => c.title)
-        .filter(t => t && t !== 'New conversation')
+        .map((c: RecentConversation) => c.title)
+        .filter((t: string | null) => t && t !== 'New conversation')
         .slice(0, 3)
 
       const currentProjects = [
         profileContext.workingOn,
-        ...pinnedItems.filter(p => p.category === 'project').map(p => p.content),
+        ...pinnedItems.filter((p: PinnedItem) => p.category === 'project').map((p: PinnedItem) => p.content),
       ].filter(Boolean) as string[]
 
       const goals = [
         profileContext.goal,
-        ...pinnedItems.filter(p => p.category === 'goal').map(p => p.content),
+        ...pinnedItems.filter((p: PinnedItem) => p.category === 'goal').map((p: PinnedItem) => p.content),
       ].filter(Boolean) as string[]
 
       // Try AI greeting

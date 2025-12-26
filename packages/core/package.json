@@ -15,8 +15,7 @@
     "./src/*": "./src/*"
   },
   "scripts": {
-    "build": "echo 'Using pre-built dist'",
-    "rebuild": "tsc",
+    "build": "tsc",
     "test": "vitest",
     "test:run": "vitest run",
     "lint": "eslint src",

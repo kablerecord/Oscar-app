@@ -104,7 +104,7 @@ export async function GET(
       mode: thread.mode,
       createdAt: thread.createdAt.toISOString(),
       updatedAt: thread.updatedAt.toISOString(),
-      messages: messages.map((m) => ({
+      messages: messages.map((m: typeof messages[number]) => ({
         id: m.id,
         role: m.role,
         content: m.content,

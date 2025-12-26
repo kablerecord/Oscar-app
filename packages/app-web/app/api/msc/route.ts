@@ -31,12 +31,13 @@ export async function GET(req: NextRequest) {
     })
 
     // Group by category
+    type MSCItem = (typeof items)[number]
     const grouped = {
-      goals: items.filter((i) => i.category === 'goal'),
-      projects: items.filter((i) => i.category === 'project'),
-      ideas: items.filter((i) => i.category === 'idea'),
-      principles: items.filter((i) => i.category === 'principle'),
-      habits: items.filter((i) => i.category === 'habit'),
+      goals: items.filter((i: MSCItem) => i.category === 'goal'),
+      projects: items.filter((i: MSCItem) => i.category === 'project'),
+      ideas: items.filter((i: MSCItem) => i.category === 'idea'),
+      principles: items.filter((i: MSCItem) => i.category === 'principle'),
+      habits: items.filter((i: MSCItem) => i.category === 'habit'),
     }
 
     return NextResponse.json({ items, grouped })

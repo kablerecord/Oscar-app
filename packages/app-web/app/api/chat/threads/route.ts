@@ -95,8 +95,9 @@ export async function GET(req: NextRequest) {
       nextCursor = nextItem?.id
     }
 
+    type ThreadItem = (typeof threads)[number]
     return NextResponse.json({
-      threads: threads.map((t) => ({
+      threads: threads.map((t: ThreadItem) => ({
         id: t.id,
         title: t.title,
         mode: t.mode,
