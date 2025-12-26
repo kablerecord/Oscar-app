@@ -514,7 +514,7 @@ export function FolderUploader({
   const indexProgress = uploadedCount > 0 ? Math.round((indexedCount / uploadedCount) * 100) : 0
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-hidden">
       {/* Hidden folder input */}
       <input
         ref={folderInputRef}
@@ -555,7 +555,7 @@ export function FolderUploader({
 
       {/* Files preview (before upload) */}
       {hasFiles && phase === 'idle' && (
-        <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden max-w-full">
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden w-full">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
             <div className="flex items-center space-x-3 min-w-0 flex-1">
               <FolderOpen className="h-5 w-5 text-blue-500 flex-shrink-0" />
@@ -580,11 +580,11 @@ export function FolderUploader({
             </div>
           </div>
 
-          <div className="max-h-80 overflow-y-auto divide-y divide-neutral-100 dark:divide-neutral-800">
+          <div className="max-h-80 overflow-y-auto overflow-x-hidden divide-y divide-neutral-100 dark:divide-neutral-800">
             {files.map((fileEntry) => (
               <div
                 key={fileEntry.path}
-                className="flex items-center justify-between px-4 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/50"
+                className="flex items-center justify-between px-4 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-800/50 w-full"
               >
                 <div className="flex items-center space-x-3 min-w-0 flex-1">
                   <FileText className="h-4 w-4 text-neutral-400 flex-shrink-0" />
