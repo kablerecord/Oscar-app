@@ -228,16 +228,17 @@ export async function generateAnalyticsReport(workspaceId: string): Promise<{
   }
 
   // Calculate summary
+  type AnalyticsItem = (typeof analytics)[number]
   const totalQuestions = analytics.length
-  const avgResponseTime = analytics.reduce((sum, a) => sum + (a.totalDurationMs || 0), 0) / totalQuestions
-  const cacheHits = analytics.filter(a => a.cacheHit).length
-  const fastPaths = analytics.filter(a => a.fastPath).length
-  const autoRoutes = analytics.filter(a => a.wasAutoRouted).length
+  const avgResponseTime = analytics.reduce((sum: number, a: AnalyticsItem) => sum + (a.totalDurationMs || 0), 0) / totalQuestions
+  const cacheHits = analytics.filter((a: AnalyticsItem) => a.cacheHit).length
+  const fastPaths = analytics.filter((a: AnalyticsItem) => a.fastPath).length
+  const autoRoutes = analytics.filter((a: AnalyticsItem) => a.wasAutoRouted).length
 
   // Find slow queries (>5s)
   const slowQueries = analytics
-    .filter(a => (a.totalDurationMs || 0) > 5000)
-    .map(a => ({
+    .filter((a: AnalyticsItem) => (a.totalDurationMs || 0) > 5000)
+    .map((a: AnalyticsItem) => ({
       question: a.question?.slice(0, 100) || '',
       durationMs: a.totalDurationMs || 0,
       mode: a.effectiveMode || 'unknown',
@@ -247,8 +248,8 @@ export async function generateAnalyticsReport(workspaceId: string): Promise<{
 
   // Find cache misses that could be prefetched
   const cacheMisses = analytics
-    .filter(a => !a.cacheHit && a.hasVaultKeywords)
-    .map(a => ({
+    .filter((a: AnalyticsItem) => !a.cacheHit && a.hasVaultKeywords)
+    .map((a: AnalyticsItem) => ({
       question: a.question?.slice(0, 100) || '',
       whatWasNeeded: a.usedKnowledge ? 'knowledge context' : 'vault stats',
     }))
@@ -256,7 +257,7 @@ export async function generateAnalyticsReport(workspaceId: string): Promise<{
 
   // Count question patterns
   const questionPatterns: Record<string, number> = {}
-  analytics.forEach(a => {
+  analytics.forEach((a: AnalyticsItem) => {
     const pattern = a.questionType || 'unknown'
     questionPatterns[pattern] = (questionPatterns[pattern] || 0) + 1
   })

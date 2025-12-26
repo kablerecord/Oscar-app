@@ -105,8 +105,9 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
         where: { workspaceId },
         select: { category: true, answer: true },
       })
+      type ProfileAnswer = (typeof profileAnswers)[number]
       const preferences = Object.fromEntries(
-        profileAnswers.map(p => [p.category, p.answer])
+        profileAnswers.map((p: ProfileAnswer) => [p.category, p.answer])
       )
       return {
         name: workspace?.name,
@@ -130,7 +131,8 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
       const settings = await prisma.userSetting.findMany({
         where: { userId: workspace.owner.id },
       })
-      return Object.fromEntries(settings.map(s => [s.key, s.value]))
+      type Setting = (typeof settings)[number]
+      return Object.fromEntries(settings.map((s: Setting) => [s.key, s.value]))
     },
   },
 
@@ -156,7 +158,8 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
         },
       })
       // Map to expected format
-      return items.map(item => ({
+      type MSCItem = (typeof items)[number]
+      return items.map((item: MSCItem) => ({
         id: item.id,
         title: item.content,
         status: item.status,
@@ -176,7 +179,8 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
         take: 10,
         select: { id: true, title: true, updatedAt: true },
       })
-      return threads.map(t => ({
+      type Thread = (typeof threads)[number]
+      return threads.map((t: Thread) => ({
         id: t.id,
         title: t.title || 'Untitled',
         lastMessageAt: t.updatedAt,
@@ -195,7 +199,8 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
         take: 10,
         select: { content: true },
       })
-      return goals.map(g => g.content)
+      type Goal = (typeof goals)[number]
+      return goals.map((g: Goal) => g.content)
     },
   },
 
@@ -226,7 +231,8 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
         where: { workspaceId },
         _count: { id: true },
       })
-      return Object.fromEntries(docs.map(d => [d.sourceType || 'unknown', d._count.id]))
+      type Doc = (typeof docs)[number]
+      return Object.fromEntries(docs.map((d: Doc) => [d.sourceType || 'unknown', d._count.id]))
     },
   },
   {
@@ -261,13 +267,14 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
       })
 
       // Simple word frequency (could be more sophisticated)
+      type ThreadTitle = (typeof threads)[number]
       const words = threads
-        .map(t => t.title?.toLowerCase().split(/\s+/) || [])
+        .map((t: ThreadTitle) => t.title?.toLowerCase().split(/\s+/) || [])
         .flat()
-        .filter(w => w.length > 4) // Skip short words
+        .filter((w: string) => w.length > 4) // Skip short words
 
       const freq = new Map<string, number>()
-      words.forEach(w => freq.set(w, (freq.get(w) || 0) + 1))
+      words.forEach((w: string) => freq.set(w, (freq.get(w) || 0) + 1))
 
       return Array.from(freq.entries())
         .sort((a, b) => b[1] - a[1])
@@ -292,10 +299,11 @@ const PREFETCH_ITEMS: PrefetchItem[] = [
         select: { content: true, description: true },
       })
 
+      type Project = (typeof projects)[number]
       return Object.fromEntries(
         projects
-          .filter(p => p.description)
-          .map(p => [p.content, p.description!])
+          .filter((p: Project) => p.description)
+          .map((p: Project) => [p.content, p.description!])
       )
     },
   },

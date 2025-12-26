@@ -272,10 +272,11 @@ async function keywordSearch(options: {
   }
 
   // Rank by keyword matches
+  type ChunkType = (typeof chunks)[number]
   const rankedChunks = chunks
-    .map(chunk => {
+    .map((chunk: ChunkType) => {
       const contentLower = chunk.content.toLowerCase()
-      const matchCount = keywords.filter(keyword =>
+      const matchCount = keywords.filter((keyword: string) =>
         contentLower.includes(keyword)
       ).length
 
@@ -292,12 +293,13 @@ async function keywordSearch(options: {
         score: matchCount,
       }
     })
-    .sort((a, b) => b.score - a.score)
+    .sort((a: { score: number }, b: { score: number }) => b.score - a.score)
     .slice(0, topK)
 
   // Format context with better source info
+  type RankedChunk = (typeof rankedChunks)[number]
   const context = rankedChunks
-    .map((result, idx) => {
+    .map((result: RankedChunk, idx: number) => {
       const sourceLabel = result.isSystem
         ? `[OSQR: ${result.sourcePath || result.documentTitle}]`
         : `[Source ${idx + 1}: ${result.documentTitle}]`

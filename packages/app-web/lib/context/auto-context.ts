@@ -204,8 +204,9 @@ async function getMSCContext(workspaceId: string): Promise<{ text: string; items
   }
 
   // Group by category
+  type MSCItemType = (typeof items)[number]
   const byCategory: Record<string, typeof items> = {}
-  items.forEach((item) => {
+  items.forEach((item: MSCItemType) => {
     const cat = item.category
     if (!byCategory[cat]) byCategory[cat] = []
     byCategory[cat].push(item)
@@ -216,7 +217,7 @@ async function getMSCContext(workspaceId: string): Promise<{ text: string; items
 
   // Goals first (most important)
   if (byCategory.goal?.length) {
-    const goals = byCategory.goal.map((g) => {
+    const goals = byCategory.goal.map((g: MSCItemType) => {
       let line = `- ${g.content}`
       if (g.status === 'in_progress') line += ' [IN PROGRESS]'
       if (g.dueDate) line += ` (due: ${formatDate(g.dueDate)})`
@@ -228,7 +229,7 @@ async function getMSCContext(workspaceId: string): Promise<{ text: string; items
 
   // Projects
   if (byCategory.project?.length) {
-    const projects = byCategory.project.map((p) => {
+    const projects = byCategory.project.map((p: MSCItemType) => {
       let line = `- ${p.content}`
       if (p.status === 'in_progress') line += ' [IN PROGRESS]'
       if (p.dueDate) line += ` (due: ${formatDate(p.dueDate)})`
@@ -240,25 +241,25 @@ async function getMSCContext(workspaceId: string): Promise<{ text: string; items
 
   // Ideas (brief)
   if (byCategory.idea?.length) {
-    const ideas = byCategory.idea.slice(0, 5).map((i) => `- ${i.content}`).join('\n')
+    const ideas = byCategory.idea.slice(0, 5).map((i: MSCItemType) => `- ${i.content}`).join('\n')
     sections.push(`**Ideas:**\n${ideas}`)
   }
 
   // Principles
   if (byCategory.principle?.length) {
-    const principles = byCategory.principle.map((p) => `- ${p.content}`).join('\n')
+    const principles = byCategory.principle.map((p: MSCItemType) => `- ${p.content}`).join('\n')
     sections.push(`**Guiding Principles:**\n${principles}`)
   }
 
   // Habits
   if (byCategory.habit?.length) {
-    const habits = byCategory.habit.map((h) => `- ${h.content}`).join('\n')
+    const habits = byCategory.habit.map((h: MSCItemType) => `- ${h.content}`).join('\n')
     sections.push(`**Active Habits:**\n${habits}`)
   }
 
   return {
     text: sections.join('\n\n'),
-    items: items.map((i) => ({
+    items: items.map((i: MSCItemType) => ({
       category: i.category,
       content: i.content,
       description: i.description,
@@ -292,14 +293,15 @@ async function getRecentThreadContext(
     return { text: '', summaries: [] }
   }
 
-  const summaries: ThreadSummary[] = threads.map((t) => ({
+  type ThreadType = (typeof threads)[number]
+  const summaries: ThreadSummary[] = threads.map((t: ThreadType) => ({
     id: t.id,
     title: t.title,
     lastMessage: t.messages[0]?.content?.slice(0, 200) || '',
     updatedAt: t.updatedAt,
   }))
 
-  const text = threads.map((t) => {
+  const text = threads.map((t: ThreadType) => {
     const lastMsg = t.messages[0]?.content?.slice(0, 150)
     return `- "${t.title}" (${formatRelativeTime(t.updatedAt)})${lastMsg ? `\n  Last: ${lastMsg}...` : ''}`
   }).join('\n')

@@ -255,22 +255,23 @@ async function fetchMSC(workspaceId: string): Promise<{
   })
 
   // Separate by category
-  const goalItems = mscItems.filter(item => item.category === 'goal')
-  const projectItems = mscItems.filter(item => item.category === 'project')
+  type MSCItemType = (typeof mscItems)[number]
+  const goalItems = mscItems.filter((item: MSCItemType) => item.category === 'goal')
+  const projectItems = mscItems.filter((item: MSCItemType) => item.category === 'project')
 
   // Determine current focus (pinned item or most recently updated)
-  const pinnedItem = mscItems.find(item => item.isPinned)
+  const pinnedItem = mscItems.find((item: MSCItemType) => item.isPinned)
   const currentFocus = pinnedItem?.content || mscItems[0]?.content || null
 
   return {
-    goals: goalItems.map(g => ({
+    goals: goalItems.map((g: MSCItemType) => ({
       id: g.id,
       title: g.content,
       status: g.status as 'active' | 'achieved' | 'archived',
       progress: 0, // MSCItem doesn't have progress field
       dueDate: g.dueDate ?? undefined,
     })),
-    projects: projectItems.map(p => ({
+    projects: projectItems.map((p: MSCItemType) => ({
       id: p.id,
       name: p.content,
       status: p.status as 'planning' | 'active' | 'paused' | 'complete',

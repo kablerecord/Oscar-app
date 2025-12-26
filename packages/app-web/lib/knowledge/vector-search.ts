@@ -52,13 +52,13 @@ export async function vectorSearch(options: VectorSearchOptions): Promise<string
   }
 
   // Filter by similarity threshold and format context
-  const relevantResults = results.filter(r => r.similarity >= similarityThreshold)
+  const relevantResults = results.filter((r: SearchResult) => r.similarity >= similarityThreshold)
 
   if (relevantResults.length === 0) {
     // If nothing passes threshold, still return top results but note low confidence
     const context = results
       .slice(0, 3)
-      .map((result, idx) => {
+      .map((result: SearchResult, idx: number) => {
         return `[Source ${idx + 1}: ${result.documentTitle}]\n${result.content}`
       })
       .join('\n\n---\n\n')
@@ -68,7 +68,7 @@ export async function vectorSearch(options: VectorSearchOptions): Promise<string
 
   // Format context for OSQR
   const context = relevantResults
-    .map((result, idx) => {
+    .map((result: SearchResult, idx: number) => {
       return `[Source ${idx + 1}: ${result.documentTitle} (${Math.round(result.similarity * 100)}% match)]\n${result.content}`
     })
     .join('\n\n---\n\n')
@@ -130,7 +130,7 @@ export async function hybridSearch(options: VectorSearchOptions): Promise<string
 
   // Format context for OSQR
   const context = results
-    .map((result, idx) => {
+    .map((result: SearchResult, idx: number) => {
       const matchInfo = result.similarity > 0
         ? `${Math.round(result.similarity * 100)}% semantic match`
         : 'keyword match'

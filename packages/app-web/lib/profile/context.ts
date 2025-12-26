@@ -15,9 +15,10 @@ export async function getProfileContext(workspaceId: string): Promise<string | u
   }
 
   // Group answers by category
+  type ProfileAnswer = (typeof answers)[number]
   const byCategory: Record<string, Array<{ question: string; answer: string }>> = {}
 
-  answers.forEach((answer) => {
+  answers.forEach((answer: ProfileAnswer) => {
     if (!byCategory[answer.category]) {
       byCategory[answer.category] = []
     }

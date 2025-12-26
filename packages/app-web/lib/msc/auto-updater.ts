@@ -43,8 +43,9 @@ export async function extractMSCUpdates(
     take: 50, // Limit for prompt size
   })
 
+  type ExistingItem = (typeof existingItems)[number]
   const existingContext = existingItems.length > 0
-    ? `\nExisting items:\n${existingItems.map(i => `- [${i.category}] "${i.content}" (${i.status})`).join('\n')}`
+    ? `\nExisting items:\n${existingItems.map((i: ExistingItem) => `- [${i.category}] "${i.content}" (${i.status})`).join('\n')}`
     : ''
 
   // Use a fast model for extraction
