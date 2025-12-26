@@ -566,6 +566,7 @@ This roadmap defines **WHAT** to build. The Development Philosophy document defi
 
 ### Phase 1: Foundation (V1.0) ✅ COMPLETE
 ### Phase 1.1: AI Feature Parity (V1.1) ⬅️ NEXT PRIORITY
+### Phase 1.9: V1.5 Environment Setup ⬅️ DO THIS BEFORE V1.5
 ### Phase 2: Core Experience (V1.0 → V1.5)
 ### Phase 3: Intelligence Layer (V1.5)
 ### Phase 4: Advanced Features (V1.5)
@@ -935,6 +936,76 @@ The Jarvis Continuum defines the end-state vision: OSQR as a voice-first, always
 6. Code Execution (power users)
 7. Voice Output (polish)
 8. Artifacts Enhancement (ongoing)
+
+---
+
+## Phase 1.9: V1.5 Environment Setup ⬅️ DO THIS BEFORE V1.5
+*Focus: Isolate v1.5 development from production so they don't interfere*
+
+> **When to do this:** Before starting any V1.5 feature work. This creates a safe staging environment.
+
+### 1.9.1 Create Staging Branch & Railway Service
+
+**Goal:** Deploy v1.5 to `testapp.osqr.app` while production stays at `app.osqr.app`
+
+- [ ] **Create v1.5 branch from main**
+  ```bash
+  git checkout main
+  git pull origin main
+  git checkout -b v1.5
+  git push -u origin v1.5
+  ```
+
+- [ ] **Create new Railway service**
+  1. Open Railway project (same project as production)
+  2. Click "New Service" → "GitHub Repo"
+  3. Select `oscar-app` repo
+  4. Set branch to `v1.5`
+  5. Use existing `railway.json` config (points to `packages/app-web/Dockerfile`)
+
+- [ ] **Add custom domain**
+  1. In Railway service settings → Domains
+  2. Add `testapp.osqr.app`
+  3. Update DNS in domain registrar (CNAME to Railway)
+
+- [ ] **Configure environment variables**
+  - Copy all env vars from production service
+  - Update `NEXTAUTH_URL` to `https://testapp.osqr.app`
+  - Decision needed: Use same DB or create staging DB?
+
+### 1.9.2 Database Strategy (Choose One)
+
+**Option A: Shared Database (Simpler)**
+- Use same Supabase connection string
+- ⚠️ Be careful with schema migrations - test locally first
+- Good for: Features that don't change schema much
+
+**Option B: Separate Staging Database (Safer)**
+- Create new Supabase project for staging
+- Run `prisma migrate deploy` on staging DB
+- Seed with test data
+- Good for: Major schema changes, risky experiments
+
+**Recommendation:** Start with Option A, switch to B if doing schema-heavy work.
+
+### 1.9.3 Development Workflow
+
+Once set up, the workflow becomes:
+
+```
+main branch     →  app.osqr.app      (V1.0 production)
+v1.5 branch     →  testapp.osqr.app  (V1.5 staging)
+```
+
+1. Develop v1.5 features on `v1.5` branch
+2. Test at `testapp.osqr.app/vault`, `/panel`, `/mobile`, etc.
+3. When v1.5 is ready, merge `v1.5` → `main`
+4. Production updates automatically
+
+**Hotfixes for V1.0:**
+- Create hotfix branch from `main`
+- Fix → merge to `main`
+- Cherry-pick or merge `main` into `v1.5` to stay in sync
 
 ---
 
