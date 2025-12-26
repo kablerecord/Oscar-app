@@ -317,7 +317,13 @@ describe('Interrupt Budget Manager', () => {
         },
       ];
 
-      const decisions = processInterruptQueue(userId, items);
+      // Explicitly disable quiet hours to ensure test is deterministic regardless of CI time
+      const prefs: Partial<TemporalPreferences> = {
+        quietHoursStart: '00:00',
+        quietHoursEnd: '00:00', // Same start/end = no quiet hours
+      };
+
+      const decisions = processInterruptQueue(userId, items, prefs);
 
       expect(decisions.length).toBe(3);
       // Check high priority got realtime
