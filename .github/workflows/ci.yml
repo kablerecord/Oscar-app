@@ -39,7 +39,7 @@ jobs:
         run: pnpm --filter @osqr/core test:run
 
       - name: Generate Prisma client
-        run: cd packages/app-web && pnpx prisma generate
+        run: cd packages/app-web && npx prisma generate
 
       - name: Lint
         run: pnpm lint
