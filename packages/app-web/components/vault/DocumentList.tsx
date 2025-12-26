@@ -285,36 +285,20 @@ export function DocumentList({
           </Button>
         </form>
 
-        {/* Refresh controls */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleManualRefresh}
-            title="Refresh now"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          </Button>
-          <Button
-            variant={isAutoRefreshing ? 'default' : 'outline'}
-            size="sm"
-            onClick={toggleAutoRefresh}
-            className={isAutoRefreshing ? 'bg-green-600 hover:bg-green-700' : ''}
-          >
-            {isAutoRefreshing ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
-          </Button>
-          {isAutoRefreshing && (
-            <span className="text-xs text-slate-400">
-              Every {autoRefreshInterval / 1000}s
-            </span>
-          )}
-        </div>
+        {/* Refresh button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleManualRefresh}
+          title="Refresh now"
+        >
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
-      {/* Document count and last refresh */}
-      <div className="flex items-center justify-between text-sm text-slate-400">
+      {/* Document count */}
+      <div className="text-sm text-slate-400">
         <span>{pagination.total} documents</span>
-        <span>Last updated: {lastRefresh.toLocaleTimeString()}</span>
       </div>
 
       {/* Bulk actions bar - shows when documents exist */}

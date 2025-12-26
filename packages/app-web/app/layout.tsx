@@ -3,8 +3,6 @@ import "./globals.css";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { FocusModeProvider } from "@/components/focus/FocusModeContext";
 import { TipsHighlightProvider } from "@/components/tips/TipsHighlightProvider";
-import { UploadStatusProvider } from "@/components/vault/UploadStatusContext";
-import { UploadStatusIndicator } from "@/components/vault/UploadStatusIndicator";
 
 export const metadata: Metadata = {
   title: "OSQR - Your AI Operating System for Capability",
@@ -32,12 +30,9 @@ export default function RootLayout({
         <SessionProvider>
           <FocusModeProvider>
             <TipsHighlightProvider>
-              <UploadStatusProvider>
-                <div className="relative">
-                  {children}
-                </div>
-                <UploadStatusIndicator />
-              </UploadStatusProvider>
+              <div className="relative">
+                {children}
+              </div>
             </TipsHighlightProvider>
           </FocusModeProvider>
         </SessionProvider>
