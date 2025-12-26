@@ -160,15 +160,76 @@ export async function POST(req: NextRequest) {
         fileContent = await file.text()
       } else if (fileType === 'application/json' || fileName.endsWith('.json')) {
         fileContent = await file.text()
+      } else if (fileType === 'text/html' || fileName.endsWith('.html')) {
+        // Check if this might be a ChatGPT export (chat.html format)
+        const htmlContent = await file.text()
+        if (htmlContent.includes('conversations') && htmlContent.includes('mapping')) {
+          await sendEvent({
+            phase: 'error',
+            progress: 0,
+            message: 'ChatGPT export detected. This HTML format contains embedded JSON and requires special processing. Please contact support or use the CLI import tool.',
+            data: {
+              error: 'ChatGPT HTML export',
+              suggestion: 'Use scripts/index-chatgpt-conversations.ts for ChatGPT exports',
+              format: 'chatgpt_html'
+            }
+          })
+          await writer.close()
+          return
+        }
+        // Regular HTML - try to extract text
+        fileContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
       } else {
         try {
           fileContent = await file.text()
+
+          // Detect common AI export formats that need special handling
+          if (fileContent.startsWith('[{"uuid"') || fileContent.startsWith('[{"title"')) {
+            // Likely a ChatGPT or Claude conversations.json export
+            const parsed = JSON.parse(fileContent)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              const first = parsed[0]
+              if (first.mapping && first.create_time) {
+                await sendEvent({
+                  phase: 'error',
+                  progress: 0,
+                  message: `ChatGPT export detected with ${parsed.length} conversations. This format requires batch processing. Please use the CLI import tool for best results.`,
+                  data: {
+                    error: 'ChatGPT conversations export',
+                    suggestion: 'Use scripts/index-chatgpt-conversations.ts',
+                    format: 'chatgpt_json',
+                    conversationCount: parsed.length
+                  }
+                })
+                await writer.close()
+                return
+              } else if (first.chat_messages && first.uuid) {
+                await sendEvent({
+                  phase: 'error',
+                  progress: 0,
+                  message: `Claude export detected with ${parsed.length} conversations. This format requires batch processing. Please use the CLI import tool for best results.`,
+                  data: {
+                    error: 'Claude conversations export',
+                    suggestion: 'Use scripts/index-claude-conversations.ts',
+                    format: 'claude_json',
+                    conversationCount: parsed.length
+                  }
+                })
+                await writer.close()
+                return
+              }
+            }
+          }
         } catch {
           await sendEvent({
             phase: 'error',
             progress: 0,
-            message: 'Unsupported file type. Please upload a PDF, DOCX, TXT, MD, or JSON file.',
-            data: { error: 'Unsupported file type' }
+            message: `Unsupported file type: ${fileType || fileName.split('.').pop()}. Please upload a PDF, DOCX, TXT, MD, or JSON file.`,
+            data: {
+              error: 'Unsupported file type',
+              fileType: fileType || 'unknown',
+              extension: fileName.split('.').pop()
+            }
           })
           await writer.close()
           return

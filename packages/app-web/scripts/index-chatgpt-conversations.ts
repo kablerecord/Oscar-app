@@ -76,7 +76,7 @@ async function extractConversationText(conv: ChatGPTConversation): Promise<strin
 }
 
 async function main() {
-  const filePath = process.argv[2] || '/Users/kablerecord/Desktop/personal brand/AI GPT/Export data/Chatgpt/Chat gpt data 12_1_25/conversations.json'
+  const filePath = process.argv[2] || '/Users/kablerecord/Desktop/Personal Brand/ai models/export data/Chatgpt/ChatGPT Data Export Dec 26 2025/conversations.json'
 
   console.log('\n🤖 ChatGPT Conversations Indexer\n')
   console.log(`📂 File: ${filePath}\n`)

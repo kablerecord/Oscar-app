@@ -35,6 +35,12 @@ interface UploadProgress {
     upgrade?: boolean
     currentTier?: string
     chunksIndexed?: number
+    // AI export format detection
+    format?: 'chatgpt_html' | 'chatgpt_json' | 'claude_json'
+    suggestion?: string
+    conversationCount?: number
+    fileType?: string
+    extension?: string
   }
 }
 
@@ -556,11 +562,26 @@ export function FileUploader({
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-red-800 dark:text-red-200">
-                Upload failed
+                {uploadProgress.data?.format ? 'Special Format Detected' : 'Upload failed'}
               </h3>
               <p className="mt-1 text-sm text-red-700 dark:text-red-300">
                 {uploadProgress.message}
               </p>
+
+              {/* AI Export format guidance */}
+              {uploadProgress.data?.format && (
+                <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    {uploadProgress.data.format === 'chatgpt_html' && 'ChatGPT HTML Export'}
+                    {uploadProgress.data.format === 'chatgpt_json' && `ChatGPT Export (${uploadProgress.data.conversationCount} conversations)`}
+                    {uploadProgress.data.format === 'claude_json' && `Claude Export (${uploadProgress.data.conversationCount} conversations)`}
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                    These exports contain multiple conversations and need batch processing.
+                    Contact support to import your AI conversation history.
+                  </p>
+                </div>
+              )}
 
               {uploadProgress.data?.upgrade && (
                 <Button
