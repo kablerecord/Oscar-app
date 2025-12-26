@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Plus, FolderOpen, FileText } from 'lucide-react'
 import { FileUploader } from './FileUploader'
 import { FolderUploader } from './FolderUploader'
+import { UploadStatusProvider } from './UploadStatusContext'
 import {
   Dialog,
   DialogContent,
@@ -74,10 +75,11 @@ export function VaultPageClient({ workspaceId, children }: VaultPageClientProps)
   }
 
   return (
-    <VaultContext.Provider value={vaultContextValue}>
-      <div>
-        {/* Sticky Header - stacks on mobile, side-by-side on larger screens */}
-        <div className="sticky top-0 z-10 bg-slate-950 pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1">
+    <UploadStatusProvider>
+      <VaultContext.Provider value={vaultContextValue}>
+        <div>
+          {/* Sticky Header - stacks on mobile, side-by-side on larger screens */}
+          <div className="sticky top-0 z-10 bg-slate-950 pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 pt-1">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div className="min-w-0 flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">
@@ -135,11 +137,12 @@ export function VaultPageClient({ workspaceId, children }: VaultPageClientProps)
           <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent" />
         </div>
 
-        {/* Scrollable content */}
-        <div className="space-y-6 pt-2">
-          {children}
+          {/* Scrollable content */}
+          <div className="space-y-6 pt-2">
+            {children}
+          </div>
         </div>
-      </div>
-    </VaultContext.Provider>
+      </VaultContext.Provider>
+    </UploadStatusProvider>
   )
 }

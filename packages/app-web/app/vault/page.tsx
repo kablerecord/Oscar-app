@@ -48,6 +48,14 @@ export default async function VaultPage() {
   // Get document count
   const totalDocuments = await prisma.document.count({ where: { workspaceId: workspace.id } })
 
+  // Get indexed document count (documents with at least one chunk)
+  const indexedDocuments = await prisma.document.count({
+    where: {
+      workspaceId: workspace.id,
+      chunks: { some: {} },
+    },
+  })
+
   // Get initial documents
   const documents = await prisma.document.findMany({
     where: { workspaceId: workspace.id },
@@ -81,7 +89,7 @@ export default async function VaultPage() {
     >
       <VaultPageClient workspaceId={workspace.id}>
         {/* Stats overview */}
-        <VaultStats totalDocuments={totalDocuments} />
+        <VaultStats totalDocuments={totalDocuments} indexedDocuments={indexedDocuments} />
 
         {/* Document list */}
         <div className="pt-4">
