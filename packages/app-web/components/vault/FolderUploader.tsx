@@ -224,6 +224,8 @@ export function FolderUploader({
     error?: string
     format?: 'chatgpt_html' | 'chatgpt_json' | 'claude_json'
     conversationCount?: number
+    skipped?: boolean
+    updated?: boolean
   }> => {
     const formData = new FormData()
     formData.append('file', fileEntry.file)
@@ -251,7 +253,12 @@ export function FolderUploader({
         }
       }
 
-      return { success: true, documentId: result.documentId }
+      return {
+        success: true,
+        documentId: result.documentId,
+        skipped: result.skipped,
+        updated: result.updated
+      }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         return { success: false, error: 'Cancelled' }
@@ -349,8 +356,14 @@ export function FolderUploader({
         const result = await uploadFileFast(fileEntry)
 
         if (result.success && result.documentId) {
-          updateFileStatus(fileEntry.path, { status: 'uploaded', documentId: result.documentId })
-          uploadedDocs.push(result.documentId)
+          if (result.skipped) {
+            // File unchanged - skip indexing
+            updateFileStatus(fileEntry.path, { status: 'skipped', documentId: result.documentId })
+          } else {
+            // New or updated file - needs indexing
+            updateFileStatus(fileEntry.path, { status: 'uploaded', documentId: result.documentId })
+            uploadedDocs.push(result.documentId)
+          }
         } else {
           updateFileStatus(fileEntry.path, {
             status: 'error',
@@ -472,9 +485,9 @@ export function FolderUploader({
 
       {/* Files preview (before upload) */}
       {hasFiles && phase === 'idle' && (
-        <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
-            <div className="flex items-center space-x-3 min-w-0">
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 overflow-hidden max-w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 py-3 bg-neutral-50 dark:bg-neutral-800 border-b border-neutral-200 dark:border-neutral-700">
+            <div className="flex items-center space-x-3 min-w-0 flex-1">
               <FolderOpen className="h-5 w-5 text-blue-500 flex-shrink-0" />
               <div className="min-w-0">
                 <p className="font-medium text-neutral-900 dark:text-white truncate">
@@ -485,7 +498,7 @@ export function FolderUploader({
                 </p>
               </div>
             </div>
-            <div className="flex items-center space-x-2 flex-shrink-0">
+            <div className="flex items-center space-x-2 flex-shrink-0 self-end sm:self-auto">
               <Button variant="ghost" size="sm" onClick={reset}>
                 <Trash2 className="h-4 w-4 mr-1" />
                 Clear
@@ -653,7 +666,7 @@ export function FolderUploader({
                       <p className="text-xs text-red-500 truncate">{fileEntry.error}</p>
                     )}
                     {fileEntry.status === 'skipped' && (
-                      <p className="text-xs text-amber-500">Already indexed</p>
+                      <p className="text-xs text-amber-500">Unchanged, skipped</p>
                     )}
                   </div>
                 </div>
@@ -690,7 +703,7 @@ export function FolderUploader({
                     <p className="text-lg font-bold text-amber-700 dark:text-amber-300">
                       {stats.skipped}
                     </p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400">skipped</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">unchanged</p>
                   </div>
                 )}
                 {stats.error > 0 && (

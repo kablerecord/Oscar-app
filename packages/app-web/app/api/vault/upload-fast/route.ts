@@ -1,8 +1,20 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { createHash } from 'crypto'
 import { prisma } from '@/lib/db/prisma'
 import { canUploadDocument, canUploadFileSize } from '@/lib/tiers/check'
 import { parsePDF } from '@/lib/utils/pdf-parser'
+
+/**
+ * Generate a simple hash for content comparison
+ * Uses first 10KB + last 10KB + length for speed on large files
+ */
+function generateContentHash(content: string): string {
+  const sample = content.length > 20000
+    ? content.slice(0, 10000) + content.slice(-10000) + content.length.toString()
+    : content
+  return createHash('md5').update(sample).digest('hex')
+}
 
 /**
  * Fast file upload endpoint
@@ -124,12 +136,79 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Sanitize text for PostgreSQL (remove null bytes which cause UTF-8 encoding errors)
+    fileContent = fileContent.replace(/\x00/g, '')
+
     if (!fileContent.trim()) {
       return Response.json({ error: 'File appears to be empty' }, { status: 400 })
     }
 
     const charCount = fileContent.length
     const wordCount = fileContent.split(/\s+/).filter(w => w.length > 0).length
+    const contentHash = generateContentHash(fileContent)
+
+    // Check for duplicate files by filename in this workspace
+    const existingDoc = await prisma.document.findFirst({
+      where: {
+        workspaceId,
+        originalFilename: fileName,
+      },
+      select: {
+        id: true,
+        metadata: true,
+      }
+    })
+
+    if (existingDoc) {
+      const existingHash = (existingDoc.metadata as Record<string, unknown>)?.contentHash as string | undefined
+      const existingSize = (existingDoc.metadata as Record<string, unknown>)?.fileSize as number | undefined
+
+      // If hash matches (or size matches for old docs without hash), skip as duplicate
+      if (existingHash === contentHash || (existingHash === undefined && existingSize === file.size)) {
+        return Response.json({
+          success: true,
+          documentId: existingDoc.id,
+          fileName,
+          skipped: true,
+          reason: 'unchanged',
+          message: 'File already exists and is unchanged'
+        })
+      }
+
+      // File has changed - update the existing document instead of creating new
+      const updatedDoc = await prisma.document.update({
+        where: { id: existingDoc.id },
+        data: {
+          textContent: fileContent,
+          metadata: {
+            fileType,
+            fileSize: file.size,
+            wordCount,
+            charCount,
+            contentHash,
+            needsIndexing: true,
+            uploadedAt: new Date().toISOString(),
+            previousVersionAt: (existingDoc.metadata as Record<string, unknown>)?.uploadedAt,
+          }
+        }
+      })
+
+      // Delete old chunks so they can be re-indexed
+      await prisma.documentChunk.deleteMany({
+        where: { documentId: existingDoc.id }
+      })
+
+      return Response.json({
+        success: true,
+        documentId: updatedDoc.id,
+        fileName,
+        wordCount,
+        charCount,
+        updated: true,
+        needsIndexing: true,
+        message: 'File updated (content changed)'
+      })
+    }
 
     // Create or get project
     let project = await prisma.project.findFirst({
@@ -163,6 +242,7 @@ export async function POST(req: NextRequest) {
           fileSize: file.size,
           wordCount,
           charCount,
+          contentHash,
           needsIndexing: true, // Flag for background indexing
           uploadedAt: new Date().toISOString(),
         }
