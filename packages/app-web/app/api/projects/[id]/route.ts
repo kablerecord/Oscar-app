@@ -52,7 +52,7 @@ export async function GET(
       description: project.description,
       createdAt: project.createdAt.toISOString(),
       updatedAt: project.updatedAt.toISOString(),
-      threads: project.threads.map(t => ({
+      threads: project.threads.map((t: typeof project.threads[number]) => ({
         id: t.id,
         title: t.title,
         messageCount: t._count.messages,

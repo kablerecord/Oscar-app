@@ -838,7 +838,8 @@ Guidelines:
     }
 
     // Transform to panel agents
-    const panelAgents: PanelAgent[] = agents.map((agent) => ({
+    type AgentRow = (typeof agents)[number]
+    const panelAgents: PanelAgent[] = agents.map((agent: AgentRow) => ({
       id: agent.id,
       name: agent.name,
       provider: agent.provider as 'openai' | 'anthropic',
@@ -1156,7 +1157,7 @@ Guidelines:
       await Promise.all(
         response.panelDiscussion.map((panelResponse) => {
           // Only include agentId if it's a real agent from the database
-          const realAgent = agents.find((a) => a.id === panelResponse.agentId)
+          const realAgent = agents.find((a: AgentRow) => a.id === panelResponse.agentId)
           return prisma.chatMessage.create({
             data: {
               threadId: thread.id,
@@ -1179,7 +1180,7 @@ Guidelines:
       if (response.roundtableDiscussion) {
         await Promise.all(
           response.roundtableDiscussion.map((panelResponse) => {
-            const realAgent = agents.find((a) => a.id === panelResponse.agentId)
+            const realAgent = agents.find((a: AgentRow) => a.id === panelResponse.agentId)
             return prisma.chatMessage.create({
               data: {
                 threadId: thread.id,

@@ -318,7 +318,8 @@ export async function POST(req: NextRequest) {
         return
       }
 
-      const panelAgents: PanelAgent[] = agents.map((agent) => ({
+      type AgentRow = (typeof agents)[number]
+      const panelAgents: PanelAgent[] = agents.map((agent: AgentRow) => ({
         id: agent.id,
         name: agent.name,
         provider: agent.provider as 'openai' | 'anthropic',

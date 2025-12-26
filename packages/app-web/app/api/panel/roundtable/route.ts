@@ -36,7 +36,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Transform to panel agents
-    const panelAgents: PanelAgent[] = agents.map((agent) => ({
+    type AgentRow = (typeof agents)[number]
+    const panelAgents: PanelAgent[] = agents.map((agent: AgentRow) => ({
       id: agent.id,
       name: agent.name,
       provider: agent.provider as 'openai' | 'anthropic',
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
             threadId,
             role: 'assistant',
             agentId: response.agentId,
-            provider: agents.find((a) => a.id === response.agentId)?.provider,
+            provider: agents.find((a: AgentRow) => a.id === response.agentId)?.provider,
             content: response.content || (response.error ? `Error: ${response.error}` : ''),
             metadata: {
               roundtable: true,

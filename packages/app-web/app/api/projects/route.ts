@@ -45,8 +45,9 @@ export async function GET(req: NextRequest) {
       },
     })
 
+    type ProjectRow = (typeof projects)[number]
     return NextResponse.json({
-      projects: projects.map(p => ({
+      projects: projects.map((p: ProjectRow) => ({
         id: p.id,
         name: p.name,
         description: p.description,

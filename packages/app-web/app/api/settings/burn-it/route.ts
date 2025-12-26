@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
 
+type PrismaTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
+
 export async function DELETE() {
   try {
     const session = await getServerSession(authOptions)
@@ -14,7 +16,7 @@ export async function DELETE() {
     const userId = session.user.id
 
     // Start a transaction to delete all user data
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: PrismaTransaction) => {
       // First, find the user's workspace
       const workspace = await tx.workspace.findFirst({
         where: { ownerId: userId },
