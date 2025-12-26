@@ -120,8 +120,27 @@ export class TextChunker {
     let chunkIndex = 0
 
     while (startChar < text.length) {
-      const endChar = Math.min(startChar + maxSize, text.length)
-      const content = text.slice(startChar, endChar)
+      let endChar = Math.min(startChar + maxSize, text.length)
+
+      // Avoid splitting a surrogate pair at the end
+      if (endChar < text.length) {
+        const lastCode = text.charCodeAt(endChar - 1)
+        // If we're ending on a high surrogate, include the low surrogate too
+        if (lastCode >= 0xD800 && lastCode <= 0xDBFF) {
+          endChar++
+        }
+      }
+
+      let content = text.slice(startChar, endChar)
+
+      // Skip orphan low surrogate at the start (can happen from overlap)
+      if (content.length > 0) {
+        const firstCode = content.charCodeAt(0)
+        if (firstCode >= 0xDC00 && firstCode <= 0xDFFF) {
+          content = content.slice(1)
+          startChar++
+        }
+      }
 
       chunks.push({
         content: content.trim(),
@@ -144,11 +163,20 @@ export class TextChunker {
     if (text.length <= overlapSize) return text
 
     // Try to overlap at sentence boundary
-    const endPart = text.slice(-overlapSize)
+    let endPart = text.slice(-overlapSize)
     const sentenceEnd = endPart.lastIndexOf('. ')
 
     if (sentenceEnd > 0) {
-      return endPart.slice(sentenceEnd + 2)
+      endPart = endPart.slice(sentenceEnd + 2)
+    }
+
+    // Ensure we don't split a surrogate pair
+    // If the first char is a low surrogate (orphaned), skip it
+    if (endPart.length > 0) {
+      const firstCode = endPart.charCodeAt(0)
+      if (firstCode >= 0xDC00 && firstCode <= 0xDFFF) {
+        endPart = endPart.slice(1)
+      }
     }
 
     return endPart

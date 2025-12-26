@@ -29,6 +29,50 @@ import { prisma } from '../lib/db/prisma'
 import { TextChunker } from '../lib/knowledge/chunker'
 import { addToCache, invalidateCache } from '../lib/knowledge/topic-cache'
 
+/**
+ * Sanitize content for PostgreSQL JSON storage
+ *
+ * PostgreSQL's JSON type rejects lone surrogate characters (U+D800-U+DFFF).
+ * Valid surrogate pairs (high + low surrogate together) form valid characters
+ * like emojis and should be preserved. Only lone/unpaired surrogates are invalid.
+ *
+ * This can happen when:
+ * - File is corrupted or has encoding issues
+ * - Content is truncated mid-character
+ * - Code contains intentional surrogate handling
+ */
+function sanitizeForJson(content: string): string {
+  // Replace only LONE surrogates, not valid pairs
+  // A valid pair is: high surrogate (D800-DBFF) followed by low surrogate (DC00-DFFF)
+  let result = ''
+  for (let i = 0; i < content.length; i++) {
+    const code = content.charCodeAt(i)
+
+    // High surrogate (D800-DBFF)
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const nextCode = content.charCodeAt(i + 1)
+      // Check if followed by valid low surrogate
+      if (nextCode >= 0xDC00 && nextCode <= 0xDFFF) {
+        // Valid pair - keep both
+        result += content[i] + content[i + 1]
+        i++ // Skip the low surrogate since we just added it
+      } else {
+        // Lone high surrogate - replace
+        result += '\uFFFD'
+      }
+    }
+    // Low surrogate without preceding high surrogate (lone)
+    else if (code >= 0xDC00 && code <= 0xDFFF) {
+      result += '\uFFFD'
+    }
+    // Regular character
+    else {
+      result += content[i]
+    }
+  }
+  return result
+}
+
 // ============================================
 // Configuration
 // ============================================
@@ -351,8 +395,11 @@ ${preview}${content.length > 500 ? '...' : ''}`
 async function indexFile(
   file: IndexableFile,
   workspaceId: string,
-  content: string
+  rawContent: string
 ): Promise<{ chunks: number }> {
+  // Sanitize content to remove invalid Unicode (lone surrogates)
+  const content = sanitizeForJson(rawContent)
+
   // Check if already indexed
   const existing = await prisma.document.findFirst({
     where: {
