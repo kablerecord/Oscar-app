@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { getServerSession } from 'next-auth'
 import {
   routeQuestion,
-  detectQuestionType,
+  // detectQuestionType - available for question analysis
   estimateComplexity,
   type QuestionType,
   type RoutingDecision,

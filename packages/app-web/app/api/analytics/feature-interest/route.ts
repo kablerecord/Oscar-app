@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db/prisma'
+// prisma import reserved for future analytics storage
+// import { prisma } from '@/lib/db/prisma'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
 }
 
 // GET endpoint to check feature interest counts (admin only)
-export async function GET(req: NextRequest) {
+export async function GET(_req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
 
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest) {
       message: 'Check Railway logs for feature interest events',
       note: 'Search for [FEATURE_INTEREST] in logs'
     })
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: 'Failed to get analytics' }, { status: 500 })
   }
 }

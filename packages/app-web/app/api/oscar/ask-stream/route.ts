@@ -20,7 +20,8 @@ import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary }
 
 // @osqr/core Integration
 import { checkInput, checkOutput, getDeclineMessage } from '@/lib/osqr/constitutional-wrapper'
-import { quickRoute, shouldUseFastPath } from '@/lib/osqr/router-wrapper'
+import { shouldUseFastPath } from '@/lib/osqr/router-wrapper'
+// quickRoute available for fast-path optimization
 import { hasCommitmentSignals, extractCommitments } from '@/lib/osqr/temporal-wrapper'
 import { featureFlags, throttleConfig } from '@/lib/osqr/config'
 

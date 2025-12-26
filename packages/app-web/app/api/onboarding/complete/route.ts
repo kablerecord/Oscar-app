@@ -8,16 +8,16 @@ export async function POST(req: NextRequest) {
     const isDev = process.env.NODE_ENV === 'development'
     const session = await getServerSession()
 
-    let userId: string
+    let _userId: string
     if (isDev && !session?.user?.email) {
-      userId = 'dev-user'
+      _userId = 'dev-user'
     } else if (!session?.user?.email) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     } else {
-      userId = (session.user as { id?: string }).id || session.user.email
+      _userId = (session.user as { id?: string }).id || session.user.email
     }
 
     const body = await req.json()

@@ -239,7 +239,7 @@ ${contextString ? contextString + '\n\n' : ''}Guidelines:
         }))
 
       // 9. Stream response from Claude
-      const tierConfig = getTierConfig(tier)
+      const _tierConfig = getTierConfig(tier) // Reserved for future token limit enforcement
       const maxTokens = mode === 'quick' ? 1024 : mode === 'thoughtful' ? 2048 : 4096
 
       let fullResponse = ''

@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const { question, context, userName, documentId, workspaceId } = await req.json()
+    const { question, context, userName, documentId, workspaceId: _workspaceId } = await req.json()
 
     if (!question) {
       return NextResponse.json(

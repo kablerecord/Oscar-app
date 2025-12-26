@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { prisma } from '@/lib/db/prisma'
 import { generateEmbedding, formatEmbeddingForPostgres } from '@/lib/ai/embeddings'

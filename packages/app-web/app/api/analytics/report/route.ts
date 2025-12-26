@@ -13,7 +13,7 @@ import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
 import { isDevWorkspace, generateAnalyticsReport } from '@/lib/analytics/dev-analytics'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

@@ -11,7 +11,7 @@ import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
 import {
   getNextInsight,
-  hasPendingInsights,
+  // hasPendingInsights - available for batch checking
   getPendingCount,
   getActiveInsight,
   markDelivered,

@@ -114,7 +114,7 @@ export async function think(input: OSQRThinkInput): Promise<OSQRThinkOutput> {
   const { questionType, complexity, recommendedModel, modeSuggestion } = routing
 
   // 2. Determine response mode
-  let mode = input.mode || determineMode(modeSuggestion, complexity, questionType)
+  const mode = input.mode || determineMode(modeSuggestion, complexity, questionType)
 
   // 3. Check if asking about OSQR himself
   const askingAboutOSQR = isAskingAboutOSQR(input.message)

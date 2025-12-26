@@ -14,7 +14,7 @@ import {
   recordBubbleShown,
   setFocusMode,
   getFocusMode,
-  rankSuggestions,
+  // rankSuggestions - available for future suggestion ordering
   type FocusModeType,
   type BubbleSuggestion,
 } from '@/lib/osqr/bubble-wrapper';

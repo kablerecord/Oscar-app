@@ -17,7 +17,8 @@ const CreateBodySchema = z.object({
   title: z.string().optional(),
 })
 
-const UpdateBodySchema = z.object({
+// UpdateBodySchema defined for PATCH endpoint (used in [id]/route.ts)
+const _UpdateBodySchema = z.object({
   title: z.string().optional(),
   projectId: z.string().nullable().optional(),
 })

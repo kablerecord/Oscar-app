@@ -351,7 +351,7 @@ export async function assembleUIP(userId: string): Promise<AssembledUIP | null> 
   }
 
   // Determine explanation style from cognitive style or defaults
-  let explanationStyle: 'theory-first' | 'example-first' | 'balanced' = 'balanced'
+  const explanationStyle: 'theory-first' | 'example-first' | 'balanced' = 'balanced'
 
   // Calculate overall confidence
   const confidences = profile.dimensions.map((d) =>

@@ -16,6 +16,12 @@ const eslintConfig = defineConfig([
   // Rule overrides for code quality
   {
     rules: {
+      // Allow unused vars prefixed with underscore (common pattern for intentionally unused params)
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_"
+      }],
       // Downgrade unescaped entities to warnings (apostrophes/quotes in JSX text)
       "react/no-unescaped-entities": "warn",
       // Downgrade explicit any to warning - some library types need any
