@@ -53,30 +53,30 @@ export function shouldSuggestArtifact(content: string): ArtifactType | null {
   if (content.includes('```')) {
     const codeBlockMatch = content.match(/```(\w+)?/)
     if (codeBlockMatch) {
-      return 'code'
+      return 'CODE'
     }
   }
 
   // Check for mermaid diagrams
   if (content.includes('```mermaid') || content.includes('graph ') || content.includes('sequenceDiagram')) {
-    return 'diagram'
+    return 'DIAGRAM'
   }
 
   // Check for HTML content
   if (content.includes('<!DOCTYPE') || content.includes('<html') || content.includes('<body')) {
-    return 'html'
+    return 'HTML'
   }
 
   // Check for SVG
   if (content.includes('<svg')) {
-    return 'svg'
+    return 'SVG'
   }
 
   // Check for JSON structure
   if (content.trim().startsWith('{') || content.trim().startsWith('[')) {
     try {
       JSON.parse(content.trim())
-      return 'json'
+      return 'JSON'
     } catch {
       // Not valid JSON
     }
@@ -84,7 +84,7 @@ export function shouldSuggestArtifact(content: string): ArtifactType | null {
 
   // Check for markdown document indicators
   if (content.includes('# ') && content.length > 500) {
-    return 'document'
+    return 'DOCUMENT'
   }
 
   return null
@@ -121,7 +121,7 @@ export function convertCodeBlocksToArtifacts(response: string): string {
   result = result.replace(codeBlockRegex, (match, language, code) => {
     artifactCount++
     const title = `Code ${artifactCount}`
-    return formatAsArtifact('code', title, code.trim(), { language })
+    return formatAsArtifact('CODE', title, code.trim(), { language })
   })
 
   return result

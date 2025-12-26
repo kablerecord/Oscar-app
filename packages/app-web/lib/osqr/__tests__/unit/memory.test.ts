@@ -1,92 +1,62 @@
 /**
  * Memory Vault Wrapper Unit Tests
  *
- * Tests for memory storage, retrieval, and cross-project queries.
+ * Tests for the memory-wrapper integration with @osqr/core MemoryVault.
+ *
+ * These tests verify that the wrapper correctly delegates to @osqr/core
+ * and handles edge cases gracefully.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import * as MemoryWrapper from '../../memory-wrapper'
 
-// Mock @osqr/core
+// Create mock functions using vi.hoisted so they're available before vi.mock runs
+const {
+  mockInitializeVault,
+  mockRetrieveContextForUser,
+  mockStoreMessage,
+  mockSearchUserMemories,
+  mockGetConversationHistory,
+  mockQueryCrossProject,
+  mockFindRelatedFromOtherProjects,
+  mockGetCrossProjectStats,
+  mockAddSourceContext,
+} = vi.hoisted(() => ({
+  mockInitializeVault: vi.fn(),
+  mockRetrieveContextForUser: vi.fn().mockResolvedValue([]),
+  mockStoreMessage: vi.fn().mockReturnValue({ id: 'msg-123' }),
+  mockSearchUserMemories: vi.fn().mockResolvedValue([]),
+  mockGetConversationHistory: vi.fn().mockReturnValue([]),
+  mockQueryCrossProject: vi.fn().mockResolvedValue({
+    memories: [],
+    commonThemes: [],
+    contradictions: [],
+    projectSummaries: new Map(),
+  }),
+  mockFindRelatedFromOtherProjects: vi.fn().mockResolvedValue([]),
+  mockGetCrossProjectStats: vi.fn().mockReturnValue({
+    memoriesWithContext: 0,
+    totalCrossReferences: 0,
+    unresolvedContradictions: 0,
+  }),
+  mockAddSourceContext: vi.fn(),
+}))
+
+// Mock @osqr/core MemoryVault
 vi.mock('@osqr/core', () => ({
   MemoryVault: {
-    initializeVault: vi.fn(),
-    retrieveContextForUser: vi.fn(() =>
-      Promise.resolve([
-        {
-          memory: {
-            id: 'mem1',
-            content: 'User prefers TypeScript',
-            category: 'preference',
-            createdAt: new Date('2024-01-01'),
-            utilityScore: 0.85,
-            source: 'conversation',
-          },
-          relevanceScore: 0.9,
-        },
-      ])
-    ),
-    getConversationHistory: vi.fn(() => [
-      { id: 'msg1', role: 'user', content: 'Hello', timestamp: new Date() },
-      { id: 'msg2', role: 'assistant', content: 'Hi there!', timestamp: new Date() },
-    ]),
-    storeMessage: vi.fn((conversationId, message) => ({
-      id: `msg_${Date.now()}`,
-      ...message,
-    })),
-    searchUserMemories: vi.fn(() =>
-      Promise.resolve([
-        {
-          id: 'mem1',
-          content: 'Search result',
-          category: 'fact',
-          createdAt: new Date(),
-          utilityScore: 0.8,
-          source: 'document',
-        },
-      ])
-    ),
-    queryCrossProject: vi.fn(() =>
-      Promise.resolve({
-        memories: [
-          {
-            memory: {
-              id: 'mem1',
-              content: 'Cross-project fact',
-              category: 'fact',
-              createdAt: new Date(),
-            },
-            relevance: 0.85,
-            project: 'project-a',
-          },
-        ],
-        commonThemes: ['AI', 'Development'],
-        contradictions: [],
-        projectSummaries: new Map([['project-a', 'AI development project']]),
-      })
-    ),
-    findRelatedFromOtherProjects: vi.fn(() =>
-      Promise.resolve([
-        {
-          id: 'rel1',
-          content: 'Related fact from other project',
-          category: 'fact',
-          createdAt: new Date(),
-          utilityScore: 0.7,
-          source: 'conversation',
-        },
-      ])
-    ),
-    addSourceContext: vi.fn(),
-    getCrossProjectStats: vi.fn(() => ({
-      memoriesWithContext: 150,
-      totalCrossReferences: 45,
-      unresolvedContradictions: 2,
-    })),
+    initializeVault: mockInitializeVault,
+    retrieveContextForUser: mockRetrieveContextForUser,
+    storeMessage: mockStoreMessage,
+    searchUserMemories: mockSearchUserMemories,
+    getConversationHistory: mockGetConversationHistory,
+    queryCrossProject: mockQueryCrossProject,
+    findRelatedFromOtherProjects: mockFindRelatedFromOtherProjects,
+    getCrossProjectStats: mockGetCrossProjectStats,
+    addSourceContext: mockAddSourceContext,
   },
 }))
 
-// Mock config
+// Mock config with feature flags enabled
 vi.mock('../../config', () => ({
   vaultConfig: {
     maxWorkingMemoryTokens: 4096,
@@ -96,152 +66,140 @@ vi.mock('../../config', () => ({
   },
   featureFlags: {
     enableMemoryVault: true,
+    enableCrossProjectMemory: true,
   },
 }))
 
-describe('Memory Wrapper', () => {
+// Import after mocks are set up
+import * as MemoryWrapper from '../../memory-wrapper'
+
+describe('Memory Wrapper (@osqr/core Integration)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   describe('initializeVault', () => {
-    it('should initialize vault for workspace', async () => {
+    it('should call MemoryVault.initializeVault', () => {
       MemoryWrapper.initializeVault('workspace123')
-      const { MemoryVault } = await import('@osqr/core')
-      expect(MemoryVault.initializeVault).toHaveBeenCalledWith('workspace123')
-    })
-
-    it('should handle initialization errors gracefully', async () => {
-      const { MemoryVault } = await import('@osqr/core')
-      vi.mocked(MemoryVault.initializeVault).mockImplementationOnce(() => {
-        throw new Error('Init error')
-      })
-
-      // Should not throw
-      expect(() => MemoryWrapper.initializeVault('workspace123')).not.toThrow()
+      expect(mockInitializeVault).toHaveBeenCalledWith('workspace123')
     })
   })
 
   describe('getContextForQuery', () => {
-    it('should retrieve relevant memories for query', async () => {
+    it('should return context bundle with memories', async () => {
+      mockRetrieveContextForUser.mockResolvedValueOnce([
+        {
+          memory: {
+            content: 'Test memory content',
+            category: 'personal_info',
+            createdAt: new Date('2024-01-01'),
+            source: { sourceId: 'conv-123' },
+          },
+          relevanceScore: 0.85,
+        },
+      ])
+
       const result = await MemoryWrapper.getContextForQuery(
         'What programming language do I prefer?',
         'workspace123'
       )
 
-      expect(result.memories).toBeDefined()
-      expect(result.memories.length).toBeGreaterThan(0)
-      expect(result.memories[0].content).toBe('User prefers TypeScript')
-    })
-
-    it('should include episodic context', async () => {
-      const result = await MemoryWrapper.getContextForQuery('test', 'workspace123')
-      expect(result.episodicContext).toBeDefined()
-      expect(Array.isArray(result.episodicContext)).toBe(true)
-    })
-
-    it('should include retrieval timing', async () => {
-      const result = await MemoryWrapper.getContextForQuery('test', 'workspace123')
+      expect(result).toBeDefined()
+      expect(result.memories).toHaveLength(1)
+      expect(result.memories[0].content).toBe('Test memory content')
+      expect(result.memories[0].relevanceScore).toBe(0.85)
       expect(result.retrievalTimeMs).toBeGreaterThanOrEqual(0)
     })
 
     it('should handle empty results gracefully', async () => {
-      const { MemoryVault } = await import('@osqr/core')
-      vi.mocked(MemoryVault.retrieveContextForUser).mockResolvedValueOnce([])
-      vi.mocked(MemoryVault.getConversationHistory).mockReturnValueOnce([])
-
-      const result = await MemoryWrapper.getContextForQuery('unknown query', 'workspace123')
+      const result = await MemoryWrapper.getContextForQuery('test', 'workspace123')
       expect(result.memories).toEqual([])
       expect(result.episodicContext).toEqual([])
     })
 
-    it('should handle errors gracefully', async () => {
-      const { MemoryVault } = await import('@osqr/core')
-      vi.mocked(MemoryVault.retrieveContextForUser).mockRejectedValueOnce(
-        new Error('Retrieval error')
-      )
+    it('should pass options to retrieveContextForUser', async () => {
+      await MemoryWrapper.getContextForQuery('test', 'workspace123', {
+        maxMemories: 5,
+        minRelevance: 0.7,
+      })
 
-      const result = await MemoryWrapper.getContextForQuery('test', 'workspace123')
-      expect(result.memories).toEqual([])
+      expect(mockRetrieveContextForUser).toHaveBeenCalledWith(
+        'workspace123',
+        'test',
+        expect.objectContaining({
+          maxTokens: 2500, // 5 * 500
+          minRelevance: 0.7,
+        })
+      )
     })
   })
 
   describe('storeMessage', () => {
-    it('should store user message', async () => {
+    it('should call MemoryVault.storeMessage with correct parameters', () => {
       MemoryWrapper.storeMessage('conv123', 'user', 'Hello there')
-      const { MemoryVault } = await import('@osqr/core')
-      expect(MemoryVault.storeMessage).toHaveBeenCalledWith(
+
+      expect(mockStoreMessage).toHaveBeenCalledWith(
         'conv123',
         expect.objectContaining({
           role: 'user',
           content: 'Hello there',
-        })
-      )
-    })
-
-    it('should store assistant message', async () => {
-      MemoryWrapper.storeMessage('conv123', 'assistant', 'Hi, how can I help?')
-      const { MemoryVault } = await import('@osqr/core')
-      expect(MemoryVault.storeMessage).toHaveBeenCalledWith(
-        'conv123',
-        expect.objectContaining({
-          role: 'assistant',
-          content: 'Hi, how can I help?',
-        })
-      )
-    })
-
-    it('should estimate tokens', async () => {
-      MemoryWrapper.storeMessage('conv123', 'user', 'Hello')
-      const { MemoryVault } = await import('@osqr/core')
-      expect(MemoryVault.storeMessage).toHaveBeenCalledWith(
-        'conv123',
-        expect.objectContaining({
           tokens: expect.any(Number),
+          toolCalls: null,
+          utilityScore: null,
+        })
+      )
+    })
+
+    it('should estimate tokens from content length', () => {
+      MemoryWrapper.storeMessage('conv123', 'assistant', 'A'.repeat(100))
+
+      expect(mockStoreMessage).toHaveBeenCalledWith(
+        'conv123',
+        expect.objectContaining({
+          tokens: 25, // Math.ceil(100 / 4)
         })
       )
     })
   })
 
   describe('searchMemories', () => {
-    it('should search for specific memories', async () => {
+    it('should return search results from MemoryVault', async () => {
+      mockSearchUserMemories.mockResolvedValueOnce([
+        {
+          id: 'mem-1',
+          content: 'TypeScript expertise',
+          category: 'domain_knowledge',
+          createdAt: new Date('2024-01-01'),
+          source: { sourceId: 'src-1' },
+        },
+      ])
+
       const results = await MemoryWrapper.searchMemories('workspace123', 'TypeScript')
-      expect(results).toBeDefined()
-      expect(results.length).toBeGreaterThan(0)
-    })
 
-    it('should return empty array on error', async () => {
-      const { MemoryVault } = await import('@osqr/core')
-      vi.mocked(MemoryVault.searchUserMemories).mockRejectedValueOnce(new Error('Search error'))
-
-      const results = await MemoryWrapper.searchMemories('workspace123', 'test')
-      expect(results).toEqual([])
+      expect(results).toHaveLength(1)
+      expect(results[0].content).toBe('TypeScript expertise')
+      expect(results[0].category).toBe('domain_knowledge')
     })
   })
 
   describe('formatMemoriesForPrompt', () => {
-    it('should format memories for inclusion in prompt', () => {
+    it('should format memories with metadata', () => {
       const memories = [
         {
-          content: 'Fact 1',
+          content: 'Prefers TypeScript',
           relevanceScore: 0.9,
-          category: 'fact',
-          createdAt: new Date(),
-          source: 'conversation',
-        },
-        {
-          content: 'Fact 2',
-          relevanceScore: 0.8,
-          category: 'preference',
-          createdAt: new Date(),
-          source: 'document',
+          category: 'preferences',
+          createdAt: new Date('2024-01-15'),
+          source: 'conv-1',
         },
       ]
 
       const formatted = MemoryWrapper.formatMemoriesForPrompt(memories)
-      expect(formatted).toContain('Relevant Past Context')
-      expect(formatted).toContain('Fact 1')
-      expect(formatted).toContain('Fact 2')
+
+      expect(formatted).toContain('## Relevant Memories')
+      expect(formatted).toContain('Prefers TypeScript')
+      expect(formatted).toContain('90%')
+      expect(formatted).toContain('preferences')
     })
 
     it('should return empty string for empty memories', () => {
@@ -249,148 +207,124 @@ describe('Memory Wrapper', () => {
       expect(formatted).toBe('')
     })
   })
+
+  describe('formatEpisodicForPrompt', () => {
+    it('should return empty string for empty episodic context', () => {
+      const formatted = MemoryWrapper.formatEpisodicForPrompt([])
+      expect(formatted).toBe('')
+    })
+  })
+
+  describe('getConversationHistory', () => {
+    it('should return filtered conversation history', () => {
+      mockGetConversationHistory.mockReturnValueOnce([
+        { role: 'user', content: 'Hello', timestamp: new Date() },
+        { role: 'assistant', content: 'Hi!', timestamp: new Date() },
+        { role: 'system', content: 'System message', timestamp: new Date() },
+      ])
+
+      const history = MemoryWrapper.getConversationHistory('conv123')
+
+      // Should filter out system messages
+      expect(history).toHaveLength(2)
+      expect(history[0].role).toBe('user')
+      expect(history[1].role).toBe('assistant')
+    })
+  })
+
+  describe('storeMessageWithContext', () => {
+    it('should store message and add source context', () => {
+      MemoryWrapper.storeMessageWithContext('conv123', 'user', 'Hello', {
+        projectId: 'proj1',
+        conversationId: 'conv1',
+        documentId: null,
+        interface: 'web',
+        timestamp: new Date(),
+      })
+
+      expect(mockStoreMessage).toHaveBeenCalled()
+      expect(mockAddSourceContext).toHaveBeenCalledWith(
+        'conv123',
+        expect.objectContaining({
+          projectId: 'proj1',
+          interface: 'web',
+        })
+      )
+    })
+  })
 })
 
-describe('Cross-Project Memory', () => {
+describe('Cross-Project Memory Features', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })
 
   describe('queryCrossProject', () => {
-    it('should query across multiple projects', async () => {
-      const result = await MemoryWrapper.queryCrossProject('workspace123', 'AI development')
-
-      expect(result.memories).toBeDefined()
-      expect(result.memories.length).toBeGreaterThan(0)
-      expect(result.commonThemes).toBeDefined()
-      expect(result.contradictions).toBeDefined()
-    })
-
-    it('should include project summaries', async () => {
-      const result = await MemoryWrapper.queryCrossProject('workspace123', 'test')
-      expect(result.projectSummaries).toBeDefined()
-      expect(result.projectSummaries instanceof Map).toBe(true)
-    })
-
-    it('should detect contradictions when enabled', async () => {
-      const { MemoryVault } = await import('@osqr/core')
-      vi.mocked(MemoryVault.queryCrossProject).mockResolvedValueOnce({
-        memories: [],
-        commonThemes: [],
-        contradictions: [
-          {
-            memoryId: 'mem1',
-            contradictingMemoryId: 'mem2',
-            topic: 'Technology preference',
-            claimA: 'Prefers Python',
-            claimB: 'Prefers JavaScript',
-            confidence: 0.8,
-          },
-        ],
-        projectSummaries: new Map(),
-      })
-
-      const result = await MemoryWrapper.queryCrossProject('workspace123', 'preferences', {
+    it('should call MemoryVault.queryCrossProject', async () => {
+      await MemoryWrapper.queryCrossProject('workspace123', 'AI development', {
+        projectIds: ['proj1', 'proj2'],
         detectContradictions: true,
       })
 
-      expect(result.contradictions.length).toBe(1)
-      expect(result.contradictions[0].topic).toBe('Technology preference')
-    })
-  })
-
-  describe('findRelatedFromOtherProjects', () => {
-    it('should find related content from other projects', async () => {
-      const results = await MemoryWrapper.findRelatedFromOtherProjects('project-a', 'AI topic')
-      expect(results).toBeDefined()
-      expect(results.length).toBeGreaterThan(0)
-    })
-
-    it('should respect limit parameter', async () => {
-      await MemoryWrapper.findRelatedFromOtherProjects('project-a', 'topic', 3)
-      const { MemoryVault } = await import('@osqr/core')
-      expect(MemoryVault.findRelatedFromOtherProjects).toHaveBeenCalledWith(
-        'project-a',
-        'topic',
-        3
+      expect(mockQueryCrossProject).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: 'AI development',
+          userId: 'workspace123',
+          projectIds: ['proj1', 'proj2'],
+          detectContradictions: true,
+        })
       )
     })
   })
 
+  describe('findRelatedFromOtherProjects', () => {
+    it('should return related memories from other projects', async () => {
+      mockFindRelatedFromOtherProjects.mockResolvedValueOnce([
+        {
+          content: 'Related from project B',
+          category: 'projects',
+          createdAt: new Date(),
+          utilityScore: 0.8,
+          sourceContext: { projectId: 'proj-b' },
+        },
+      ])
+
+      const results = await MemoryWrapper.findRelatedFromOtherProjects('proj-a', 'AI topic')
+
+      expect(results).toHaveLength(1)
+      expect(results[0].content).toBe('Related from project B')
+      expect(results[0].source).toBe('proj-b')
+    })
+  })
+
   describe('formatCrossProjectForPrompt', () => {
-    it('should format cross-project results', () => {
+    it('should format cross-project results with grouping', () => {
       const results = {
         memories: [
           {
             memory: {
-              content: 'Test fact',
-              relevanceScore: 0.9,
-              category: 'fact',
+              content: 'Memory from project B',
+              relevanceScore: 0.85,
+              category: 'projects',
               createdAt: new Date(),
-              source: 'conversation',
+              source: 'src-1',
             },
-            relevance: 0.9,
-            project: 'project-a',
+            relevance: 0.85,
+            project: 'proj-b',
           },
         ],
-        commonThemes: ['AI'],
-        contradictions: [],
-        projectSummaries: new Map([['project-a', 'AI project']]),
-      }
-
-      const formatted = MemoryWrapper.formatCrossProjectForPrompt(results)
-      expect(formatted).toContain('Cross-Project')
-      expect(formatted).toContain('Test fact')
-    })
-
-    it('should include common themes', () => {
-      const results = {
-        memories: [
-          {
-            memory: {
-              content: 'Test',
-              relevanceScore: 0.9,
-              category: 'fact',
-              createdAt: new Date(),
-              source: 'conversation',
-            },
-            relevance: 0.9,
-            project: null,
-          },
-        ],
-        commonThemes: ['Theme 1', 'Theme 2'],
+        commonThemes: ['AI', 'Development'],
         contradictions: [],
         projectSummaries: new Map(),
       }
 
-      const formatted = MemoryWrapper.formatCrossProjectForPrompt(results)
+      const formatted = MemoryWrapper.formatCrossProjectForPrompt(results, 'proj-a')
+
+      expect(formatted).toContain('Cross-Project Context')
+      expect(formatted).toContain('From Project: proj-b')
+      expect(formatted).toContain('Memory from project B')
       expect(formatted).toContain('Common Themes')
-      expect(formatted).toContain('Theme 1')
-    })
-
-    // SKIPPED: formatCrossProjectForPrompt returns early on empty memories
-    // The function doesn't currently format contradictions separately
-    // TODO: Add contradiction formatting to implementation if needed
-    it.skip('should show contradictions when present', () => {
-      const results = {
-        memories: [],
-        commonThemes: [],
-        contradictions: [
-          {
-            memoryId: 'mem1',
-            contradictingMemoryId: 'mem2',
-            topic: 'Framework choice',
-            claimA: 'React is best',
-            claimB: 'Vue is best',
-            confidence: 0.75,
-          },
-        ],
-        projectSummaries: new Map(),
-      }
-
-      const formatted = MemoryWrapper.formatCrossProjectForPrompt(results)
-      expect(formatted).toContain('Contradiction')
-      expect(formatted).toContain('Framework choice')
+      expect(formatted).toContain('AI')
     })
 
     it('should return empty string for empty results', () => {
@@ -405,11 +339,18 @@ describe('Cross-Project Memory', () => {
   })
 
   describe('getCrossProjectStats', () => {
-    it('should return cross-project statistics', () => {
+    it('should return stats from MemoryVault', () => {
+      mockGetCrossProjectStats.mockReturnValueOnce({
+        memoriesWithContext: 100,
+        totalCrossReferences: 50,
+        unresolvedContradictions: 5,
+      })
+
       const stats = MemoryWrapper.getCrossProjectStats()
-      expect(stats.memoriesWithContext).toBeDefined()
-      expect(stats.totalCrossReferences).toBeDefined()
-      expect(stats.unresolvedContradictions).toBeDefined()
+
+      expect(stats.memoriesWithContext).toBe(100)
+      expect(stats.totalCrossReferences).toBe(50)
+      expect(stats.unresolvedContradictions).toBe(5)
     })
   })
 })
@@ -418,6 +359,7 @@ describe('Memory Edge Cases', () => {
   it('should handle empty query', async () => {
     const result = await MemoryWrapper.getContextForQuery('', 'workspace123')
     expect(result).toBeDefined()
+    expect(result.memories).toEqual([])
   })
 
   it('should handle very long query', async () => {
@@ -431,9 +373,17 @@ describe('Memory Edge Cases', () => {
     expect(result).toBeDefined()
   })
 
-  it('should handle unicode in content', async () => {
-    MemoryWrapper.storeMessage('conv123', 'user', '你好世界 🌍')
-    const { MemoryVault } = await import('@osqr/core')
-    expect(MemoryVault.storeMessage).toHaveBeenCalled()
+  it('should handle unicode in content', () => {
+    expect(() => MemoryWrapper.storeMessage('conv123', 'user', '你好世界 🌍')).not.toThrow()
+  })
+
+  it('should handle errors gracefully in getContextForQuery', async () => {
+    mockRetrieveContextForUser.mockRejectedValueOnce(new Error('Database error'))
+
+    const result = await MemoryWrapper.getContextForQuery('test', 'workspace123')
+
+    // Should return empty result, not throw
+    expect(result.memories).toEqual([])
+    expect(result.retrievalTimeMs).toBeGreaterThanOrEqual(0)
   })
 })

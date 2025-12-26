@@ -307,6 +307,12 @@ Secretary insights respect user's quiet hours and focus modes (from Bubble Inter
 
 ---
 
+## Related Documents
+
+- **[EXECUTION_ORCHESTRATOR_SPEC.md](./EXECUTION_ORCHESTRATOR_SPEC.md)** – V3.0 feature that extends Secretary Checklist from proactive *monitoring* to proactive *execution*. The Secretary Checklist surfaces issues; the Execution Orchestrator resolves them autonomously.
+
+---
+
 ## Open Questions
 
 1. Should users be able to snooze specific checklist items?

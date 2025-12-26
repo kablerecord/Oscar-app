@@ -108,9 +108,16 @@ export const featureFlags = {
   enableCrossProjectMemory: true,
   enableThrottle: true,
 
+  // V3.0 Features - Execution Orchestrator (disabled until V3.0)
+  // See: docs/features/EXECUTION_ORCHESTRATOR_SPEC.md
+  enableExecutionOrchestrator: false,      // Master toggle for Execution Orchestrator
+  enableParallelWorkstreams: false,        // Parallel workstream execution
+  enableAutoDecisionResolution: false,     // Auto-resolve decisions with timeout
+
   // Debug flags
   logConstitutionalViolations: process.env.NODE_ENV === 'development',
   logRouterDecisions: process.env.NODE_ENV === 'development',
   logThrottleDecisions: process.env.NODE_ENV === 'development',
   logDocumentIndexing: process.env.NODE_ENV === 'development',
+  logExecutionOrchestrator: process.env.NODE_ENV === 'development',
 };

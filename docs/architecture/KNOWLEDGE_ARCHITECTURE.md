@@ -428,6 +428,192 @@ If needed for support:
 
 ---
 
+## Known Scaling Thresholds
+
+**Added:** 2025-12-24 after embedding pipeline verification
+
+These thresholds document when current implementations will need optimization.
+Review after alpha usage data is available.
+
+---
+
+### Memory Vault (V1.5 Action Required)
+
+**Current implementation:** In-memory cosine similarity via JavaScript
+
+**How it works:**
+- `semanticStore.getAllMemories()` loads all user memories
+- Similarity calculated in JS: `cosineSimilarity(queryEmbedding, memory.embedding)`
+- No database round-trip for similarity search
+
+**Works well until:** ~5,000 memories per user
+
+**Symptom when exceeded:**
+- Slow cross-project memory queries (>500ms)
+- Increased server memory usage
+- Potential Node.js heap issues on high-memory users
+
+**Future fix options:**
+1. Add pgvector fallback when `memoryCount > 5000`
+2. Implement chunked retrieval with top-K pre-filtering in SQL
+3. Hybrid: precompute clusters, only load relevant cluster into memory
+
+**Tracking:** Flag for V1.5 review after alpha usage data
+
+**Code locations:**
+- `packages/core/src/memory-vault/cross-project.ts:97-166`
+- `packages/core/src/memory-vault/retrieval/embedding.ts`
+
+---
+
+### Embedding API Costs
+
+**Current model:** OpenAI `text-embedding-ada-002` (1536 dimensions)
+
+**Cost:** ~$0.0001 per 1K tokens (~$0.10 per 1M tokens)
+
+**Per-document estimate:**
+| Document Size | Tokens | Cost |
+|--------------|--------|------|
+| 1-page doc | ~500 tokens | $0.00005 |
+| 10-page doc | ~3,000 tokens | $0.0003 |
+| 100-page doc | ~25,000 tokens | $0.0025 |
+
+**Per-user monthly estimate:**
+- Light user (10 docs/month): ~$0.003
+- Heavy user (100 docs/month): ~$0.03
+- Power user (500 docs/month): ~$0.15
+
+**Not a concern until:** 10,000+ active users with heavy document uploads
+
+**Mitigation options (when needed):**
+1. Local embedding models (e.g., `sentence-transformers/all-MiniLM-L6-v2`) - free but slower, 384 dims
+2. Batch embedding during off-peak hours with queue
+3. Embedding caching for duplicate/similar content (content hash → cached embedding)
+4. Upgrade to `text-embedding-3-small` ($0.02/1M tokens) - 5x cheaper
+
+**Code locations:**
+- `packages/app-web/lib/ai/embeddings.ts:20-63`
+- `packages/app-web/lib/adapters/openai-embedding-adapter.ts`
+
+---
+
+### pgvector Query Performance
+
+**Current implementation:**
+- Cosine distance on 1536-dimensional vectors
+- Sequential scan (no vector index yet)
+- User-scoped queries via `WHERE workspaceId = ?`
+
+**Works well until:** ~1M total chunks in database (across all users)
+
+**Symptom when exceeded:**
+- Search latency >500ms
+- Database CPU spikes during searches
+- Slow cold-start queries
+
+**Current query pattern:**
+```sql
+SELECT ...
+FROM "DocumentChunk" dc
+JOIN "Document" d ON d.id = dc."documentId"
+WHERE d."workspaceId" = ${workspaceId}
+ORDER BY dc.embedding <=> ${queryVector}::vector
+LIMIT ${topK}
+```
+
+**Future fix (BEFORE hitting threshold):**
+
+1. **Add HNSW index** (recommended for production):
+```sql
+CREATE INDEX CONCURRENTLY idx_chunk_embedding_hnsw
+ON "DocumentChunk"
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+```
+- Pros: Fast queries (~10ms), good recall
+- Cons: Slower inserts, more memory
+
+2. **Add IVFFlat index** (simpler, lower memory):
+```sql
+CREATE INDEX idx_chunk_embedding_ivf
+ON "DocumentChunk"
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+```
+- Pros: Lower memory, faster builds
+- Cons: Requires `SET ivfflat.probes = 10` for good recall
+
+3. **User-scoped partitioning** (if single users have huge vaults):
+```sql
+CREATE TABLE "DocumentChunk_partitioned" (
+  ...
+) PARTITION BY HASH (document."workspaceId");
+```
+
+**Important:** Index creation is expensive (~30 min for 1M rows). Add BEFORE hitting threshold.
+
+**Code locations:**
+- `packages/app-web/lib/knowledge/vector-search.ts:35-48`
+- `packages/app-web/lib/adapters/prisma-storage-adapter.ts:278-331`
+- `packages/app-web/prisma/schema.prisma:111-121` (DocumentChunk model)
+
+---
+
+### Conversation Auto-Indexing Volume
+
+**Current implementation:**
+- Every OSQR response triggers background indexing
+- `indexInBackground()` fire-and-forget pattern
+- No rate limiting or batching
+
+**Works well until:** ~100 concurrent active users
+
+**Symptom when exceeded:**
+- OpenAI rate limits (embedding API)
+- Database connection pool exhaustion
+- Delayed indexing failures silently dropped
+
+**Future fix options:**
+1. Queue-based indexing with retry (Bull, pg-boss)
+2. Batch embeddings: collect 10-50 chunks, single API call
+3. Rate limiter on `generateEmbedding()` calls
+4. Priority queue: user documents > conversations > artifacts
+
+**Code locations:**
+- `packages/app-web/lib/knowledge/auto-index.ts:268-275`
+- `packages/app-web/app/api/oscar/ask/route.ts:910-920`
+
+---
+
+### Monitoring Recommendations
+
+When approaching production scale, add these metrics:
+
+```typescript
+// Suggested telemetry points
+const metrics = {
+  // Memory Vault
+  'memory.count_per_user': gauge,
+  'memory.query_latency_ms': histogram,
+
+  // Embeddings
+  'embedding.api_calls_total': counter,
+  'embedding.tokens_total': counter,
+  'embedding.cost_usd': counter,
+
+  // pgvector
+  'vector_search.latency_ms': histogram,
+  'vector_search.chunks_scanned': histogram,
+
+  // Auto-indexing
+  'auto_index.queue_depth': gauge,
+  'auto_index.failures_total': counter,
+}
+```
+
+---
+
 ## Summary
 
 OSQR's knowledge architecture is built on one principle:

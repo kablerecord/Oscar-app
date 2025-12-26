@@ -45,7 +45,7 @@ export function Hero() {
         setAccessError(data.error || 'Invalid access code. Please check with whoever gave you the code.')
         setIsChecking(false)
       }
-    } catch (error) {
+    } catch (_error) {
       // Fallback to client-side check if API fails
       if (VALID_ACCESS_CODES.includes(accessCode.toLowerCase().trim())) {
         window.location.href = `${APP_URL}/signup?early_access=true&code=${encodeURIComponent(accessCode.toLowerCase().trim())}`
@@ -178,7 +178,7 @@ export function Hero() {
                 </form>
 
                 <p className="mt-4 text-xs text-slate-500 text-center">
-                  Don't have a code? <a href={`${APP_URL}/signup`} className="text-blue-400 hover:text-blue-300">Sign up for free</a>
+                  Don&apos;t have a code? <a href={`${APP_URL}/signup`} className="text-blue-400 hover:text-blue-300">Sign up for free</a>
                 </p>
               </div>
             </div>

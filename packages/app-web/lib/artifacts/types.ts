@@ -9,15 +9,18 @@
  * - Version history (optional)
  */
 
+// Matches Prisma ArtifactType enum (uppercase)
 export type ArtifactType =
-  | 'code'           // Source code (any language)
-  | 'document'       // Markdown/text documents
-  | 'diagram'        // Mermaid diagrams
-  | 'html'           // HTML/CSS/JS (renderable)
-  | 'svg'            // SVG graphics
-  | 'json'           // Structured JSON data
-  | 'csv'            // Tabular data
-  | 'react'          // React component (preview in sandbox)
+  | 'IMAGE'          // Image artifacts
+  | 'CHART'          // Chart visualizations
+  | 'CODE'           // Source code (any language)
+  | 'DOCUMENT'       // Markdown/text documents
+  | 'DIAGRAM'        // Mermaid diagrams
+  | 'HTML'           // HTML/CSS/JS (renderable)
+  | 'SVG'            // SVG graphics
+  | 'JSON'           // Structured JSON data
+  | 'CSV'            // Tabular data
+  | 'REACT'          // React component (preview in sandbox)
 
 export interface Artifact {
   id: string

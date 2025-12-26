@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   Crown,
@@ -105,7 +105,7 @@ export function UpgradePrompt({
     }
   }
 
-  const getIcon = () => {
+  const Icon = useMemo(() => {
     switch (moment.type) {
       case 'trial_ending':
         return Clock
@@ -118,9 +118,7 @@ export function UpgradePrompt({
       default:
         return Crown
     }
-  }
-
-  const Icon = getIcon()
+  }, [moment.type])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">

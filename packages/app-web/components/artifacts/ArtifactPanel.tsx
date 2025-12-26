@@ -27,36 +27,42 @@ interface ArtifactPanelProps {
 }
 
 const typeIcons: Record<ArtifactType, React.ElementType> = {
-  code: Code,
-  document: FileText,
-  diagram: GitBranch,
-  html: Globe,
-  svg: Image,
-  json: Database,
-  csv: Table,
-  react: Component,
+  IMAGE: Image,
+  CHART: GitBranch,
+  CODE: Code,
+  DOCUMENT: FileText,
+  DIAGRAM: GitBranch,
+  HTML: Globe,
+  SVG: Image,
+  JSON: Database,
+  CSV: Table,
+  REACT: Component,
 }
 
 const typeLabels: Record<ArtifactType, string> = {
-  code: 'Code',
-  document: 'Document',
-  diagram: 'Diagram',
-  html: 'HTML',
-  svg: 'SVG',
-  json: 'JSON',
-  csv: 'CSV',
-  react: 'React',
+  IMAGE: 'Image',
+  CHART: 'Chart',
+  CODE: 'Code',
+  DOCUMENT: 'Document',
+  DIAGRAM: 'Diagram',
+  HTML: 'HTML',
+  SVG: 'SVG',
+  JSON: 'JSON',
+  CSV: 'CSV',
+  REACT: 'React',
 }
 
 const typeColors: Record<ArtifactType, string> = {
-  code: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
-  document: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400',
-  diagram: 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400',
-  html: 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400',
-  svg: 'bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400',
-  json: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400',
-  csv: 'bg-teal-100 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400',
-  react: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-400',
+  IMAGE: 'bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400',
+  CHART: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400',
+  CODE: 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400',
+  DOCUMENT: 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400',
+  DIAGRAM: 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400',
+  HTML: 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400',
+  SVG: 'bg-pink-100 text-pink-700 dark:bg-pink-900/20 dark:text-pink-400',
+  JSON: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400',
+  CSV: 'bg-teal-100 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400',
+  REACT: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-400',
 }
 
 export function ArtifactPanel({ artifacts, onClose }: ArtifactPanelProps) {
@@ -77,14 +83,16 @@ export function ArtifactPanel({ artifacts, onClose }: ArtifactPanelProps) {
 
   const handleDownload = () => {
     const extensions: Record<ArtifactType, string> = {
-      code: currentArtifact.language || 'txt',
-      document: 'md',
-      diagram: 'mmd',
-      html: 'html',
-      svg: 'svg',
-      json: 'json',
-      csv: 'csv',
-      react: 'tsx',
+      IMAGE: 'png',
+      CHART: 'svg',
+      CODE: currentArtifact.language || 'txt',
+      DOCUMENT: 'md',
+      DIAGRAM: 'mmd',
+      HTML: 'html',
+      SVG: 'svg',
+      JSON: 'json',
+      CSV: 'csv',
+      REACT: 'tsx',
     }
 
     const ext = extensions[currentArtifact.type]
@@ -203,13 +211,13 @@ export function ArtifactPanel({ artifacts, onClose }: ArtifactPanelProps) {
 
 function ArtifactContent({ artifact }: { artifact: ArtifactBlock }) {
   switch (artifact.type) {
-    case 'html':
+    case 'HTML':
       return <HtmlPreview content={artifact.content} />
-    case 'svg':
+    case 'SVG':
       return <SvgPreview content={artifact.content} />
-    case 'diagram':
+    case 'DIAGRAM':
       return <DiagramPreview content={artifact.content} />
-    case 'json':
+    case 'JSON':
       return <JsonPreview content={artifact.content} />
     default:
       return <CodePreview content={artifact.content} language={artifact.language} />

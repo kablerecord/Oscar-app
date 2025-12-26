@@ -2,7 +2,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -24,7 +24,11 @@ export default function AdminLayout({
   const { data: session, status } = useSession()
   const router = useRouter()
   const pathname = usePathname()
-  const [authorized, setAuthorized] = useState(false)
+
+  // Compute authorization directly from session state
+  const isAuthorized = status !== 'loading' &&
+    session?.user?.email != null &&
+    ADMIN_EMAILS.includes(session.user.email)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -38,11 +42,9 @@ export default function AdminLayout({
       router.push('/')
       return
     }
-
-    setAuthorized(true)
   }, [session, status, router])
 
-  if (status === 'loading' || !authorized) {
+  if (status === 'loading' || !isAuthorized) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="text-white text-xl">Loading...</div>

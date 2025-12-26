@@ -1,7 +1,13 @@
 # User Intelligence Artifacts
 
-**Status:** Internal Specification (Not User-Facing)
+> **⚠️ DEPRECATED:** This document has been superseded by [UIP_SPEC.md](../architecture/UIP_SPEC.md).
+> The User Intelligence Profile (UIP) specification consolidates this document with additional
+> architecture for Privacy Tier integration, confidence decay, and the Prospective Reflection Engine.
+> This file is retained for historical reference only.
+
+**Status:** DEPRECATED — See [UIP_SPEC.md](../architecture/UIP_SPEC.md)
 **Last Updated:** 2025-12-14
+**Deprecated:** 2025-12-26
 **Purpose:** Defines the invisible models OSQR maintains about each user
 
 This document describes what OSQR learns and infers about users over time. These artifacts are **never exposed directly** — they exist to make OSQR more helpful without burdening users with self-reporting.

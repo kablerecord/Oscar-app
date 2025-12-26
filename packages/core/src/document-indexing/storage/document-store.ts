@@ -1,7 +1,8 @@
 /**
  * OSQR Document Indexing - Document Store
  *
- * Stores indexed documents with integration to Memory Vault.
+ * Stores indexed documents using the registered StorageAdapter.
+ * Falls back to in-memory storage when no adapter is registered.
  */
 
 import {
@@ -14,9 +15,13 @@ import {
   ComparisonResult,
 } from '../types';
 import { embed, cosineSimilarity } from '../embedding';
+import {
+  getStorageAdapterOrNull,
+  hasStorageAdapter,
+} from '../adapters';
 
 // ============================================================================
-// In-Memory Store (to be replaced with Memory Vault integration)
+// In-Memory Store (fallback when no StorageAdapter is registered)
 // ============================================================================
 
 const documentStore: Map<string, IndexedDocument> = new Map();
@@ -28,13 +33,27 @@ const relationshipStore: Map<string, RelationshipMap> = new Map();
 // ============================================================================
 
 /**
- * Store an indexed document
+ * Store an indexed document.
+ * Uses the registered StorageAdapter if available, falls back to in-memory.
  */
 export async function storeDocument(
   document: IndexedDocument,
   chunks: DocumentChunk[],
   relationships: RelationshipMap
 ): Promise<void> {
+  const adapter = getStorageAdapterOrNull();
+
+  if (adapter) {
+    // Use real storage adapter
+    await adapter.storeDocument(document);
+    await adapter.storeChunks(document.id, chunks);
+    await adapter.storeRelationships(document.id, relationships);
+    return;
+  }
+
+  // Fallback to in-memory storage
+  console.warn('[OSQR DIS] No storage adapter registered, using in-memory storage');
+
   // Store document
   documentStore.set(document.id, {
     ...document,
@@ -51,23 +70,45 @@ export async function storeDocument(
 }
 
 /**
- * Get a document by ID
+ * Get a document by ID.
+ * Uses the registered StorageAdapter if available.
  */
 export async function getDocument(documentId: string): Promise<IndexedDocument | null> {
+  const adapter = getStorageAdapterOrNull();
+
+  if (adapter) {
+    return adapter.getDocument(documentId);
+  }
+
   return documentStore.get(documentId) || null;
 }
 
 /**
- * Get all documents for a user
+ * Get all documents for a user.
+ * Uses the registered StorageAdapter if available.
  */
 export async function getUserDocuments(userId: string): Promise<IndexedDocument[]> {
+  const adapter = getStorageAdapterOrNull();
+
+  if (adapter) {
+    return adapter.getUserDocuments(userId);
+  }
+
   return Array.from(documentStore.values()).filter((doc) => doc.userId === userId);
 }
 
 /**
- * Delete a document and its chunks
+ * Delete a document and its chunks.
+ * Uses the registered StorageAdapter if available.
  */
 export async function deleteDocument(documentId: string): Promise<void> {
+  const adapter = getStorageAdapterOrNull();
+
+  if (adapter) {
+    await adapter.deleteDocument(documentId);
+    return;
+  }
+
   const document = documentStore.get(documentId);
   if (document) {
     // Delete chunks

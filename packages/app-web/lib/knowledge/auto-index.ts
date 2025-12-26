@@ -3,15 +3,48 @@
  *
  * This is OSQR's KEY DIFFERENTIATOR - automatically indexing everything.
  * Every conversation, profile answer, and artifact gets embedded and searchable.
+ *
+ * Enhanced with semantic flag detection (isDecision, isQuestion, isAction)
+ * using the LLM adapter from @osqr/core.
  */
 
 import { prisma } from '@/lib/db/prisma'
 import { generateEmbedding, formatEmbeddingForPostgres } from '@/lib/ai/embeddings'
 import { TextChunker } from './chunker'
+import { initializeAdapters, isInitialized, openAILLMAdapter } from '@/lib/adapters'
+
+/**
+ * Detect semantic flags for a chunk of text.
+ * Returns whether the text contains decisions, questions, or action items.
+ */
+async function detectSemanticFlags(text: string): Promise<{
+  isDecision: boolean
+  isQuestion: boolean
+  isAction: boolean
+}> {
+  try {
+    // Ensure adapters are initialized
+    if (!isInitialized()) {
+      initializeAdapters()
+    }
+
+    return await openAILLMAdapter.detectSemanticFlags(text)
+  } catch (error) {
+    console.error('[Auto-Index] Semantic flag detection failed:', error)
+    // Fallback to simple heuristics
+    return {
+      isDecision: /\b(decided|decision|chose|chosen|determined|concluded)\b/i.test(text),
+      isQuestion: text.includes('?'),
+      isAction: /\b(todo|need to|have to|must|should|will|going to)\b/i.test(text),
+    }
+  }
+}
 
 /**
  * Index a conversation (both user message and OSQR's response)
- * Called after every OSQR response
+ * Called after every OSQR response.
+ *
+ * Now includes semantic flag detection to identify decisions, questions, and actions.
  */
 export async function indexConversation({
   workspaceId,
@@ -23,11 +56,18 @@ export async function indexConversation({
   threadId: string
   userMessage: string
   osqrResponse: string
-}): Promise<void> {
+}): Promise<{
+  documentId: string
+  chunks: number
+  hasDecisions: boolean
+  hasActions: boolean
+} | null> {
   try {
     // Create a combined document from the conversation
     const conversationText = `User: ${userMessage}\n\nOSQR: ${osqrResponse}`
-    const timestamp = new Date().toISOString().split('T')[0]
+
+    // Detect semantic flags for the entire conversation
+    const semanticFlags = await detectSemanticFlags(conversationText)
 
     // Create a document for this conversation
     const doc = await prisma.document.create({
@@ -40,6 +80,9 @@ export async function indexConversation({
           threadId,
           autoIndexed: true,
           indexedAt: new Date().toISOString(),
+          hasDecisions: semanticFlags.isDecision,
+          hasActions: semanticFlags.isAction,
+          hasQuestions: semanticFlags.isQuestion,
         },
       },
     })
@@ -50,13 +93,16 @@ export async function indexConversation({
       overlapSize: 50,
     })
 
-    // Generate embeddings for each chunk
+    // Generate embeddings for each chunk with semantic flags
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i]
       const embedding = await generateEmbedding(chunk.content)
       const vectorString = formatEmbeddingForPostgres(embedding)
 
-      // Insert chunk with embedding using raw SQL (Prisma doesn't support vector type directly)
+      // Detect semantic flags for this specific chunk
+      const chunkFlags = await detectSemanticFlags(chunk.content)
+
+      // Insert chunk with embedding and semantic flags using raw SQL
       await prisma.$executeRawUnsafe(`
         INSERT INTO "DocumentChunk" (id, "documentId", content, embedding, "chunkIndex", "createdAt")
         VALUES (
@@ -68,12 +114,25 @@ export async function indexConversation({
           NOW()
         )
       `, doc.id, chunk.content, vectorString, i)
+
+      // Store semantic flags in metadata (if chunk has decisions/actions)
+      if (chunkFlags.isDecision || chunkFlags.isAction) {
+        console.log(`[Auto-Index] Chunk ${i} contains: ${chunkFlags.isDecision ? 'DECISION ' : ''}${chunkFlags.isAction ? 'ACTION' : ''}`)
+      }
     }
 
-    console.log(`[Auto-Index] Indexed conversation: "${userMessage.slice(0, 30)}..." (${chunks.length} chunks)`)
+    console.log(`[Auto-Index] Indexed conversation: "${userMessage.slice(0, 30)}..." (${chunks.length} chunks, decisions: ${semanticFlags.isDecision}, actions: ${semanticFlags.isAction})`)
+
+    return {
+      documentId: doc.id,
+      chunks: chunks.length,
+      hasDecisions: semanticFlags.isDecision,
+      hasActions: semanticFlags.isAction,
+    }
   } catch (error) {
     // Don't throw - auto-indexing failures shouldn't break the main flow
     console.error('[Auto-Index] Failed to index conversation:', error)
+    return null
   }
 }
 

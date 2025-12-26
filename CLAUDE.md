@@ -278,9 +278,124 @@ When user says "build the insights system" or similar, read that doc first. It h
 
 ---
 
+## V1.5 Implementation-Ready Specs
+
+These specs are **fully designed and ready to build**. No more questions needed — just say "build [system name]" and follow the build order in each spec.
+
+### User Intelligence Profile (UIP)
+**Spec:** `docs/architecture/UIP_SPEC.md`
+**What it is:** OSQR's continuously updating mentorship rulebook. Learns how to work with each user over time. Not psychology — Mentorship-as-Code.
+
+**Key concepts:**
+- 3-tier domain structure: Foundation (Identity, Goals) → Style (Cognitive, Communication, Expertise) → Dynamics (Behavioral, Relationship, Decision Friction)
+- Prospective Reflection Engine: Background job that synthesizes signals into UIP updates
+- Progressive elicitation: Session 1 = zero questions, Sessions 2-4 = one question each, cap at 4, always skippable
+- Confidence decay: Old signals decay over time
+- Privacy Tier integration: Tier A/B/C controls what gets collected
+
+**Build order:** Schema → UIP service → Reflection Engine → Elicitation → Behavior Adapters → Telemetry integration
+
+**Replaces:** `docs/features/USER_INTELLIGENCE_ARTIFACTS.md` (deprecated)
+
+---
+
+### Render System
+**Spec:** `docs/features/RENDER_SYSTEM_SPEC.md`
+**What it is:** First execution surface where OSQR produces visible artifacts (images, charts). "Gives intelligence a place to land."
+
+**Key concepts:**
+- Canonical render loop: User requests → "Rendering..." → "Render complete. Would you like to see it?" → User confirms → Shows artifact → "How does that look?"
+- v1.5 scope: IMAGE (DALL-E 3) + CHART (Recharts) only. UI/Game deferred to v1.6+
+- Explicit render intent: `/render`, "visualize", "draw" keywords. No fuzzy detection yet.
+- State machine: IDLE → RENDERING → COMPLETE_AWAITING_VIEW → VIEWING → UPDATING → ERROR/CANCELLED
+- Client-side rendering from stored spec (no server execution, no sandboxing)
+- Conversation linking: Artifacts belong to conversations, "make it blue" updates most recently viewed
+
+**Build order:** Database & API → Render Intent Detection → Image Artifact → Chart Artifact → Render Surface → State Machine → Bubble Integration → Iteration Flow → Error Handling
+
+---
+
+## Design Philosophy (Important Context)
+
+When building OSQR features, these principles apply:
+
+1. **Sequenced autonomy** — OSQR does more over time, but earns the right through trust. v1.5 shows, v2.0 writes, v3.0 executes.
+
+2. **Consent gates** — User confirms before OSQR acts. "Would you like to see it?" is UX and legal boundary.
+
+3. **PKV > UIP** — Explicit user statements always override inferred signals.
+
+4. **Privacy Tiers matter** — Tier A = minimal collection, Tier B = personal learning, Tier C = global learning. Check tier before collecting.
+
+5. **Bubble is the orchestrator** — One conversation, multiple surfaces. Bubble announces, asks consent, bridges screens.
+
+6. **No sub-phasing features** — Build the whole thing. Don't split a feature into MVP → v2 → v3. Ship complete, iterate later.
+
+---
+
 ## Pre-Launch Checklist
 
 See `docs/process/BLOCKED.md` for:
 - AI Provider Billing checklist (all 5 providers)
 - Cost estimates per user tier
 - Blocked items needing resolution
+
+---
+
+## Communication Protocol
+
+Use these templates for structured communication during implementation sessions.
+
+### When Blocked:
+```
+🚧 BLOCKER: [Description]
+NEED FROM KABLE: [Question/decision needed]
+```
+
+### When Spec Needs Revision:
+```
+📝 SPEC REVISION NEEDED: [filename]
+ISSUE: [What's unclear or problematic]
+SUGGESTED: [Your recommendation]
+```
+
+### When Complete:
+```
+✅ COMPLETED: [Component/Feature]
+TESTED: [Yes/No]
+NEXT: [What's next]
+```
+
+### Session Workflow
+
+**At Session Start:**
+1. Read relevant specs/docs for the task
+2. Identify dependencies and blockers
+3. Confirm approach before implementing
+
+**During Implementation:**
+- Follow specs exactly — flag issues, don't silently change specs
+- Write tests alongside code
+- If blocked, document what you need and move to another task
+
+**At Session End:**
+- Update ROADMAP.md if status changed
+- Summarize what was built, what's working, what's needed next
+
+---
+
+## Research Library
+
+For deep context on AI architecture, MCP, context engineering, and related topics, see:
+
+**Location:** `docs/research/README.md`
+
+This contains 48 curated research documents from NotebookLM covering:
+- Model Context Protocol (MCP)
+- Multi-agent systems
+- Context engineering
+- n8n workflow automation
+- BMAD methodology
+- LLM research and fine-tuning
+
+**If something is unclear in these docs**, ask Kable — he can query the NotebookLM project for deeper detail.

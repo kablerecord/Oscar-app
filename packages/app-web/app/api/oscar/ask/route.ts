@@ -20,12 +20,25 @@ import { isDevWorkspace, createTimer, analyzeQuestion, logAnalytics, type Analyt
 import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary } from '@/lib/oscar/cross-session-memory'
 
 // ==========================================================================
+// UIP (User Intelligence Profile) Integration
+// Mentorship-as-Code layer for adaptive AI behavior
+// ==========================================================================
+import {
+  getUIPContext,
+  processSignalsForUser,
+  incrementSessionCount,
+} from '@/lib/uip/service'
+import { extractSignalsFromMessage } from '@/lib/uip/signal-processor'
+import { shouldAskQuestion, formatElicitationQuestion, processElicitationResponse } from '@/lib/uip/elicitation'
+
+// ==========================================================================
 // @osqr/core Integration
 // These imports connect oscar-app to the OSQR brain library
 // ==========================================================================
 import { checkInput, checkOutput, getDeclineMessage } from '@/lib/osqr/constitutional-wrapper'
 import { quickRoute, shouldUseFastPath } from '@/lib/osqr/router-wrapper'
 import { hasCommitmentSignals, extractCommitments } from '@/lib/osqr/temporal-wrapper'
+import { persistDecisions } from '@/lib/decisions/persister'
 import { featureFlags, throttleConfig } from '@/lib/osqr/config'
 
 // New Phase 2 integrations: Throttle (I-10) & Cross-Project Memory (I-9)
@@ -126,6 +139,31 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const { message: rawMessage, workspaceId, projectId, conversationId, useKnowledge, includeDebate, mode, systemMode: explicitSystemMode, conversationHistory } = RequestSchema.parse(body)
+
+    // ==========================================================================
+    // UIP: Get User Intelligence Profile for adaptive behavior
+    // This personalizes responses based on learned user preferences
+    // ==========================================================================
+    let uipContext: Awaited<ReturnType<typeof getUIPContext>> | null = null
+    let elicitationQuestion: string | null = null
+
+    try {
+      // Get UIP context for this user
+      uipContext = await getUIPContext(userId)
+
+      // Check if we should ask an elicitation question (phases 2-4)
+      const elicitationDecision = await shouldAskQuestion(userId)
+      if (elicitationDecision.shouldAsk && elicitationDecision.question) {
+        elicitationQuestion = formatElicitationQuestion(elicitationDecision.question)
+      }
+
+      if (uipContext.shouldPersonalize) {
+        console.log('[UIP] Profile loaded - personalizing response (confidence:', uipContext.confidence.toFixed(2) + ')')
+      }
+    } catch (uipError) {
+      console.error('[UIP] Error loading profile:', uipError)
+      // Continue without UIP - it's non-blocking
+    }
 
     // ==========================================================================
     // THROTTLE CHECK (I-10): Check query budget before processing
@@ -251,6 +289,40 @@ export async function POST(req: NextRequest) {
     }
 
     // ==========================================================================
+    // RENDER INTENT DETECTION: Check if user wants to create visual content
+    // Handles "/render", "draw me", "visualize", "make a chart" etc.
+    // ==========================================================================
+    const { detectRenderIntent, detectIterationIntent } = await import('@/lib/render/intent-detection')
+    const renderIntent = detectRenderIntent(message)
+    const iterationIntent = detectIterationIntent(message)
+
+    if (renderIntent.detected) {
+      // User wants to create a new render (image or chart)
+      return NextResponse.json({
+        answer: "Rendering... I'll create that for you.",
+        renderIntent: {
+          type: renderIntent.type,
+          prompt: message,
+        },
+        renderPending: true,
+        // Frontend will call /api/render to actually generate
+      })
+    }
+
+    if (iterationIntent.isIteration && conversationId) {
+      // User wants to modify a recent render ("make it blue", "add more data")
+      return NextResponse.json({
+        answer: "Updating the render...",
+        iterationIntent: {
+          modification: message,
+          conversationId,
+        },
+        renderPending: true,
+        // Frontend will call /api/render with conversationId to iterate
+      })
+    }
+
+    // ==========================================================================
     // OSQR ROUTER (I-2): Get routing recommendation from @osqr/core
     // This supplements the existing routeQuestion with OSQR's classification
     // ==========================================================================
@@ -358,6 +430,24 @@ Guidelines:
 - Don't explain your reasoning process or why you're answering a certain way
 - When you know things about the user from past conversations, naturally reference that knowledge when relevant (but don't be creepy about it)`
 
+      // UIP: Add personalization from User Intelligence Profile
+      if (uipContext?.shouldPersonalize && uipContext.summary) {
+        systemPrompt += `\n\n${uipContext.summary}`
+
+        // Apply UIP adapters to behavior
+        if (uipContext.adapters.verbosityMultiplier < 0.8) {
+          systemPrompt += '\n- Keep responses concise and to-the-point (user prefers brevity).'
+        } else if (uipContext.adapters.verbosityMultiplier > 1.3) {
+          systemPrompt += '\n- Provide thorough explanations (user prefers detailed responses).'
+        }
+
+        if (uipContext.adapters.proactivityLevel > 0.7) {
+          systemPrompt += '\n- Be proactive in offering suggestions and next steps.'
+        } else if (uipContext.adapters.proactivityLevel < 0.3) {
+          systemPrompt += '\n- Wait for the user to ask before offering additional suggestions.'
+        }
+      }
+
       // Add cross-session memory context
       if (memoryContext) {
         systemPrompt += `\n\n${memoryContext}`
@@ -451,6 +541,19 @@ Guidelines:
         }).catch(err => console.error('[Cross-Session Memory] Save error:', err))
       }
 
+      // UIP: Extract signals and process for profile learning
+      // This runs async so it doesn't slow down the response
+      try {
+        const signals = extractSignalsFromMessage(message, thread.id, assistantMessage.id)
+        if (signals.length > 0) {
+          processSignalsForUser(userId, signals).catch(err =>
+            console.error('[UIP] Signal processing error:', err)
+          )
+        }
+      } catch (signalError) {
+        console.error('[UIP] Signal extraction error:', signalError)
+      }
+
       // Log analytics for dev workspaces (Joe's account)
       // This collects data to optimize the prefetch system
       // See docs/TODO-ANALYTICS-REVIEW.md and lib/analytics/dev-analytics.ts
@@ -480,8 +583,14 @@ Guidelines:
         logAnalytics(workspaceId, thread.id, assistantMessage.id, analyticsEvent)
       }
 
+      // Build final response with optional elicitation question
+      let finalAnswer = answer
+      if (elicitationQuestion) {
+        finalAnswer = `${answer}\n\n---\n\n${elicitationQuestion}`
+      }
+
       return NextResponse.json({
-        answer,
+        answer: finalAnswer,
         threadId: thread.id,
         routing: {
           questionType,
@@ -492,6 +601,13 @@ Guidelines:
           complexity,
         },
         contextSources: autoContext.sources,
+        // UIP: Include personalization metadata
+        uip: uipContext?.shouldPersonalize ? {
+          personalized: true,
+          confidence: uipContext.confidence,
+          suggestedMode: uipContext.adapters.suggestedMode,
+        } : undefined,
+        elicitationPending: !!elicitationQuestion,
       })
     }
 
@@ -788,6 +904,10 @@ Guidelines:
     if (crossProjectContext) {
       contextParts.push(crossProjectContext)
     }
+    // UIP: Add personalization context from User Intelligence Profile
+    if (uipContext?.shouldPersonalize && uipContext.summary) {
+      contextParts.push(uipContext.summary)
+    }
     const context = contextParts.filter(Boolean).join('\n\n---\n\n') || undefined
 
     // Log what context sources were used
@@ -795,6 +915,7 @@ Guidelines:
       console.log('[OSQR] Auto-context sources:', autoContext.sources)
       if (tilContext) console.log('[OSQR] TIL context included')
       if (crossProjectContext) console.log('[OSQR] Cross-project context included')
+      if (uipContext?.shouldPersonalize) console.log('[OSQR] UIP personalization active (confidence:', uipContext.confidence.toFixed(2) + ')')
     }
 
     // Ask OSQR with user's capability level for GKVI context
@@ -889,14 +1010,13 @@ Guidelines:
         artifacts.map((artifact) =>
           prisma.artifact.create({
             data: {
+              userId,
               workspaceId,
               messageId: osqrMessage.id,
-              threadId: thread.id,
-              type: artifact.type,
+              conversationId: thread.id,
+              type: artifact.type as 'CODE' | 'DOCUMENT' | 'DIAGRAM' | 'HTML' | 'SVG' | 'JSON' | 'CSV' | 'REACT' | 'IMAGE' | 'CHART',
               title: artifact.title,
-              content: artifact.content,
-              language: artifact.language,
-              description: artifact.description,
+              content: { text: artifact.content, language: artifact.language, description: artifact.description },
               version: 1,
             },
           })
@@ -998,17 +1118,34 @@ Guidelines:
             })
 
             if (commitments.length > 0) {
-              console.log('[OSQR Temporal] Extracted', commitments.length, 'commitments from conversation')
-              // TODO: Store commitments in database for morning digest
-              // For now, just log them for visibility
-              commitments.forEach((c) => {
-                console.log(`  - ${c.what} (${c.when.rawText}) - Confidence: ${c.confidence}`)
+              // Persist commitments to Decision table for morning digest and tracking
+              const { persisted, ids } = await persistDecisions({
+                workspaceId,
+                userId,
+                threadId: thread.id,
+                commitments,
+                source: 'web',
               })
+
+              if (persisted > 0) {
+                console.log(`[OSQR Temporal] Persisted ${persisted} decisions:`, ids)
+              }
             }
           }
         } catch (error) {
           console.error('[OSQR Temporal] Extraction error:', error)
         }
+      }
+
+      // UIP: Extract signals from conversation and process for profile learning
+      try {
+        const signals = extractSignalsFromMessage(message, thread.id, osqrMessage.id)
+        if (signals.length > 0) {
+          await processSignalsForUser(userId, signals)
+          console.log(`[UIP] Processed ${signals.length} signals from conversation`)
+        }
+      } catch (error) {
+        console.error('[UIP] Signal processing error:', error)
       }
     })
 
@@ -1096,9 +1233,15 @@ Guidelines:
       )
     }
 
+    // Build final response with optional elicitation question
+    let finalAnswer = cleanAnswer
+    if (elicitationQuestion) {
+      finalAnswer = `${cleanAnswer}\n\n---\n\n${elicitationQuestion}`
+    }
+
     return NextResponse.json(
       {
-        answer: cleanAnswer,
+        answer: finalAnswer,
         artifacts: artifacts.length > 0 ? artifacts : undefined,
         threadId: thread.id,
         panelDiscussion: response.panelDiscussion,
@@ -1123,6 +1266,13 @@ Guidelines:
         degraded: throttleResult?.degraded || false,
         // I-9: Cross-project context indicator
         usedCrossProjectContext: !!crossProjectContext,
+        // UIP: Include personalization metadata
+        uip: uipContext?.shouldPersonalize ? {
+          personalized: true,
+          confidence: uipContext.confidence,
+          suggestedMode: uipContext.adapters.suggestedMode,
+        } : undefined,
+        elicitationPending: !!elicitationQuestion,
       },
       {
         headers: {

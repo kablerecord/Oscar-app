@@ -4,9 +4,10 @@
  * This file is loaded before all tests.
  */
 
-import { vi } from 'vitest'
+import { vi, afterEach, afterAll } from 'vitest'
 
 // Mock environment variables
+// @ts-expect-error - NODE_ENV assignment for test setup
 process.env.NODE_ENV = 'test'
 
 // Global mock for console to reduce test noise

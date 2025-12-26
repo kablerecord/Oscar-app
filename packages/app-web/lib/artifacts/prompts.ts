@@ -101,13 +101,13 @@ export function getArtifactInstructions(): string {
  * Artifact generation prompt for specific requests
  */
 export function getArtifactGenerationPrompt(request: {
-  type: 'code' | 'document' | 'diagram'
+  type: 'CODE' | 'DOCUMENT' | 'DIAGRAM'
   topic: string
   requirements?: string[]
 }): string {
   const { type, topic, requirements } = request
 
-  let prompt = `Generate a ${type} artifact for: ${topic}\n\n`
+  let prompt = `Generate a ${type.toLowerCase()} artifact for: ${topic}\n\n`
 
   if (requirements && requirements.length > 0) {
     prompt += 'Requirements:\n'

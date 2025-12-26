@@ -5,6 +5,8 @@
  * - Content: Direct content embedding
  * - Contextual: Content + document context
  * - Queryable: Hypothetical questions this chunk answers
+ *
+ * Uses the adapter pattern to delegate to external implementations (e.g., OpenAI).
  */
 
 import {
@@ -14,13 +16,19 @@ import {
   DocumentIndexingConfig,
   DEFAULT_INDEXING_CONFIG,
 } from '../types';
+import {
+  getEmbeddingAdapterOrNull,
+  getLLMAdapterOrNull,
+} from '../adapters';
 
 // ============================================================================
 // Embedding Generation
 // ============================================================================
 
-// Simple mock embedding function - in production, this would use OpenAI/other
-// For now we generate deterministic embeddings for testing
+/**
+ * Fallback mock embedding function for when no adapter is registered.
+ * Used for testing or when running without OpenAI integration.
+ */
 function mockEmbed(text: string, dimensions: number): number[] {
   const embedding = new Array(dimensions).fill(0);
   const words = text.toLowerCase().split(/\s+/);
@@ -46,36 +54,46 @@ function mockEmbed(text: string, dimensions: number): number[] {
 }
 
 /**
- * Generate embedding for text
- * This is a placeholder - in production would call OpenAI API
+ * Generate embedding for text.
+ * Uses the registered EmbeddingAdapter if available, falls back to mock.
  */
 export async function embed(
   text: string,
   config: DocumentIndexingConfig = DEFAULT_INDEXING_CONFIG
 ): Promise<number[]> {
-  // TODO: Replace with actual OpenAI embedding call
-  // const response = await openai.embeddings.create({
-  //   model: config.embeddingModel,
-  //   input: text,
-  // });
-  // return response.data[0].embedding;
+  const adapter = getEmbeddingAdapterOrNull();
 
+  if (adapter) {
+    // Use real embedding adapter
+    return adapter.embed(text, config);
+  }
+
+  // Fallback to mock for testing
+  console.warn('[OSQR DIS] No embedding adapter registered, using mock embeddings');
   return mockEmbed(text, config.embeddingDimensions);
 }
 
 /**
- * Generate hypothetical questions that a chunk might answer
+ * Generate hypothetical questions that a chunk might answer.
+ * Uses the registered LLMAdapter if available, falls back to heuristics.
  */
 export async function generateQuestions(
   content: string,
   _config: DocumentIndexingConfig = DEFAULT_INDEXING_CONFIG
 ): Promise<string[]> {
-  // TODO: Replace with actual LLM call to generate questions
-  // For now, generate simple questions based on content
+  const adapter = getLLMAdapterOrNull();
 
+  if (adapter) {
+    try {
+      return await adapter.generateQuestions(content, 3);
+    } catch (error) {
+      console.error('[OSQR DIS] LLM question generation failed, using fallback:', error);
+    }
+  }
+
+  // Fallback: generate simple questions based on content patterns
   const questions: string[] = [];
 
-  // Check for patterns and generate appropriate questions
   if (/decision|decided|chose/i.test(content)) {
     questions.push('What decisions were made?');
   }

@@ -14,7 +14,7 @@ export function Footer() {
               <span className="text-xl font-bold text-white">OSQR</span>
             </Link>
             <p className="text-slate-400 text-sm max-w-md">
-              The AI operating system for capability and execution. Don't just ask questions. Ask the right ones.
+              The AI operating system for capability and execution. Don&apos;t just ask questions. Ask the right ones.
             </p>
             <p className="text-slate-500 text-xs mt-4">
               Built by <a href="https://kablerecord.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">Kable Record</a>

@@ -24,10 +24,10 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@osqr/core": "workspace:*",
     "@anthropic-ai/sdk": "^0.71.0",
     "@auth/prisma-adapter": "^2.11.1",
     "@google/generative-ai": "^0.24.1",
+    "@osqr/core": "workspace:*",
     "@prisma/client": "6.19.0",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
@@ -57,6 +57,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

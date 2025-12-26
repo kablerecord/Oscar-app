@@ -267,6 +267,12 @@ For full details, see:
 
 ---
 
+## Related Documents
+
+- **[EXECUTION_ORCHESTRATOR_SPEC.md](../features/EXECUTION_ORCHESTRATOR_SPEC.md)** – Detailed spec for the Execution Orchestrator that powers autonomous workstream management, parallel VS Code sessions, and the "Go build it" command.
+
+---
+
 ## Key Quotes From This Session
 
 On storage: "The answer is everything. The cost argument against it is dead."

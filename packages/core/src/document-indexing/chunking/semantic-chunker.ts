@@ -53,7 +53,7 @@ export function chunkBySections(
           section: section.heading?.text || null,
           order: order++,
         },
-        metadata: buildChunkMetadata(section.content, section.heading?.text),
+        metadata: buildChunkMetadata(section.content, section.heading?.text ?? null),
       });
     } else {
       // Section too large, split by paragraphs

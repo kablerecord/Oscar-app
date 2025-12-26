@@ -556,11 +556,11 @@ This roadmap defines **WHAT** to build. The Development Philosophy document defi
 
 | Version | Focus | Key Deliverables |
 |---------|-------|------------------|
-| **V1.0** | Core OSQR | Web app, PKV, multi-model routing, Refine→Fire |
+| **V1.0** | Core OSQR | Web app, PKV, multi-model routing, Refine→Fire, **Tier Upgrade Ceremony** |
 | **V1.1** | AI Feature Parity | Voice input, image analysis, image generation, web search, code execution |
-| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction, Auto-Organization, Secretary Checklist, Import Interviews, **Deep Research System**, **Tribunal Mode** |
+| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction, Auto-Organization, Secretary Checklist, Import Interviews, **Deep Research System**, **Tribunal Mode**, **Render System**, **UIP** |
 | **V2.0** | Creator Marketplace | Marketplace launch, creator onboarding, plugin ecosystem |
-| **V3.0** | VS Code OSQR | Full VS Code extension, Builder Plugin, Queue System |
+| **V3.0** | VS Code OSQR | Full VS Code extension, Builder Plugin, Queue System, **Execution Orchestrator** |
 | **V4.0** | Privacy Phone | OSQR-native phone, intelligence utility model, US manufacturing |
 | **V5.0** | Robotics Integration | OSQR intelligence layer for robotics/automation |
 
@@ -606,6 +606,7 @@ Implemented:
 - [x] **Mode selector UI** in chat interface (Quick/Thoughtful/Contemplate buttons)
 - [x] **Mode badge** on responses showing which mode was used
 - [x] **Auto-suggest mode** based on question complexity (analyzes patterns, word count)
+- [x] **Council Wrapper** - @osqr/core integration for multi-model deliberation → `lib/osqr/council-wrapper.ts` (Dec 2024)
 
 ### 1.3.1 "See What Another AI Thinks" Button ✅ COMPLETE
 *A brilliant Quick Mode enhancement that adds panel-like feel without full Contemplate compute*
@@ -755,6 +756,81 @@ interface GlobalKnowledgeIndex {
 - Differentiates OSQR from generic ChatGPT/Claude
 - Users get your system delivered by superintelligence
 
+### 1.9 Tier Upgrade Ceremony
+*Premium "crossing the threshold" moment when users upgrade to paid tiers*
+
+> **Full Spec:** [docs/features/TIER_CEREMONY_SPEC.md](docs/features/TIER_CEREMONY_SPEC.md)
+
+A restrained, Apple-level ceremony that plays once per tier, per account when a user upgrades. Not a splash screen—an acknowledgment of arrival.
+
+**Design Philosophy:**
+- Same structure for all tiers (OSQR mark → shimmer → tier name → fade to app)
+- No tier-based visual escalation (no "cooler effects" for Master)
+- Restraint over spectacle ("Oh, nice." not "Wow!")
+- Server-side gating (account-level, not localStorage)
+
+**Phase 1.9a: Beta (Build before V1.0 launch)**
+- [ ] **Ceremony animation component** — Framer Motion, ~3.2s timeline
+- [ ] **Ceremony page** — `/ceremony` route with tier validation
+- [ ] **API endpoints** — GET/POST for `ceremonySeen` flags
+- [ ] **Prisma migration** — Add `ceremonySeen` JSON field to User
+- [ ] **Stripe webhook integration** — Redirect to ceremony after upgrade
+- [ ] **Middleware check** — Route to ceremony if needed on app load
+
+**Technical Implementation:**
+```
+app/ceremony/page.tsx           # Main ceremony route
+lib/ceremony/types.ts           # Tier, CeremonySeen types
+lib/ceremony/useCeremony.ts     # Hook for gating logic
+lib/ceremony/CeremonyAnimation.tsx  # Framer Motion component
+app/api/user/ceremony/route.ts  # GET + POST handlers
+```
+
+**Effort Estimate:** 6-9 hours (one focused build session)
+
+**Why This Matters:**
+- Creates memorable "I've arrived" moment for new paid users
+- Reinforces premium positioning without explaining features
+- Demonstrates OSQR's restraint and confidence
+- High impact, low complexity—perfect for final polish phase
+
+### 1.10 Jarvis Continuum & Companion Docs ✅ COMPLETE
+*Long-term vision locked, implementation path documented*
+
+> **Full Spec:** [docs/governance/OSQR-JARVIS-CONTINUUM.md](docs/governance/OSQR-JARVIS-CONTINUUM.md)
+
+The Jarvis Continuum defines the end-state vision: OSQR as a voice-first, always-present intelligence that earns autonomy over time. Companion documents translate this vision into implementation reality.
+
+**Governance Documents (Complete):**
+- [x] **OSQR-JARVIS-CONTINUUM.md** — North star doctrine (voice-first, autonomy ladder, Bubble vs Panel)
+- [x] **JARVIS_V1_SCOPE.md** — What ships in V1.0 vs what's deferred
+- [x] **OSQR_FAILURE_RECOVERY.md** — Error handling, trust repair, confidence degradation
+- [x] **VOICE_FIRST_PATH.md** — Roadmap from text to voice-first Jarvis
+
+**V1.0 Implementation Tasks:**
+- [ ] **Basic error recovery patterns** — Implement misunderstanding, incorrect info, context failure recovery (from OSQR_FAILURE_RECOVERY.md §1.1-1.4)
+- [ ] **Apology patterns in system prompts** — Align OSQR responses with Character Guide error handling
+- [ ] **Voice input polish** — Visual feedback, error handling per VOICE_FIRST_PATH.md §3
+
+**V1.1 Implementation Tasks:**
+- [ ] **Voice output (TTS)** — OpenAI TTS integration per VOICE_FIRST_PATH.md §4
+- [ ] **Playback UI** — Speaker icon, speed control, voice selection
+
+**V1.5 Implementation Tasks:**
+- [ ] **Confidence degradation system** — Track error patterns, adjust OSQR confidence per OSQR_FAILURE_RECOVERY.md §3
+- [ ] **Conversational voice mode** — Full voice conversations per VOICE_FIRST_PATH.md §5
+
+**V3.0 Implementation Tasks:**
+- [ ] **Ambient mode** — Wake word, always-listening per VOICE_FIRST_PATH.md §6
+- [ ] **Cross-device continuity** — Session handoff per VOICE_FIRST_PATH.md §7
+- [ ] **Mode A autonomy** — Earned permissions, autonomy overreach recovery per OSQR_FAILURE_RECOVERY.md §1.6
+
+**Why This Matters:**
+- Vision is locked—no drift under implementation pressure
+- Clear separation between "what we want" and "what ships when"
+- Failure modes defined before they happen
+- Voice path is a roadmap, not a vague promise
+
 ---
 
 ## Phase 1.1: AI Feature Parity (V1.1) ⬅️ NEXT PRIORITY
@@ -851,13 +927,16 @@ Needed:
 - [ ] **Edit/correct profile entries**
 
 ### 2.2 Memory System Architecture (Master Plan: Part 2D)
-Current: Chat history + indexed documents
-Needed:
-- [ ] **Working Memory** - current session context
-- [ ] **Dialogue Memory** - cross-session context
-- [ ] **Long-Term Memory** - PKV integration
-- [ ] **Preference Memory** - user settings + patterns
-- [ ] **Framework Memory** - user's philosophies embedded in OSQR
+**Status: Core functionality COMPLETE (Dec 2024)**
+
+The "Memory Vault" concept from specs is implemented across multiple systems:
+- [x] **Working Memory** - current session context → `lib/context/auto-context.ts`
+- [x] **Dialogue Memory** - cross-session context → `lib/oscar/cross-session-memory.ts`
+- [x] **Long-Term Memory** - PKV integration → `lib/knowledge/` + pgvector
+- [x] **Preference Memory** - user settings + patterns → `lib/uip/` (User Intelligence Profile)
+- [x] **Memory Vault Wrapper** - @osqr/core integration → `lib/osqr/memory-wrapper.ts` (Dec 2024)
+- [ ] **Framework Memory** - user's philosophies embedded in OSQR (future)
+- [ ] **Cross-Project Queries** - enterprise feature, ready in `lib/osqr/memory-wrapper.ts` (feature-flagged)
 
 ### 2.3 Master Summary Checklist (Master Plan: Part 2D.8)
 Current: Not implemented
@@ -969,9 +1048,48 @@ WellnessEntry {
 ## Phase 3: Intelligence Layer
 *Focus: Proactive features, pattern recognition, cross-referencing, behavioral learning*
 
-### 3.0 Behavioral Intelligence Layer ⭐ NEW
+### 3.0 User Intelligence Profile (UIP) ⭐ NEW
 
-> **Full Spec:** [docs/BEHAVIORAL_INTELLIGENCE_LAYER.md](docs/BEHAVIORAL_INTELLIGENCE_LAYER.md)
+> **Full Spec:** [docs/architecture/UIP_SPEC.md](docs/architecture/UIP_SPEC.md)
+
+**Purpose:** OSQR's continuously updating mentorship rulebook for how to think, speak, and act in alignment with a specific human. Not a psychological profile—a **Mentorship-as-Code layer**.
+
+**Core Question UIP Answers:**
+> "How should OSQR think, speak, and act for this specific user, in this specific moment?"
+
+**Architecture:**
+```
+PKV + Telemetry + Elicitation
+        ↓
+Prospective Reflection Engine
+        ↓
+User Intelligence Profile (8 domains, 3 tiers)
+        ↓
+Behavior Adapters (mode defaults, response shaping, autonomy)
+```
+
+**3-Tier Domain Structure:**
+- **Foundation:** Identity Context, Goals & Values
+- **Style:** Cognitive Processing, Communication Preferences, Expertise Calibration
+- **Dynamics:** Behavioral Patterns, Relationship State, Decision Friction Profile
+
+**Key Components:**
+- [ ] **Prospective Reflection Engine** - Background synthesis that compacts signals into UIP updates
+- [ ] **Confidence decay system** - Old signals decay in relevance over time
+- [ ] **UIP Gap Detection** - Triggers targeted elicitation when knowledge gaps matter
+- [ ] **Behavior Adapters** - UIP directly controls mode defaults, response shaping, Bubble behavior
+
+**Implementation Phases:**
+- [ ] Phase 1 (V1.5): Foundation domains, basic telemetry integration, session-local reflection
+- [ ] Phase 2 (V2.0): Style domains, cross-session reflection, confidence decay
+- [ ] Phase 3 (V2.5): Dynamics domains, full Behavior Adapter integration
+- [ ] Phase 4 (V3.0): User-facing UIP summary, manual corrections, global learning (Tier C)
+
+---
+
+### 3.0.1 Behavioral Intelligence Layer (UIP Data Source)
+
+> **Full Spec:** [docs/features/BEHAVIORAL_INTELLIGENCE_LAYER.md](docs/features/BEHAVIORAL_INTELLIGENCE_LAYER.md)
 
 **Purpose:** Enable OSQR to learn from user behavior (not content) and improve over time.
 
@@ -1396,6 +1514,63 @@ A live, real-time, multi-agent thinking room where 2-6 AI models think in parall
 ```
 
 **See full spec for:** UI layout, backend architecture, model routing logic, cost controls, system prompts, and future expansions.
+
+---
+
+### 3.6 Render System ⭐ V1.5 FLAGSHIP
+
+> **Full Spec:** [docs/features/RENDER_SYSTEM_SPEC.md](docs/features/RENDER_SYSTEM_SPEC.md)
+
+**Purpose:** The first execution surface where OSQR moves beyond text responses into **visible, inspectable artifacts**.
+
+**Core Insight:**
+> AI intelligence is no longer the bottleneck. **Surface area is.**
+
+OSQR already reasons and generates. The Render System gives that intelligence a place to *land* — safely, visibly, iteratively.
+
+**The Canonical Render Loop:**
+```
+User: "Build a tic tac toe game"
+OSQR: "Rendering..." (busy animation)
+OSQR: "Render complete. Would you like to see it?"
+User: "Yes"
+OSQR: Opens /r/<artifactId>, shows artifact
+OSQR: "How does that look? Want anything changed?"
+```
+
+**v1.5 Scope (Bounded by Design):**
+- OSQR may **render and visualize**
+- OSQR may **not act outside itself**
+- No filesystem writes, deployments, or external side effects
+- This is **sequenced autonomy**, not reckless autonomy
+
+**Artifact Types (v1.5):**
+1. **image** — Generated visuals, mockups
+2. **chart** — Data visualizations (line graphs first)
+3. **ui/game** — Simple interactive artifacts (sandboxed)
+
+**Implementation Checklist:**
+- [ ] Artifact schema + `/r/:artifactId` route
+- [ ] State machine (IDLE → RENDERING → COMPLETE_AWAITING_VIEW → VIEWING → UPDATING)
+- [ ] Bubble integration for render announcements
+- [ ] Consent gate UX
+- [ ] Image renderer
+- [ ] Chart renderer
+- [ ] UI/Game renderer (sandboxed)
+- [ ] Version history
+
+**Why This Is Safe:**
+- All actions visible
+- All outputs consent-gated
+- All changes versioned
+- Nothing happens silently
+
+**Bridge to VS Code OSQR:**
+```
+v1.5: OSQR renders → User sees artifact
+v2.0: OSQR renders → User approves → OSQR writes to project
+v3.0: OSQR + VS Code unified → User talks, things get built
+```
 
 ---
 
@@ -2313,8 +2488,41 @@ These are stacked. Each depends on the previous.
 Full specifications preserved in vision documents:
 - **[docs/vision/VSCODE-DEV-COMPANION.md](docs/vision/VSCODE-DEV-COMPANION.md)** – Dev Companion v1 & Autonomous Mode specs
 - **[docs/vision/AUTONOMOUS-APP-BUILDER.md](docs/vision/AUTONOMOUS-APP-BUILDER.md)** – App Builder blueprint
+- **[docs/features/EXECUTION_ORCHESTRATOR_SPEC.md](docs/features/EXECUTION_ORCHESTRATOR_SPEC.md)** – Execution Orchestrator for autonomous workstream management
 
 *Detailed implementation planning begins when prerequisites are met.*
+
+### 8.1 Execution Orchestrator
+
+> **Spec:** [EXECUTION_ORCHESTRATOR_SPEC.md](docs/features/EXECUTION_ORCHESTRATOR_SPEC.md)
+
+The Execution Orchestrator transforms OSQR from a conversational assistant into an autonomous execution layer. User says "Go build it" → OSQR reads specs, spawns parallel work, collects decisions, returns "Built 3 of 4. Need your input on embedding strategy."
+
+**Core Components:**
+- **Workstream Registry** – Track parallel work across sessions
+- **Dependency Graph** – Sequence work correctly based on dependencies
+- **Decision Accumulator** – Never block, always collect decisions for batch resolution
+- **Execution Queue** – Manage parallel VS Code sessions
+- **Completion Reporter** – "Built 3/4, need input on 1"
+- **Interface Handoff Protocol** – Web OSQR architects, VS Code OSQR builds
+
+**Implementation Phases:**
+- [ ] Phase 1: Workstream Registry (V3.0 Alpha)
+- [ ] Phase 2: Decision Accumulator (V3.0 Alpha)
+- [ ] Phase 3: Execution Queue (V3.0 Beta)
+- [ ] Phase 4: VS Code Integration (V3.0 Beta)
+- [ ] Phase 5: Full Orchestration (V3.0 Release)
+
+**Dependencies:**
+- Requires: VS Code Extension (this phase)
+- Extends: Secretary Checklist (V1.5)
+- Integrates: Memory Vault, Document Indexing, Constitutional Framework
+
+**Key Commands:**
+- `go build it` – Start all implementation-ready workstreams
+- `what needs me` – List pending decisions
+- `status` – Show orchestrator dashboard
+- `proceed with recommendations` – Accept OSQR's recommendations for all pending decisions
 
 ---
 

@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+// NOTE: Enterprise features documented in docs/enterprise/
+// See ENTERPRISE_INTEGRATION_STATUS.md for full context
+// Multi-user support is documented but not built (V1.5+ scope)
+
 interface EnterpriseInquiry {
   name: string
   email: string

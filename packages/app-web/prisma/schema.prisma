@@ -37,6 +37,7 @@ model User {
   settings           UserSetting[]
   workspaces         Workspace[]
   insightPreferences UserInsightPreferences?
+  artifacts          Artifact[]
 
   @@index([email])
 }
@@ -265,25 +266,83 @@ model RateLimitEvent {
   @@index([endpoint, timestamp])
 }
 
-model Artifact {
-  id          String    @id @default(cuid())
-  workspaceId String
-  messageId   String?
-  threadId    String?
-  type        String
-  title       String
-  content     String
-  language    String?
-  description String?
-  version     Int       @default(1)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+// ============================================
+// Render System Artifacts (V1.5)
+// @see docs/features/RENDER_SYSTEM_SPEC.md
+// ============================================
 
+model Artifact {
+  id            String        @id @default(cuid())
+  userId        String
+  workspaceId   String?
+
+  // Type and content
+  type          ArtifactType
+  title         String?
+  content       Json          // Type-specific content (ImageArtifactContent | ChartArtifactContent)
+  metadata      Json?         // Additional metadata
+
+  // Conversation linking
+  conversationId String?      // Links to originating conversation (threadId)
+  messageId      String?      // Links to specific message that created it
+
+  // Versioning
+  version       Int           @default(1)
+  parentId      String?       // Previous version
+  parent        Artifact?     @relation("ArtifactVersions", fields: [parentId], references: [id])
+  children      Artifact[]    @relation("ArtifactVersions")
+
+  // State machine
+  state         RenderState   @default(IDLE)
+
+  // Telemetry (for debugging and future implicit detection)
+  provider      String?       // 'openai', etc.
+  model         String?       // 'dall-e-3', etc.
+  latencyMs     Int?          // Time to generate
+  attemptCount  Int           @default(1)  // Number of attempts (retries)
+  errorCode     String?       // Sanitized error code
+  errorMessage  String?       // Sanitized error message
+  promptHash    String?       // Hash of prompt for duplicate detection
+
+  // Timestamps
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  viewedAt      DateTime?
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace     Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
   @@index([workspaceId])
-  @@index([threadId])
   @@index([type])
+  @@index([conversationId])
+  @@index([state])
   @@index([createdAt])
+}
+
+enum ArtifactType {
+  IMAGE
+  CHART
+  CODE      // Source code (any language)
+  DOCUMENT  // Markdown/text documents
+  DIAGRAM   // Mermaid diagrams
+  HTML      // HTML/CSS/JS (renderable)
+  SVG       // SVG graphics
+  JSON      // Structured JSON data
+  CSV       // Tabular data
+  REACT     // React component (preview in sandbox)
+  // UI_GAME — deferred to v1.6+
+}
+
+enum RenderState {
+  IDLE
+  RENDERING
+  COMPLETE_AWAITING_VIEW
+  VIEWING
+  UPDATING
+  ERROR
+  CANCELLED
 }
 
 model CapabilityAssessment {
@@ -634,6 +693,238 @@ model ResearchSession {
   @@index([depth])
   @@index([createdAt])
   @@index([refreshAt])
+}
+
+// ============================================
+// User Intelligence Profile (UIP) System (V1.5)
+// ============================================
+// @see docs/architecture/UIP_SPEC.md
+
+// Main UIP record per user - holds high-level profile state
+model UserIntelligenceProfile {
+  id                    String             @id @default(cuid())
+  userId                String             @unique
+  workspaceId           String?            // Primary workspace (users may have multiple)
+
+  // Privacy and consent
+  privacyTier           PrivacyTier        @default(A)
+  consentedAt           DateTime?          // When user consented to UIP collection
+
+  // Profile maturity
+  sessionCount          Int                @default(0)   // Total sessions with this user
+  signalCount           Int                @default(0)   // Total signals processed
+  firstSeenAt           DateTime           @default(now())
+  lastActiveAt          DateTime           @default(now())
+
+  // Reflection state
+  lastReflectionAt      DateTime?          // Last time Prospective Reflection ran
+  nextReflectionAt      DateTime?          // Scheduled next reflection
+
+  // Progressive elicitation state
+  elicitationPhase      Int                @default(0)   // 0 = none, 1-4 = onboarding questions
+  questionsAsked        Int                @default(0)   // Total elicitation questions asked
+  questionsSkipped      Int                @default(0)   // How many were skipped
+
+  // Computed profile summary (denormalized for fast access)
+  profileSummary        Json?              // Quick summary for context injection
+
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  // Relations
+  dimensions            UIPDimensionScore[]
+  facts                 UIPFact[]
+  signals               UIPSignal[]
+  elicitationResponses  UIPElicitationResponse[]
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([lastActiveAt])
+}
+
+// Dimension scores - the 8 UIP domains with confidence tracking
+model UIPDimensionScore {
+  id              String              @id @default(cuid())
+  profileId       String
+
+  // Domain identification
+  tier            UIPTier             // FOUNDATION, STYLE, DYNAMICS
+  domain          UIPDomain           // IDENTITY, GOALS, COGNITIVE_STYLE, etc.
+
+  // Score with confidence
+  value           Json                // Domain-specific structured value
+  confidence      Float               @default(0.5)  // 0.0 - 1.0
+  decayRate       Float               @default(0.2)  // Per 30 days
+
+  // Source attribution
+  sources         UIPSource[]         // What contributed to this score
+  sourceCount     Int                 @default(0)    // How many signals formed this
+
+  // Timestamps
+  lastUpdatedAt   DateTime            @default(now())
+  lastDecayedAt   DateTime            @default(now())
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  profile         UserIntelligenceProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, domain])
+  @@index([profileId])
+  @@index([domain])
+  @@index([confidence])
+}
+
+// Individual facts extracted from signals
+model UIPFact {
+  id              String              @id @default(cuid())
+  profileId       String
+
+  // Fact identification
+  domain          UIPDomain           // Which domain this fact informs
+  factType        String              // "name", "role", "preference", "goal", etc.
+  key             String              // Unique key within type (e.g., "communication.verbosity")
+  value           String              // The fact value
+
+  // Confidence and validity
+  confidence      Float               @default(0.5)
+  source          UIPSource           // How we learned this
+  decayRate       Float               @default(0.2)
+
+  // PKV override tracking
+  isExplicit      Boolean             @default(false)  // From PKV or direct elicitation
+  explicitSource  String?             // "pkv", "elicitation", "user_correction"
+
+  // Timestamps
+  firstSeenAt     DateTime            @default(now())
+  lastConfirmedAt DateTime            @default(now())
+  expiresAt       DateTime?           // For time-bound facts
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  profile         UserIntelligenceProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, factType, key])
+  @@index([profileId])
+  @@index([domain])
+  @@index([factType])
+  @@index([confidence])
+}
+
+// Raw signals before processing into facts/dimensions
+model UIPSignal {
+  id              String              @id @default(cuid())
+  profileId       String
+
+  // Signal identification
+  signalType      String              // "mode_selection", "message_length", "retry_pattern", etc.
+  category        UIPSignalCategory   // Which category of signal
+
+  // Signal data
+  data            Json                // Signal-specific payload
+  strength        Float               @default(0.5)  // How strong this signal is
+
+  // Context
+  sessionId       String?             // Which session this came from
+  messageId       String?             // Which message triggered this
+
+  // Processing state
+  processed       Boolean             @default(false)
+  processedAt     DateTime?
+
+  createdAt       DateTime            @default(now())
+
+  profile         UserIntelligenceProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@index([profileId])
+  @@index([signalType])
+  @@index([category])
+  @@index([processed])
+  @@index([createdAt])
+}
+
+// Elicitation question responses
+model UIPElicitationResponse {
+  id              String              @id @default(cuid())
+  profileId       String
+
+  // Question tracking
+  questionId      String              // Stable question identifier
+  question        String              // The question text asked
+  domain          UIPDomain           // Which domain this informs
+
+  // Response
+  response        String?             // User's answer (null if skipped)
+  skipped         Boolean             @default(false)
+
+  // Context
+  sessionNumber   Int                 // Which session this was asked in
+  phase           Int                 // Onboarding phase (1-4)
+
+  createdAt       DateTime            @default(now())
+
+  profile         UserIntelligenceProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, questionId])
+  @@index([profileId])
+  @@index([domain])
+}
+
+// ============================================
+// UIP Enums
+// ============================================
+
+enum PrivacyTier {
+  A   // Session-only, minimal collection
+  B   // Full UIP, cross-session learning
+  C   // Full UIP + anonymized global learning
+}
+
+enum UIPTier {
+  FOUNDATION  // Identity, Goals & Values
+  STYLE       // Cognitive Processing, Communication, Expertise
+  DYNAMICS    // Behavioral Patterns, Relationship State, Decision Friction
+}
+
+enum UIPDomain {
+  // Foundation tier
+  IDENTITY_CONTEXT
+  GOALS_VALUES
+  // Style tier
+  COGNITIVE_STYLE
+  COMMUNICATION_PREFS
+  EXPERTISE_CALIBRATION
+  // Dynamics tier
+  BEHAVIORAL_PATTERNS
+  RELATIONSHIP_STATE
+  DECISION_FRICTION
+}
+
+enum UIPSource {
+  EXPLICIT_PKV        // User-entered in PKV (confidence: 1.0)
+  ELICITATION         // Direct answer to OSQR question (confidence: 0.95)
+  BEHAVIORAL_REPEATED // 3+ behavioral observations (confidence: 0.8)
+  BEHAVIORAL_SINGLE   // Single behavioral signal (confidence: 0.5)
+  DOC_STYLE           // Document style inference (confidence: 0.6)
+}
+
+enum UIPSignalCategory {
+  // Behavioral (telemetry-based)
+  MODE_SELECTION      // Which mode they choose
+  SESSION_TIMING      // When/how long they work
+  RETRY_PATTERN       // How often they retry/abort
+  LATENCY_TOLERANCE   // How long they wait
+  REFINEMENT_USAGE    // How often they refine
+  // Content (message-based)
+  MESSAGE_STYLE       // Length, structure, tone
+  QUESTION_SOPHISTICATION // Complexity of questions
+  VOCABULARY_DENSITY  // Technical language use
+  FEEDBACK_SIGNALS    // Corrections, praise, frustration
+  // Interaction
+  DECISION_MENTIONS   // When they mention decisions
+  GOAL_REFERENCES     // When they reference goals
+  PREFERENCE_STATEMENTS // Explicit preference mentions
 }
 
 // Monthly Tribunal usage tracking per user

@@ -1,0 +1,151 @@
+{
+  "name": "osqr-vscode",
+  "displayName": "OSQR",
+  "description": "Your AI thinking companion - OSQR brings persistent memory and multi-model reasoning to VS Code",
+  "version": "0.1.0",
+  "publisher": "osqr",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/osqr/oscar-app"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "assistant",
+    "copilot",
+    "osqr",
+    "multi-model",
+    "reasoning"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "osqr-sidebar",
+          "title": "OSQR",
+          "icon": "media/osqr-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "osqr-sidebar": [
+        {
+          "type": "webview",
+          "id": "osqr.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "osqr.signIn",
+        "title": "OSQR: Sign In"
+      },
+      {
+        "command": "osqr.signOut",
+        "title": "OSQR: Sign Out"
+      },
+      {
+        "command": "osqr.markDecision",
+        "title": "OSQR: Mark as Decision"
+      },
+      {
+        "command": "osqr.askOsqr",
+        "title": "OSQR: Ask OSQR"
+      },
+      {
+        "command": "osqr.explainSelection",
+        "title": "OSQR: Explain Selection"
+      },
+      {
+        "command": "osqr.refineQuestion",
+        "title": "OSQR: Refine Question"
+      },
+      {
+        "command": "osqr.showUsage",
+        "title": "OSQR: Show Usage"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "osqr.explainSelection",
+          "when": "editorHasSelection",
+          "group": "osqr@1"
+        },
+        {
+          "command": "osqr.markDecision",
+          "when": "editorHasSelection",
+          "group": "osqr@2"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "osqr.askOsqr",
+        "key": "ctrl+shift+o",
+        "mac": "cmd+shift+o"
+      },
+      {
+        "command": "osqr.markDecision",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "editorHasSelection"
+      }
+    ],
+    "configuration": {
+      "title": "OSQR",
+      "properties": {
+        "osqr.apiEndpoint": {
+          "type": "string",
+          "default": "https://app.osqr.ai",
+          "description": "OSQR API endpoint"
+        },
+        "osqr.autoSaveConversations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically save all conversations to PKV (no ephemeral mode)"
+        },
+        "osqr.includeWorkspaceContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include workspace context (open files, git branch) with messages"
+        },
+        "osqr.showUsageMeter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show token usage meter in status bar"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --sourcemap --watch",
+    "lint": "eslint src --ext ts",
+    "test": "echo 'No tests configured yet - VSCode extension tests require @vscode/test-electron setup'",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "esbuild": "^0.25.0",
+    "eslint": "^8.54.0",
+    "typescript": "^5.3.2"
+  },
+  "dependencies": {}
+}

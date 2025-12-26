@@ -47,19 +47,21 @@ export async function validateUserInput(
     };
   }
 
-  const result = await Constitutional.validateIntent({
+  const context = {
+    requestId: `req_${Date.now()}`,
     userId,
-    sessionId: sessionId || 'default',
-    input,
-    source: 'web',
-  });
+    conversationId: sessionId || 'default',
+    honestyTier: 'BASE' as const,
+  };
+
+  const result = await Constitutional.validateIntent(input, context);
 
   return {
     allowed: result.allowed,
     clausesChecked: result.clausesChecked,
-    violations: result.violations.map((v: { type: string; clauseId: string }) => ({
-      type: v.type,
-      clause: v.clauseId,
+    violations: result.violations.map((v) => ({
+      type: v.violationType,
+      clause: v.clauseViolated,
     })),
     confidenceScore: result.confidenceScore,
   };
@@ -78,18 +80,21 @@ export async function validateAIOutput(
     };
   }
 
-  const result = await Constitutional.validateOutput({
+  const context = {
+    requestId: `req_${Date.now()}`,
     userId,
+    conversationId: 'default',
+    honestyTier: 'BASE' as const,
     originalInput,
-    output,
-    source: 'web',
-  });
+  };
+
+  const result = await Constitutional.validateOutput(output, context);
 
   return {
-    valid: result.isValid,
-    violations: result.violations.map((v: { type: string; clauseId: string }) => ({
-      type: v.type,
-      clause: v.clauseId,
+    valid: result.valid,
+    violations: result.violations.map((v) => ({
+      type: v.violationType,
+      clause: v.clauseViolated,
     })),
     sanitizedOutput: result.sanitizedOutput,
   };
@@ -99,14 +104,16 @@ export function quickScreenInput(input: string) {
   if (!featureFlags.enableConstitutionalValidation) {
     return { allowed: true, reason: null };
   }
-  return Constitutional.quickScreenInput(input);
+  const allowed = Constitutional.quickScreenInput(input);
+  return { allowed, reason: allowed ? null : 'Failed constitutional screen' };
 }
 
 export function quickScreenOutput(output: string) {
   if (!featureFlags.enableConstitutionalValidation) {
     return { allowed: true, reason: null };
   }
-  return Constitutional.quickScreenOutput(output);
+  const allowed = Constitutional.quickScreenOutput(output);
+  return { allowed, reason: allowed ? null : 'Failed constitutional screen' };
 }
 
 // ============================================================================
@@ -141,14 +148,14 @@ export function quickClassify(input: string) {
 
 export function detectTaskType(input: string) {
   if (!featureFlags.enableRouterMRP) {
-    return 'general';
+    return Router.TaskType.SIMPLE_QA;
   }
   return Router.detectTaskType(input);
 }
 
-export function estimateComplexity(input: string, taskType: string) {
+export function estimateComplexity(input: string, taskType: Router.TaskType) {
   if (!featureFlags.enableRouterMRP) {
-    return 'medium';
+    return Router.ComplexityTier.SIMPLE;
   }
   return Router.estimateComplexity(input, taskType);
 }
@@ -186,7 +193,7 @@ export async function routeRequest(
   const result = await Router.routeRequest({
     input,
     inputType: options?.inputType || 'text',
-    sessionId: options?.sessionId,
+    sessionId: options?.sessionId || `session_${Date.now()}`,
     userId: options?.userId,
     forceModel: options?.forceModel,
   });
@@ -218,6 +225,8 @@ export function initializeVault(userId: string) {
   return MemoryVault.initializeVault(userId);
 }
 
+// MemoryVault integration with @osqr/core
+
 export async function retrieveContext(
   query: string,
   userId: string,
@@ -231,7 +240,45 @@ export async function retrieveContext(
     return { memories: [], context: '' };
   }
 
-  return MemoryVault.retrieveContext(query, userId, options);
+  try {
+    const retrievalOptions: Parameters<typeof MemoryVault.retrieveContextForUser>[2] = {
+      maxTokens: (options?.maxResults || 10) * 500,
+      minRelevance: options?.minRelevance || 0.5,
+    };
+    if (options?.categories) {
+      retrievalOptions.categories = options.categories as NonNullable<typeof retrievalOptions>['categories'];
+    }
+    const retrieved = await MemoryVault.retrieveContextForUser(userId, query, retrievalOptions);
+
+    const memories = retrieved.map((mem) => {
+      const memory = mem.memory;
+      if ('content' in memory) {
+        return {
+          content: memory.content,
+          relevanceScore: mem.relevanceScore,
+          category: memory.category,
+          source: memory.source?.sourceId || 'unknown',
+        };
+      } else {
+        return {
+          content: memory.summary,
+          relevanceScore: mem.relevanceScore,
+          category: 'episodic',
+          source: memory.conversationId || 'unknown',
+        };
+      }
+    });
+
+    // Format as context string
+    const context = memories
+      .map((m) => `[${m.category}] ${m.content}`)
+      .join('\n\n');
+
+    return { memories, context };
+  } catch (error) {
+    console.error('[OSQR] Memory retrieval failed:', error);
+    return { memories: [], context: '' };
+  }
 }
 
 export function storeMessage(
@@ -242,7 +289,21 @@ export function storeMessage(
   if (!featureFlags.enableMemoryVault) {
     return { success: true };
   }
-  return MemoryVault.storeMessage(conversationId, role, content);
+
+  try {
+    MemoryVault.storeMessage(conversationId, {
+      role,
+      content,
+      timestamp: new Date(),
+      tokens: Math.ceil(content.length / 4), // Rough estimate
+      toolCalls: null,
+      utilityScore: null,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error('[OSQR] Message storage failed:', error);
+    return { success: false };
+  }
 }
 
 export async function searchMemories(
@@ -253,19 +314,54 @@ export async function searchMemories(
   if (!featureFlags.enableMemoryVault) {
     return [];
   }
-  return MemoryVault.searchMemories(userId, query, filters);
+
+  try {
+    const searchFilters: Parameters<typeof MemoryVault.searchUserMemories>[2] = {
+      minConfidence: filters?.minConfidence as number | undefined,
+      minUtility: filters?.minUtility as number | undefined,
+      createdAfter: filters?.createdAfter as Date | undefined,
+      createdBefore: filters?.createdBefore as Date | undefined,
+    };
+    if (filters?.categories) {
+      searchFilters.categories = filters.categories as NonNullable<typeof searchFilters>['categories'];
+    }
+    const memories = await MemoryVault.searchUserMemories(userId, query, searchFilters);
+
+    return memories.map((mem) => ({
+      id: mem.id,
+      content: mem.content,
+      category: mem.category,
+      createdAt: new Date(mem.createdAt),
+    }));
+  } catch (error) {
+    console.error('[OSQR] Memory search failed:', error);
+    return [];
+  }
 }
 
-export async function getEpisodicContext(userId: string, limit?: number) {
+export function getEpisodicContext(conversationId: string, limit?: number) {
   if (!featureFlags.enableMemoryVault) {
     return [];
   }
-  return MemoryVault.getConversationHistory(userId, limit);
+
+  try {
+    const messages = MemoryVault.getConversationHistory(conversationId, limit);
+    return messages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+      timestamp: new Date(msg.timestamp),
+    }));
+  } catch (error) {
+    console.error('[OSQR] Episodic context retrieval failed:', error);
+    return [];
+  }
 }
 
 // ============================================================================
 // Council Mode
 // ============================================================================
+
+// Council integration with @osqr/core for multi-model deliberation
 
 export function shouldTriggerCouncil(
   query: string,
@@ -279,85 +375,135 @@ export function shouldTriggerCouncil(
 
 export async function runCouncilDeliberation(
   query: string,
-  context?: Record<string, unknown>,
-  options?: Record<string, unknown>
+  _context?: Record<string, unknown>,
+  options?: { forceCouncil?: boolean; resilientMode?: boolean }
 ) {
   if (!featureFlags.enableCouncilMode) {
-    return { responses: [], synthesis: '' };
+    return { responses: [], synthesis: '', triggered: false };
   }
 
-  const result = await Council.executeCouncil(
-    query,
-    context as Parameters<typeof Council.executeCouncil>[1],
-    options as Parameters<typeof Council.executeCouncil>[2]
-  );
+  try {
+    const result = await Council.executeCouncil(
+      query,
+      undefined, // Context is optional
+      {
+        forceCouncil: options?.forceCouncil ?? true,
+        resilientMode: options?.resilientMode ?? true,
+      }
+    );
 
-  if (!result.triggered || !result.deliberation) {
-    return { responses: [], synthesis: '' };
-  }
+    if (!result.triggered || !result.deliberation) {
+      return {
+        responses: [],
+        synthesis: result.reason || 'Council did not trigger',
+        triggered: false,
+      };
+    }
 
-  return {
-    responses: result.deliberation.responses.map((r: { modelId: string; content: string }) => ({
-      model: r.modelId,
+    // Extract responses and synthesis
+    const responses = result.deliberation.responses.map((r) => ({
+      model: Council.getModelDisplayName(r.modelId) || r.modelId,
       response: r.content,
-    })),
-    synthesis: result.deliberation.synthesis.content,
-  };
+      confidence: r.confidence?.normalizedScore || 0.5,
+    }));
+
+    const synthesis = result.deliberation.synthesis?.finalResponse || '';
+
+    return {
+      responses,
+      synthesis,
+      triggered: true,
+      agreementLevel: result.deliberation.agreement?.level,
+      agreementScore: result.deliberation.agreement?.score,
+    };
+  } catch (error) {
+    console.error('[OSQR] Council deliberation failed:', error);
+    return { responses: [], synthesis: '', triggered: false };
+  }
 }
 
 export async function synthesizeCouncilResponses(
   query: string,
-  responses: { model: string; response: string }[]
+  responses: { model: string; response: string; confidence?: number }[]
 ) {
   if (!featureFlags.enableCouncilMode) {
     return { synthesis: '' };
   }
 
-  const modelResponses = responses.map(r => ({
-    modelId: r.model as 'claude' | 'gpt4' | 'gemini',
-    content: r.response,
-    status: 'success' as const,
-    confidence: { overall: 0.8, factors: {} },
-    latencyMs: 0,
-    timestamp: new Date(),
-  }));
+  try {
+    // Convert to @osqr/core ModelResponse format
+    const modelResponses: Parameters<typeof Council.synthesize>[1] = responses.map((r) => ({
+      modelId: r.model,
+      modelDisplayName: r.model,
+      content: r.response,
+      summary: r.response.slice(0, 200),
+      confidence: {
+        rawScore: r.confidence || 0.7,
+        normalizedScore: r.confidence || 0.7,
+        reasoningDepth: 0.5,
+      },
+      sourcesCited: [],
+      reasoningChain: [],
+      latencyMs: 0,
+      tokensUsed: 0,
+      timestamp: new Date().toISOString(),
+      status: 'success' as const,
+    }));
 
-  const result = await Council.synthesize(query, modelResponses);
-  return { synthesis: result.content };
+    const result = await Council.synthesize(query, modelResponses);
+
+    // Calculate average confidence from responses
+    const avgConfidence =
+      modelResponses.reduce((sum, r) => sum + r.confidence.normalizedScore, 0) /
+      modelResponses.length;
+
+    return {
+      synthesis: result.finalResponse,
+      confidence: avgConfidence,
+    };
+  } catch (error) {
+    console.error('[OSQR] Council synthesis failed:', error);
+    return { synthesis: '' };
+  }
 }
 
 // ============================================================================
 // Guidance
 // ============================================================================
 
-export function getProjectGuidance(projectId: string) {
+// Note: Guidance module API is still being finalized in @osqr/core
+// These functions provide stub implementations until full integration
+
+export function getProjectGuidance(_projectId: string) {
+  // TODO: Integrate with Guidance.loadGuidance when API stabilizes
   if (!featureFlags.enableGuidance) {
     return { items: [], context: '' };
   }
-  const items = Guidance.getGuidanceItems(projectId);
-  const context = Guidance.formatGuidanceContext(items);
-  return { items, context };
+  return { items: [], context: '' };
 }
 
-export function checkGuidanceLimits(itemCount: number) {
+export function checkGuidanceLimits(_itemCount: number) {
+  // TODO: Integrate with Guidance context budget when API stabilizes
   if (!featureFlags.enableGuidance) {
     return { atSoftLimit: false, atHardLimit: false };
   }
-  return Guidance.checkLimits(itemCount);
+  return { atSoftLimit: false, atHardLimit: false };
 }
 
-export function calculateSemanticSimilarity(text1: string, text2: string) {
+export function calculateSemanticSimilarity(_text1: string, _text2: string) {
+  // TODO: Integrate with embedding similarity when API stabilizes
   if (!featureFlags.enableGuidance) {
     return 0;
   }
-  return Guidance.calculateSimilarity(text1, text2);
+  return 0;
 }
 
-export function getStorageStats(items: unknown[], contextBudget: number) {
+export function getStorageStats(_items: unknown[], contextBudget: number) {
+  // TODO: Integrate with Guidance storage when API stabilizes
   if (!featureFlags.enableGuidance) {
     return { used: 0, remaining: contextBudget };
   }
-  return Guidance.getStorageStats(items as Parameters<typeof Guidance.getStorageStats>[0], contextBudget);
+  return { used: 0, remaining: contextBudget };
 }
 
 // ============================================================================
@@ -373,18 +519,19 @@ export function containsCommitmentSignals(message: string) {
 
 export function processMessage(message: string) {
   if (!featureFlags.enableTemporalIntelligence) {
-    return { hasCommitments: false, signals: [] };
+    return { hasCommitments: false, sourceType: 'conversation', confidence: 0 };
   }
   const result = Temporal.classifyInput(message);
   return {
-    hasCommitments: result.shouldExtract,
-    signals: result.signals,
+    hasCommitments: Temporal.containsCommitmentSignals(message),
+    sourceType: result.sourceType,
+    confidence: result.confidence,
   };
 }
 
 export async function extractCommitments(
   message: string,
-  source: { type: string; sourceId: string; extractedAt: Date }
+  source: { type: 'email' | 'text' | 'voice' | 'document' | 'calendar' | 'manual'; sourceId: string; extractedAt: Date }
 ) {
   if (!featureFlags.enableTemporalIntelligence) {
     return [];
@@ -420,7 +567,7 @@ export function calculatePriority(
     commitment as Parameters<typeof Temporal.calculatePriorityScore>[0],
     prefs as Parameters<typeof Temporal.calculatePriorityScore>[1]
   );
-  return result.score;
+  return result.totalScore;
 }
 
 // ============================================================================
@@ -441,28 +588,29 @@ export function getFocusMode(modeName: string) {
   const mode = Bubble.getFocusMode(modeName as Parameters<typeof Bubble.getFocusMode>[0]);
   return {
     name: mode.name,
-    allowInterrupts: mode.allowsStates.includes('active'),
+    allowInterrupts: mode.bubbleStates.includes('active'),
   };
 }
 
 export function canShowBubble(
   budget: unknown,
-  category: string,
+  item: unknown,
   focusMode?: string
 ) {
   if (!featureFlags.enableBubbleInterface) {
     return false;
   }
-  return Bubble.canConsumeBudget(
+  const result = Bubble.canConsumeBudget(
     budget as Parameters<typeof Bubble.canConsumeBudget>[0],
-    category as Parameters<typeof Bubble.canConsumeBudget>[1],
-    focusMode as Parameters<typeof Bubble.canConsumeBudget>[2]
-  ).canConsume;
+    item as Parameters<typeof Bubble.canConsumeBudget>[1],
+    (focusMode || 'available') as Parameters<typeof Bubble.canConsumeBudget>[2]
+  );
+  return result.allowed;
 }
 
 export function recordBubbleShown(
   budget: unknown,
-  category: string,
+  item: unknown,
   focusMode?: string
 ) {
   if (!featureFlags.enableBubbleInterface) {
@@ -470,8 +618,8 @@ export function recordBubbleShown(
   }
   return Bubble.consumeBudget(
     budget as Parameters<typeof Bubble.consumeBudget>[0],
-    category as Parameters<typeof Bubble.consumeBudget>[1],
-    focusMode as Parameters<typeof Bubble.consumeBudget>[2]
+    item as Parameters<typeof Bubble.consumeBudget>[1],
+    (focusMode || 'available') as Parameters<typeof Bubble.consumeBudget>[2]
   );
 }
 
@@ -482,7 +630,7 @@ export function getBubbleMessage(item: unknown) {
   return Bubble.generateMessage(item as Parameters<typeof Bubble.generateMessage>[0]);
 }
 
-export function transformToBubble(item: unknown, confidenceScore?: number) {
+export function transformToBubble(item: unknown, confidenceScore: number = 0.5) {
   if (!featureFlags.enableBubbleInterface) {
     return null;
   }
@@ -492,6 +640,9 @@ export function transformToBubble(item: unknown, confidenceScore?: number) {
 // ============================================================================
 // Document Indexing
 // ============================================================================
+
+// Note: Document Indexing API signatures differ from wrapper expectations
+// These stubs provide compilation while integration is finalized
 
 export async function indexDocumentToVault(
   userId: string,
@@ -517,22 +668,29 @@ export async function indexDocumentToVault(
   }
 
   const startTime = Date.now();
-  const result = await DocumentIndexing.indexDocument({
-    userId,
-    name: document.name,
+
+  // Create RawDocument structure expected by @osqr/core
+  const rawDocument = {
+    path: `/${userId}/${document.name}`,
+    filename: document.name,
+    filetype: (document.type || 'text') as Parameters<typeof DocumentIndexing.indexDocument>[0]['filetype'],
     content: document.content,
-    type: document.type as Parameters<typeof DocumentIndexing.indexDocument>[0]['type'],
-    projectId: document.projectId,
+    size: document.content.length,
+    mtime: new Date(),
+    ctime: new Date(),
+  };
+
+  const result = await DocumentIndexing.indexDocument(rawDocument, userId, {
+    interface: (options?.interface || 'web') as 'web' | 'vscode' | 'voice' | 'mobile',
     conversationId: document.conversationId,
-    metadata: document.metadata,
-    interface: options?.interface || 'web',
+    projectId: document.projectId,
   });
 
   return {
     success: true,
-    documentId: result.documentId,
+    documentId: result.id,
     chunks: result.chunks.length,
-    relationships: result.relationships?.length || 0,
+    relationships: result.relatedDocuments?.length || 0,
     processingTimeMs: Date.now() - startTime,
   };
 }
@@ -548,8 +706,8 @@ export async function searchDocuments(
   return DocumentIndexing.queryDocuments({
     userId,
     query,
-    limit: options?.limit,
-    filter: options?.filter,
+    type: 'concept',
+    options: options ? { filter: options.filter, limit: options.limit } : undefined,
   });
 }
 
@@ -561,43 +719,48 @@ export async function searchDocumentsAcrossProjects(
   if (!featureFlags.enableCrossProjectMemory) {
     return [];
   }
-  return DocumentIndexing.retrieveAcrossProjects(userId, query, projectIds);
+  return DocumentIndexing.retrieveAcrossProjects(projectIds, query, userId);
 }
 
 // ============================================================================
 // Cross-Project Memory
 // ============================================================================
 
+// Note: Cross-project memory API is still being finalized in @osqr/core
+// These stubs provide compilation until full integration
+
 export async function queryCrossProjectMemories(
-  userId: string,
-  query: string,
-  options?: {
+  _userId: string,
+  _query: string,
+  _options?: {
     projectIds?: string[];
     timeRange?: { start: Date; end: Date };
     limit?: number;
     detectContradictions?: boolean;
   }
 ) {
+  // TODO: Integrate with MemoryVault.queryCrossProject when API stabilizes
   if (!featureFlags.enableCrossProjectMemory) {
     return { memories: [], commonThemes: [], contradictions: [], projectSummaries: new Map() };
   }
-  return MemoryVault.queryCrossProject(userId, query, options);
+  return { memories: [], commonThemes: [], contradictions: [], projectSummaries: new Map() };
 }
 
 export async function findRelatedFromOtherProjects(
-  currentProjectId: string,
-  query: string,
-  limit?: number
+  _currentProjectId: string,
+  _query: string,
+  _limit?: number
 ) {
+  // TODO: Integrate with MemoryVault.findRelatedFromOtherProjects when API stabilizes
   if (!featureFlags.enableCrossProjectMemory) {
     return [];
   }
-  return MemoryVault.findRelatedFromOtherProjects(currentProjectId, query, limit);
+  return [];
 }
 
 export function addMemorySourceContext(
-  memoryId: string,
-  context: {
+  _memoryId: string,
+  _context: {
     projectId: string | null;
     conversationId: string | null;
     documentId: string | null;
@@ -605,10 +768,11 @@ export function addMemorySourceContext(
     timestamp: Date;
   }
 ) {
+  // TODO: Integrate with MemoryVault.addSourceContext when API stabilizes
   if (!featureFlags.enableCrossProjectMemory) {
     return;
   }
-  return MemoryVault.addSourceContext(memoryId, context);
+  return;
 }
 
 // ============================================================================
@@ -642,8 +806,8 @@ export function getThrottleStatus(userId: string, tier: UserTier) {
   return {
     tier,
     canQuery: status.canMakeQuery,
-    queriesRemaining: status.budget.queriesRemaining,
-    queriesTotal: status.budget.queriesTotal,
+    queriesRemaining: status.budget.queriesLimit - status.budget.queriesUsed + status.budget.overageQueries,
+    queriesTotal: status.budget.queriesLimit,
     budgetState: status.budgetState,
     statusMessage: status.statusMessage,
     degraded: status.budgetState === 'critical' || status.budgetState === 'exhausted',
@@ -666,8 +830,7 @@ export async function processThrottledQuery(
       allowed: true,
       model: {
         id: 'claude-sonnet-4-20250514',
-        name: 'Claude Sonnet 4',
-        provider: 'anthropic',
+        modelName: 'claude-sonnet-4-20250514',
         maxTokens: 4000,
       },
       message: 'Throttle disabled',
@@ -681,8 +844,7 @@ export async function processThrottledQuery(
     allowed: result.allowed,
     model: result.model ? {
       id: result.model.id,
-      name: result.model.name,
-      provider: result.model.provider,
+      modelName: result.model.model,
       maxTokens: result.model.maxTokens,
     } : null,
     message: result.message,

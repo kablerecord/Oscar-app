@@ -28,8 +28,8 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    const tierName = (workspace?.tier || 'starter') as 'starter' | 'pro' | 'master'
-    const tierConfig = TIERS[tierName] || TIERS.starter
+    const tierName = (workspace?.tier || 'pro') as 'lite' | 'pro' | 'master'
+    const tierConfig = TIERS[tierName] || TIERS.pro
 
     // Get today's usage count
     const today = new Date()

@@ -308,8 +308,8 @@ export async function checkBulkUploadEnterprise(
 
   // Check if it exceeds current tier but fits in a higher tier
   if (totalAfterUpload > config.limits.maxDocuments) {
-    // Starter users should upgrade to Pro first
-    if (tier === 'starter') {
+    // Lite users should upgrade to Pro first
+    if (tier === 'lite') {
       return {
         requiresEnterprise: false,
         filesAttempted: newFileCount,

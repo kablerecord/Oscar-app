@@ -484,14 +484,13 @@ export async function POST(req: NextRequest) {
           artifacts.map((artifact) =>
             prisma.artifact.create({
               data: {
+                userId,
                 workspaceId,
                 messageId: osqrMessage.id,
-                threadId: thread.id,
-                type: artifact.type,
+                conversationId: thread.id,
+                type: artifact.type as 'CODE' | 'DOCUMENT' | 'DIAGRAM' | 'HTML' | 'SVG' | 'JSON' | 'CSV' | 'REACT' | 'IMAGE' | 'CHART',
                 title: artifact.title,
-                content: artifact.content,
-                language: artifact.language,
-                description: artifact.description,
+                content: { text: artifact.content, language: artifact.language, description: artifact.description },
                 version: 1,
               },
             })

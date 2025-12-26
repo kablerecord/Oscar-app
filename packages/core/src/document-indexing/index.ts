@@ -92,3 +92,14 @@ export {
 
 // Re-export pipeline types
 export type { DocumentQuery } from './pipeline';
+
+// Adapters - for connecting to external implementations
+export * from './adapters';
+export type {
+  EmbeddingAdapter,
+  StorageAdapter,
+  LLMAdapter,
+  DocumentIndexingAdapters,
+  StorageSearchOptions,
+  StorageSearchResult,
+} from './adapters';

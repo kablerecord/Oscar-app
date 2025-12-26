@@ -848,12 +848,6 @@ function DeeperInsightPhase({
 }) {
   const [isGenerating, setIsGenerating] = useState(false)
 
-  useEffect(() => {
-    if (deeperInsights.length === 0 && !isGenerating) {
-      generateDeeperInsights()
-    }
-  }, [deeperInsights.length, isGenerating])
-
   const generateDeeperInsights = async () => {
     setIsGenerating(true)
     await new Promise(resolve => setTimeout(resolve, 2500))
@@ -875,6 +869,13 @@ function DeeperInsightPhase({
     onInsightsGenerated([insight])
     setIsGenerating(false)
   }
+
+  useEffect(() => {
+    if (deeperInsights.length === 0 && !isGenerating) {
+      generateDeeperInsights()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deeperInsights.length, isGenerating])
 
   if (isGenerating) {
     return (

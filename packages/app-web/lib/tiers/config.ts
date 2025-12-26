@@ -4,10 +4,15 @@
  * Defines features and limits for each subscription tier
  *
  * PRICING PHILOSOPHY (from PRICING-ARCHITECTURE.md):
- * - No visible query limits - users shouldn't feel constrained
+ * - Token-based billing - uniform across all interfaces (web, VS Code, mobile)
  * - Mode-based differentiation - higher tiers unlock more powerful AI modes
  * - Document vault as value anchor - clear, tangible limits users understand
- * - Invisible throttling - protect margins without marketing complexity
+ * - VS Code requires Pro tier minimum
+ *
+ * TOKEN LIMITS (per month):
+ * - Lite: 500K tokens (no VS Code access)
+ * - Pro: 2.5M tokens
+ * - Master: 12.5M tokens
  */
 
 export type TierName = 'lite' | 'pro' | 'master'
@@ -22,11 +27,16 @@ export interface TierConfig {
   positioning: string // Marketing positioning phrase
   features: string[]
   limits: {
+    // Token-based billing (primary model)
+    monthlyTokenLimit: number
+    // Interface access
+    vsCodeAccess: boolean
+    mobileAccess: boolean
     // PKV limits
     maxDocuments: number
     maxFileSizeMB: number
     maxTotalStorageMB: number
-    // Usage limits (invisible - not shown in UI)
+    // Legacy: Usage limits (kept for backward compatibility, invisible)
     panelQueriesPerDay: number
     refineQueriesPerDay: number
     contemplatePerDay: number
@@ -62,21 +72,30 @@ export const TIERS: Record<TierName, TierConfig> = {
     description: 'Entry point with persistent memory and Quick mode',
     positioning: 'Start thinking with AI',
     features: [
+      '500K tokens per month',
       '5 documents in vault',
-      '10 queries per day',
       '7-day chat history analysis',
       'Quick mode only',
       'Memory persists',
       '1GB storage',
+      'Web access only',
     ],
     limits: {
+      // Token-based (primary)
+      monthlyTokenLimit: 500_000,
+      // Interface access
+      vsCodeAccess: false, // Lite users cannot use VS Code extension
+      mobileAccess: true,
+      // PKV limits
       maxDocuments: 5,
       maxFileSizeMB: 25,
       maxTotalStorageMB: 1024, // 1GB
-      panelQueriesPerDay: 10, // Visible limit for Lite
+      // Legacy limits (backward compatibility)
+      panelQueriesPerDay: 10,
       refineQueriesPerDay: 10,
-      contemplatePerDay: 0, // Not available
-      councilPerDay: 0, // Not available
+      contemplatePerDay: 0,
+      councilPerDay: 0,
+      // Feature access
       hasRefineFire: true,
       hasMultiModel: false,
       hasMSC: false,
@@ -97,26 +116,35 @@ export const TIERS: Record<TierName, TierConfig> = {
     price: 99,
     yearlyPrice: 948, // $79/month × 12 = $948 (2 months free)
     futurePrice: 149,
-    description: 'Full OSQR experience with multi-model panel',
+    description: 'Full OSQR experience with VS Code extension',
     positioning: 'The real product',
     features: [
+      '2.5M tokens per month',
       '500 documents in vault',
-      '100 queries per day',
       '30-day chat history analysis',
       'Quick, Thoughtful, and Contemplate modes',
       'Full Personal Knowledge Vault',
       'Cross-interface continuity',
       '10GB storage',
       '100 image analyses per month',
+      'VS Code Extension',
     ],
     limits: {
+      // Token-based (primary)
+      monthlyTokenLimit: 2_500_000,
+      // Interface access
+      vsCodeAccess: true, // Pro users have VS Code access
+      mobileAccess: true,
+      // PKV limits
       maxDocuments: 500,
       maxFileSizeMB: 25,
       maxTotalStorageMB: 10240, // 10GB
+      // Legacy limits (backward compatibility)
       panelQueriesPerDay: 100,
       refineQueriesPerDay: 100,
       contemplatePerDay: 0, // Not available at Pro
       councilPerDay: 0, // Not available at Pro
+      // Feature access
       hasRefineFire: true,
       hasMultiModel: true,
       hasMSC: true,
@@ -141,8 +169,8 @@ export const TIERS: Record<TierName, TierConfig> = {
     positioning: 'Build with OSQR',
     features: [
       'Everything in Pro',
+      '12.5M tokens per month',
       '1,500 documents in vault',
-      '300 queries per day',
       'Unlimited chat history analysis',
       'Council Mode (multi-model deliberation)',
       'Priority fast-lane processing',
@@ -150,17 +178,25 @@ export const TIERS: Record<TierName, TierConfig> = {
       'Unlimited image analyses',
       'Weekly automated reviews',
       'Custom Agent Builder (coming)',
-      'VS Code Extension (coming)',
+      'VS Code Extension with priority routing',
       'Early access to new models and features',
     ],
     limits: {
+      // Token-based (primary)
+      monthlyTokenLimit: 12_500_000,
+      // Interface access
+      vsCodeAccess: true, // Master users have VS Code access
+      mobileAccess: true,
+      // PKV limits
       maxDocuments: 1500,
       maxFileSizeMB: 50,
       maxTotalStorageMB: 102400, // 100GB
+      // Legacy limits (backward compatibility)
       panelQueriesPerDay: 300,
       refineQueriesPerDay: 300,
-      contemplatePerDay: 50, // Invisible throttle
-      councilPerDay: 20, // Invisible throttle
+      contemplatePerDay: 50,
+      councilPerDay: 20,
+      // Feature access
       hasRefineFire: true,
       hasMultiModel: true,
       hasMSC: true,
@@ -181,7 +217,7 @@ export const TIERS: Record<TierName, TierConfig> = {
  * Get tier config by name
  */
 export function getTierConfig(tier: TierName): TierConfig {
-  return TIERS[tier] || TIERS.starter
+  return TIERS[tier] || TIERS.pro // Default to pro, not starter
 }
 
 /**
@@ -226,4 +262,33 @@ export function getYearlyMonthlyPrice(tier: TierName): number {
   const config = getTierConfig(tier)
   if (config.yearlyPrice === 0) return config.price
   return Math.round(config.yearlyPrice / 12)
+}
+
+/**
+ * Check if tier has VS Code access
+ */
+export function hasVSCodeAccess(tier: TierName): boolean {
+  const config = getTierConfig(tier)
+  return config.limits.vsCodeAccess
+}
+
+/**
+ * Get monthly token limit for tier
+ */
+export function getMonthlyTokenLimit(tier: TierName): number {
+  const config = getTierConfig(tier)
+  return config.limits.monthlyTokenLimit
+}
+
+/**
+ * Format token count for display (e.g., 2500000 -> "2.5M")
+ */
+export function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    return `${(tokens / 1_000_000).toFixed(1)}M`.replace('.0M', 'M')
+  }
+  if (tokens >= 1_000) {
+    return `${(tokens / 1_000).toFixed(0)}K`
+  }
+  return tokens.toString()
 }
