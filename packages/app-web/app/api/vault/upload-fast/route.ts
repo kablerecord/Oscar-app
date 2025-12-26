@@ -73,12 +73,53 @@ export async function POST(req: NextRequest) {
       fileContent = await file.text()
     } else if (fileType === 'application/json' || fileName.endsWith('.json')) {
       fileContent = await file.text()
+
+      // Detect AI export formats that need special handling
+      if (fileContent.startsWith('[{"uuid"') || fileContent.startsWith('[{"title"')) {
+        try {
+          const parsed = JSON.parse(fileContent)
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const first = parsed[0]
+            if (first.mapping && first.create_time) {
+              return Response.json({
+                error: `ChatGPT export detected (${parsed.length} conversations). Use the CLI import tool for batch processing.`,
+                format: 'chatgpt_json',
+                conversationCount: parsed.length,
+                suggestion: 'scripts/index-chatgpt-conversations.ts'
+              }, { status: 400 })
+            } else if (first.chat_messages && first.uuid) {
+              return Response.json({
+                error: `Claude export detected (${parsed.length} conversations). Use the CLI import tool for batch processing.`,
+                format: 'claude_json',
+                conversationCount: parsed.length,
+                suggestion: 'scripts/index-claude-conversations.ts'
+              }, { status: 400 })
+            }
+          }
+        } catch {
+          // Not valid JSON array, continue with normal processing
+        }
+      }
+    } else if (fileType === 'text/html' || fileName.endsWith('.html')) {
+      const htmlContent = await file.text()
+      // Check if this might be a ChatGPT export (chat.html format)
+      if (htmlContent.includes('conversations') && htmlContent.includes('mapping')) {
+        return Response.json({
+          error: 'ChatGPT HTML export detected. Use the CLI import tool for processing.',
+          format: 'chatgpt_html',
+          suggestion: 'scripts/index-chatgpt-conversations.ts'
+        }, { status: 400 })
+      }
+      // Regular HTML - extract text
+      fileContent = htmlContent.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
     } else {
       try {
         fileContent = await file.text()
       } catch {
         return Response.json({
-          error: 'Unsupported file type. Please upload a PDF, DOCX, TXT, MD, or JSON file.'
+          error: `Unsupported file type: ${fileType || fileName.split('.').pop()}. Please upload a PDF, DOCX, TXT, MD, or JSON file.`,
+          fileType: fileType || 'unknown',
+          extension: fileName.split('.').pop()
         }, { status: 400 })
       }
     }

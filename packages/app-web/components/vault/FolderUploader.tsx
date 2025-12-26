@@ -28,6 +28,9 @@ interface FileEntry {
   status: 'pending' | 'uploading' | 'uploaded' | 'indexing' | 'complete' | 'error' | 'skipped'
   error?: string
   documentId?: string
+  // AI export format detection
+  format?: 'chatgpt_html' | 'chatgpt_json' | 'claude_json'
+  conversationCount?: number
 }
 
 interface UploadStats {
@@ -215,7 +218,13 @@ export function FolderUploader({
   }, [])
 
   // Fast upload - just saves content to DB
-  const uploadFileFast = async (fileEntry: FileEntry): Promise<{ success: boolean; documentId?: string; error?: string }> => {
+  const uploadFileFast = async (fileEntry: FileEntry): Promise<{
+    success: boolean
+    documentId?: string
+    error?: string
+    format?: 'chatgpt_html' | 'chatgpt_json' | 'claude_json'
+    conversationCount?: number
+  }> => {
     const formData = new FormData()
     formData.append('file', fileEntry.file)
     formData.append('workspaceId', workspaceId)
@@ -234,7 +243,12 @@ export function FolderUploader({
       const result = await response.json()
 
       if (!response.ok) {
-        return { success: false, error: result.error || 'Upload failed' }
+        return {
+          success: false,
+          error: result.error || 'Upload failed',
+          format: result.format,
+          conversationCount: result.conversationCount
+        }
       }
 
       return { success: true, documentId: result.documentId }
@@ -338,7 +352,12 @@ export function FolderUploader({
           updateFileStatus(fileEntry.path, { status: 'uploaded', documentId: result.documentId })
           uploadedDocs.push(result.documentId)
         } else {
-          updateFileStatus(fileEntry.path, { status: 'error', error: result.error })
+          updateFileStatus(fileEntry.path, {
+            status: 'error',
+            error: result.error,
+            format: result.format,
+            conversationCount: result.conversationCount
+          })
         }
       }
     }
@@ -683,6 +702,31 @@ export function FolderUploader({
                   </div>
                 )}
               </div>
+
+              {/* Show AI export format guidance if detected */}
+              {files.some(f => f.format) && (
+                <div className="mt-4 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    AI Conversation Exports Detected
+                  </p>
+                  <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                    Some files are ChatGPT or Claude exports that need batch processing.
+                    Contact support to import your AI conversation history.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {files.filter(f => f.format === 'chatgpt_json').length > 0 && (
+                      <span className="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded">
+                        ChatGPT: {files.filter(f => f.format === 'chatgpt_json').reduce((sum, f) => sum + (f.conversationCount || 0), 0)} conversations
+                      </span>
+                    )}
+                    {files.filter(f => f.format === 'claude_json').length > 0 && (
+                      <span className="text-xs bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded">
+                        Claude: {files.filter(f => f.format === 'claude_json').reduce((sum, f) => sum + (f.conversationCount || 0), 0)} conversations
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               <Button
                 variant="outline"
