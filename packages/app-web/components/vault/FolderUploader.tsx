@@ -18,6 +18,7 @@ import {
   Zap,
   Brain,
 } from 'lucide-react'
+import { useUploadStatus } from './UploadStatusContext'
 
 interface FileEntry {
   file: File
@@ -86,6 +87,10 @@ export function FolderUploader({
   const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState<number | null>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const globalJobIdRef = useRef<string | null>(null)
+
+  // Global upload status for persistent indicator
+  const { addJob, updateJob } = useUploadStatus()
 
   const getStats = useCallback((): UploadStats => {
     return {
@@ -323,6 +328,21 @@ export function FolderUploader({
       onStart()
     }
 
+    // Create global job for persistent status indicator
+    const folderName = files[0]?.relativePath?.split('/')[0] || 'Folder'
+    const jobId = addJob({
+      fileName: `${files.length} files`,
+      folderName,
+      status: 'uploading',
+      progress: 0,
+      totalFiles: files.length,
+      completedFiles: 0,
+      indexedFiles: 0,
+      errorCount: 0,
+      skippedCount: 0,
+    })
+    globalJobIdRef.current = jobId
+
     const filesRef = { current: [...files] }
 
     const updateFileStatus = (path: string, updates: Partial<FileEntry>) => {
@@ -345,6 +365,9 @@ export function FolderUploader({
     const pendingFiles = files.filter(f => f.status === 'pending')
     const uploadQueue = [...pendingFiles]
     const uploadedDocs: string[] = []
+    let completedCount = 0
+    let skippedCount = 0
+    let errorCount = 0
 
     const processUpload = async () => {
       while (uploadQueue.length > 0 && !abortControllerRef.current?.signal.aborted) {
@@ -354,11 +377,13 @@ export function FolderUploader({
         updateFileStatus(fileEntry.path, { status: 'uploading' })
 
         const result = await uploadFileFast(fileEntry)
+        completedCount++
 
         if (result.success && result.documentId) {
           if (result.skipped) {
             // File unchanged - skip indexing
             updateFileStatus(fileEntry.path, { status: 'skipped', documentId: result.documentId })
+            skippedCount++
           } else {
             // New or updated file - needs indexing
             updateFileStatus(fileEntry.path, { status: 'uploaded', documentId: result.documentId })
@@ -370,6 +395,17 @@ export function FolderUploader({
             error: result.error,
             format: result.format,
             conversationCount: result.conversationCount
+          })
+          errorCount++
+        }
+
+        // Update global job progress
+        if (globalJobIdRef.current) {
+          updateJob(globalJobIdRef.current, {
+            completedFiles: completedCount,
+            skippedCount,
+            errorCount,
+            progress: Math.round((completedCount / files.length) * 100),
           })
         }
       }
@@ -388,12 +424,34 @@ export function FolderUploader({
       setPhase('indexing')
       setStartTime(Date.now())
 
+      // Update global job to indexing phase
+      if (globalJobIdRef.current) {
+        updateJob(globalJobIdRef.current, {
+          status: 'indexing',
+          progress: 0,
+          indexedFiles: 0,
+        })
+      }
+
+      let indexedCount = 0
       for (const documentId of uploadedDocs) {
         if (abortControllerRef.current?.signal.aborted) break
 
         updateFileById(documentId, 'indexing')
         const success = await indexDocument(documentId, updateFileById)
         updateFileById(documentId, success ? 'complete' : 'error')
+
+        indexedCount++
+        if (!success) errorCount++
+
+        // Update global job indexing progress
+        if (globalJobIdRef.current) {
+          updateJob(globalJobIdRef.current, {
+            indexedFiles: indexedCount,
+            errorCount,
+            progress: Math.round((indexedCount / uploadedDocs.length) * 100),
+          })
+        }
       }
     }
 
@@ -409,6 +467,18 @@ export function FolderUploader({
       complete: filesRef.current.filter(f => f.status === 'complete').length,
       error: filesRef.current.filter(f => f.status === 'error').length,
       skipped: filesRef.current.filter(f => f.status === 'skipped').length,
+    }
+
+    // Update global job to complete
+    if (globalJobIdRef.current) {
+      updateJob(globalJobIdRef.current, {
+        status: finalStats.error > 0 && finalStats.complete === 0 ? 'error' : 'complete',
+        progress: 100,
+        completedAt: Date.now(),
+        indexedFiles: finalStats.complete,
+        errorCount: finalStats.error,
+        skippedCount: finalStats.skipped,
+      })
     }
 
     if (onComplete) {

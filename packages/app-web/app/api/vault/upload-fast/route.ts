@@ -188,7 +188,7 @@ export async function POST(req: NextRequest) {
             contentHash,
             needsIndexing: true,
             uploadedAt: new Date().toISOString(),
-            previousVersionAt: (existingDoc.metadata as Record<string, unknown>)?.uploadedAt,
+            previousVersionAt: ((existingDoc.metadata as Record<string, unknown>)?.uploadedAt as string) || null,
           }
         }
       })
