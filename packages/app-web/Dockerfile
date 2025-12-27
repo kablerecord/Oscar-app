@@ -53,10 +53,11 @@ COPY --from=builder /app/packages/app-web/public ./packages/app-web/public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/static ./packages/app-web/.next/static
 
 # Copy Prisma schema and migrations for runtime migrations
+# In pnpm monorepo, prisma deps are in packages/app-web/node_modules
 COPY --from=builder /app/packages/app-web/prisma ./packages/app-web/prisma
 COPY --from=builder /app/packages/app-web/node_modules/.prisma ./packages/app-web/node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/packages/app-web/node_modules/@prisma ./packages/app-web/node_modules/@prisma
+COPY --from=builder /app/packages/app-web/node_modules/prisma ./packages/app-web/node_modules/prisma
 
 # Create startup script that runs migrations then starts the server
 # Migrations are optional - if they fail, server still starts (for db push setups)
