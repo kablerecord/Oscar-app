@@ -33,15 +33,8 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const startTime = Date.now()
-
   try {
-    // Process up to 10 tasks per cron run
-    // With 1-minute intervals from cron-job.org, smaller batches work well
-    // Each document takes ~2-5 seconds, so 10 docs ≈ 20-50 seconds
-    const processed = await processPendingTasks(10)
-
-    // Get queue status for logging
+    // Get queue status first (fast operation)
     const [pending, running, failed] = await Promise.all([
       prisma.backgroundTask.count({
         where: { type: 'index-document', status: 'pending' }
@@ -54,12 +47,21 @@ export async function POST(req: NextRequest) {
       })
     ])
 
-    const duration = Date.now() - startTime
+    // Fire-and-forget: Start processing in background, respond immediately
+    // This prevents cron-job.org timeout (30s limit) while still processing docs
+    // Process up to 5 docs per cron run - with 1-minute intervals this is ~300 docs/hour
+    if (pending > 0 || running === 0) {
+      // Don't await - let it run in background
+      processPendingTasks(5).then(processed => {
+        console.log(`[Cron] Processed ${processed} documents in background`)
+      }).catch(err => {
+        console.error('[Cron] Background processing error:', err)
+      })
+    }
 
     return Response.json({
       success: true,
-      processed,
-      duration: `${duration}ms`,
+      message: 'Processing started',
       queue: { pending, running, failed },
       timestamp: new Date().toISOString()
     })
@@ -67,8 +69,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Cron processing error:', error)
     return Response.json({
-      error: error instanceof Error ? error.message : 'Processing failed',
-      duration: `${Date.now() - startTime}ms`
+      error: error instanceof Error ? error.message : 'Processing failed'
     }, { status: 500 })
   }
 }
