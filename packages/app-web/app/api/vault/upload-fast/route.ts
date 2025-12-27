@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import { prisma } from '@/lib/db/prisma'
 import { canUploadDocument, canUploadFileSize } from '@/lib/tiers/check'
 import { parsePDF } from '@/lib/utils/pdf-parser'
+import { enqueueTask } from '@/lib/tasks/queue'
 
 /**
  * Generate a simple hash for content comparison
@@ -198,6 +199,17 @@ export async function POST(req: NextRequest) {
         where: { documentId: existingDoc.id }
       })
 
+      // Enqueue background indexing task
+      await enqueueTask({
+        type: 'index-document',
+        payload: {
+          documentId: updatedDoc.id,
+          workspaceId,
+        },
+        workspaceId,
+        priority: 'normal',
+      })
+
       return Response.json({
         success: true,
         documentId: updatedDoc.id,
@@ -205,7 +217,7 @@ export async function POST(req: NextRequest) {
         wordCount,
         charCount,
         updated: true,
-        needsIndexing: true,
+        indexingQueued: true,
         message: 'File updated (content changed)'
       })
     }
@@ -249,13 +261,24 @@ export async function POST(req: NextRequest) {
       }
     })
 
+    // Enqueue background indexing task
+    await enqueueTask({
+      type: 'index-document',
+      payload: {
+        documentId: document.id,
+        workspaceId,
+      },
+      workspaceId,
+      priority: 'normal',
+    })
+
     return Response.json({
       success: true,
       documentId: document.id,
       fileName,
       wordCount,
       charCount,
-      needsIndexing: true,
+      indexingQueued: true,
     })
 
   } catch (error) {
