@@ -27,6 +27,7 @@ export type QuestionType =
   | 'summarization'  // "Summarize", "Extract key points"
   | 'conversational' // Casual chat, opinions, discussion
   | 'high_stakes'    // Major decisions, consequential advice
+  | 'self_referential' // Questions about OSQR/Oscar himself - fast, uses constitution
 
 // Provider types (expandable for future providers)
 export type ModelProvider = 'anthropic' | 'openai' | 'google' | 'xai' | 'mistral' | 'meta'
@@ -579,6 +580,16 @@ const QUESTION_PATTERNS: Record<QuestionType, RegExp[]> = {
     /\b(health|medical|diagnosis)\b/i,
     /\b(career|job|offer)\b/i,
   ],
+  self_referential: [
+    /\b(osqr|oscar)\b/i,
+    /\bwho (are|made) you\b/i,
+    /\bwhat (are|model) you\b/i,
+    /\babout yourself\b/i,
+    /\byour (values|constitution|commitments|philosophy|principles)\b/i,
+    /\bwhat (will you never|do you believe)\b/i,
+    /\bhow do you (work|think|operate)\b/i,
+    /\b(openai|anthropic|claude|gpt)\b/i, // Questions probing model identity
+  ],
 }
 
 // Complexity indicators
@@ -608,6 +619,7 @@ export function detectQuestionType(question: string): QuestionType {
 
   // Check each pattern type in priority order
   const priorityOrder: QuestionType[] = [
+    'self_referential', // Questions about OSQR - fast path
     'high_stakes',
     'coding',
     'creative',
@@ -685,6 +697,7 @@ export function getRecommendedModel(
     summarization: 'summarization',
     conversational: 'default',
     high_stakes: 'reasoning', // Use best reasoning for high stakes
+    self_referential: 'fast', // Questions about OSQR - use fast model, constitution is in prompt
   }
 
   const category = typeToCategory[questionType]
@@ -737,12 +750,15 @@ export function routeQuestion(question: string): RoutingDecision {
   const alternativeModels = getAlternativeModels(questionType, recommendedModel)
 
   // Determine if we should suggest a different mode
+  // Self-referential questions always stay in Quick mode
   let modeSuggestion: 'none' | 'thoughtful' | 'contemplate' = 'none'
-  if (questionType === 'high_stakes' || complexity >= 4) {
-    modeSuggestion = 'thoughtful'
-  }
-  if (questionType === 'high_stakes' && complexity >= 4) {
-    modeSuggestion = 'contemplate'
+  if (questionType !== 'self_referential') {
+    if (questionType === 'high_stakes' || complexity >= 4) {
+      modeSuggestion = 'thoughtful'
+    }
+    if (questionType === 'high_stakes' && complexity >= 4) {
+      modeSuggestion = 'contemplate'
+    }
   }
 
   // Determine confidence based on pattern matching strength
