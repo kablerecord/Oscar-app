@@ -34,8 +34,6 @@ import {
   MicOff,
 } from 'lucide-react'
 import { RoutingNotification } from '@/components/oscar/RoutingNotification'
-import { OSCARBubble } from '@/components/oscar/OSCARBubble'
-import { shouldShowOnboarding } from '@/lib/onboarding/oscar-onboarding'
 import { ShareActions } from '@/components/share/ShareActions'
 import { ResponseActions } from '@/components/chat/ResponseActions'
 import {
@@ -2312,19 +2310,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         onDismiss={() => setRoutingNotification(null)}
       />
 
-      {/* OSQR Onboarding Bubble - shows during onboarding stages */}
-      {shouldShowOnboarding(onboardingState) && (
-        <OSCARBubble
-          onboardingState={onboardingState}
-          onOnboardingProgress={setOnboardingState}
-          workspaceId={workspaceId}
-          onBubbleChat={(message) => {
-            handleDirectFire(message)
-          }}
-          onHighlightElement={onHighlightElement}
-          streamingState={streamingState}
-        />
-      )}
+      {/* OSQR Onboarding Bubble removed - earlier version, no longer needed */}
     </div>
   )
 })
