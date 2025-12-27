@@ -222,15 +222,12 @@ export function VaultStats({ totalDocuments, indexedDocuments, workspaceId }: Va
               <div className="flex items-center gap-1.5">
                 {isIndexing || displayIsReindexing ? (
                   <Loader2 className="h-3.5 w-3.5 text-purple-400 animate-spin" />
-                ) : hasIncompleteIndexing ? (
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-400" />
                 ) : (
-                  <Brain className="h-3.5 w-3.5 text-emerald-400" />
+                  <Brain className={`h-3.5 w-3.5 ${isAllIndexed ? 'text-emerald-400' : 'text-emerald-400'}`} />
                 )}
                 <span className="text-sm text-slate-300">Indexed</span>
                 <span className={`text-sm font-semibold ${
-                  isIndexing || displayIsReindexing ? 'text-purple-400' :
-                  isAllIndexed ? 'text-emerald-400' : 'text-amber-400'
+                  isIndexing || displayIsReindexing ? 'text-purple-400' : 'text-emerald-400'
                 }`}>
                   {isIndexing ? `${uploadProgress}%` :
                    displayIsReindexing ? `${reindexProgress}%` :
@@ -280,15 +277,15 @@ export function VaultStats({ totalDocuments, indexedDocuments, workspaceId }: Va
         {hasIncompleteIndexing && !displayIsReindexing && (
           <div className="pt-1">
             <div className="flex items-center justify-between text-xs mb-1.5">
-              <span className="text-amber-400 flex items-center gap-1">
-                <AlertTriangle className="h-3 w-3" />
-                {unindexedCount} document{unindexedCount !== 1 ? 's' : ''} not indexed
+              <span className="text-emerald-400 flex items-center gap-1">
+                <Brain className="h-3 w-3" />
+                {indexedDocuments.toLocaleString()} document{indexedDocuments !== 1 ? 's' : ''} indexed
               </span>
-              <span className="text-slate-500">{indexedDocuments}/{totalDocuments}</span>
+              <span className="text-slate-500">{indexedDocuments.toLocaleString()}/{totalDocuments.toLocaleString()}</span>
             </div>
             <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all"
+                className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 transition-all"
                 style={{ width: `${indexedPercent}%` }}
               />
             </div>
