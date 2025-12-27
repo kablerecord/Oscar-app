@@ -36,9 +36,10 @@ export async function POST(req: NextRequest) {
   const startTime = Date.now()
 
   try {
-    // Process up to 5 tasks per cron run
-    // This prevents timeout issues while still making progress
-    const processed = await processPendingTasks(5)
+    // Process up to 10 tasks per cron run
+    // With 1-minute intervals from cron-job.org, smaller batches work well
+    // Each document takes ~2-5 seconds, so 10 docs ≈ 20-50 seconds
+    const processed = await processPendingTasks(10)
 
     // Get queue status for logging
     const [pending, running, failed] = await Promise.all([
