@@ -89,7 +89,7 @@ export default async function VaultPage() {
     >
       <VaultPageClient workspaceId={workspace.id}>
         {/* Stats overview */}
-        <VaultStats totalDocuments={totalDocuments} indexedDocuments={indexedDocuments} />
+        <VaultStats totalDocuments={totalDocuments} indexedDocuments={indexedDocuments} workspaceId={workspace.id} />
 
         {/* Document list */}
         <div className="pt-4">
