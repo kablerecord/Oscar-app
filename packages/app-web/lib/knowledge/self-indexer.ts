@@ -1,24 +1,25 @@
 /**
  * OSQR Self-Indexer
  *
- * This is what makes OSQR "know himself" - indexing his own architecture,
- * system prompts, and operational specs into searchable knowledge.
+ * This is what makes OSQR "know himself" - indexing his constitution,
+ * values, and philosophy into searchable knowledge.
  *
- * This gives OSQR internal clarity no other AI has.
+ * What gets indexed (SHAREABLE):
+ * 1. Constitution and core commitments
+ * 2. Philosophy on growth, guidance, imagination
+ * 3. Capability ladder and coaching frameworks
+ * 4. Ethics and privacy commitments
  *
- * What gets indexed:
- * 1. System prompts and identity definitions
- * 2. Capability ladder and coaching frameworks
- * 3. Model registry and routing logic
- * 4. GKVI sections (ethics, execution, leverage, decisions)
- * 5. Architecture documentation
+ * What is NOT indexed (INTERNAL):
+ * - Model names and providers
+ * - Routing logic and implementation details
+ * - Pricing and infrastructure
  *
- * @see docs/OSQR-ARCHITECTURE.md
+ * @see docs/architecture/SELF_DISCLOSURE_SPEC.md
  */
 
 import { prisma } from '@/lib/db/prisma'
 import { GKVI, type GKVISection } from './gkvi'
-import { MODEL_REGISTRY, type ModelDefinition } from '@/lib/ai/model-router'
 
 // =============================================================================
 // TYPES
@@ -26,7 +27,7 @@ import { MODEL_REGISTRY, type ModelDefinition } from '@/lib/ai/model-router'
 
 export interface SelfKnowledgeEntry {
   id: string
-  category: 'identity' | 'capability' | 'models' | 'ethics' | 'coaching' | 'execution' | 'architecture'
+  category: 'constitution' | 'identity' | 'capability' | 'ethics' | 'coaching' | 'execution'
   title: string
   content: string
   metadata?: Record<string, unknown>
@@ -35,9 +36,9 @@ export interface SelfKnowledgeEntry {
 }
 
 export interface OSQRSelfKnowledge {
+  constitution: SelfKnowledgeEntry[]
   identity: SelfKnowledgeEntry[]
   capabilities: SelfKnowledgeEntry[]
-  models: SelfKnowledgeEntry[]
   frameworks: SelfKnowledgeEntry[]
   lastIndexed: Date
   version: string
@@ -49,30 +50,25 @@ export interface OSQRSelfKnowledge {
 
 /**
  * Compile OSQR's complete self-knowledge from all sources
- * This is what OSQR "knows about himself"
+ * This is what OSQR "knows about himself" — only shareable content
  */
 export function compileOSQRSelfKnowledge(): OSQRSelfKnowledge {
   const now = new Date()
-  const version = '1.0.0'
+  const version = '2.0.0'
 
   return {
-    identity: [
+    constitution: [
       {
-        id: 'osqr-core-identity',
-        category: 'identity',
-        title: 'OSQR Core Identity',
-        content: `I am OSQR, an advanced AI assistant designed to be an Operating System for Capability.
-
-My name stands for "OSQR" - I synthesize insights from a panel of AI experts (Claude, GPT, Gemini, Grok) to give users the best possible answer.
-
-I am inspired by Jarvis from Iron Man - helpful, responsive, confident but humble, smart but approachable, proactive and efficient.
-
-My core purpose: Help users upgrade their identity, build capabilities, create outputs, and establish lasting legacy.
-
-I am not just a Q&A tool. I am a strategic partner that compounds thinking and accelerates execution.`,
+        id: 'osqr-constitution',
+        category: 'constitution',
+        title: 'OSQR Constitution',
+        content: GKVI.constitution,
         version,
         lastUpdated: now,
       },
+    ],
+
+    identity: [
       {
         id: 'osqr-voice-style',
         category: 'identity',
@@ -80,13 +76,12 @@ I am not just a Q&A tool. I am a strategic partner that compounds thinking and a
         content: `How I communicate:
 - Write like a human having a natural conversation — warm, clear, engaging
 - Use simple, direct language that's easy to read and understand
-- NO corporate jargon, NO academic formality, NO "furthermore/moreover/additionally"
-- Be conversational but intelligent — think helpful friend who happens to be brilliant
+- NO corporate jargon, NO academic formality
+- Be conversational but intelligent
 - Get to the point quickly — respect the user's time
 - Confident but humble — here to assist, not impress
-- Proactive and efficient — anticipate needs when appropriate
 
-I speak as "OSQR" in first person. I'm the user's trusted AI partner, not a faceless system.`,
+I speak in first person. I'm your trusted AI partner.`,
         version,
         lastUpdated: now,
       },
@@ -111,17 +106,7 @@ I speak as "OSQR" in first person. I'm the user's trusted AI partner, not a face
       },
     ],
 
-    models: compileModelKnowledge(now, version),
-
     frameworks: [
-      {
-        id: 'osqr-execution-framework',
-        category: 'execution',
-        title: 'Execution Frameworks',
-        content: GKVI.execution,
-        version,
-        lastUpdated: now,
-      },
       {
         id: 'osqr-ethics-framework',
         category: 'ethics',
@@ -161,74 +146,6 @@ I speak as "OSQR" in first person. I'm the user's trusted AI partner, not a face
   }
 }
 
-/**
- * Compile knowledge about available AI models
- */
-function compileModelKnowledge(now: Date, version: string): SelfKnowledgeEntry[] {
-  const enabledModels = MODEL_REGISTRY.filter(m => m.enabled)
-
-  // Create entry for each model
-  const modelEntries = enabledModels.map((model): SelfKnowledgeEntry => ({
-    id: `osqr-model-${model.id}`,
-    category: 'models',
-    title: `Model: ${model.displayName}`,
-    content: `**${model.displayName}** (${model.provider})
-
-Codename: "${model.personality.codename}"
-${model.personality.description}
-
-**Capabilities:**
-- Reasoning: ${model.capabilities.reasoning}/10
-- Creativity: ${model.capabilities.creativity}/10
-- Coding: ${model.capabilities.coding}/10
-- Speed: ${model.capabilities.speed}/10
-- Accuracy: ${model.capabilities.accuracy}/10
-- Nuance: ${model.capabilities.nuance}/10
-
-**Best For:** ${model.personality.strengths.join(', ')}
-**Communication Style:** ${model.personality.style}
-
-Cost Profile: ${model.costProfile}
-Max Context: ${(model.maxContextTokens / 1000).toFixed(0)}K tokens`,
-    metadata: {
-      provider: model.provider,
-      modelId: model.model,
-      capabilities: model.capabilities,
-    },
-    version,
-    lastUpdated: now,
-  }))
-
-  // Add a summary entry about how models work together
-  const modelSummary: SelfKnowledgeEntry = {
-    id: 'osqr-model-orchestration',
-    category: 'models',
-    title: 'Model Orchestration Strategy',
-    content: `I coordinate multiple AI models based on question type and complexity:
-
-**Question Type Routing:**
-- Factual/Simple → Fast models (Haiku, GPT-4o-mini) for speed
-- Creative → Claude models for nuance and tone
-- Coding → GPT-4o or Claude Sonnet for technical accuracy
-- High Stakes → Best reasoning models + suggest Thoughtful mode
-- Analytical → Panel discussion for multiple perspectives
-
-**Response Modes:**
-- Quick Mode: Single fast model (~5-15 seconds)
-- Thoughtful Mode: 3-model panel + synthesis (~20-40 seconds)
-- Contemplate Mode: Extended reasoning + deep synthesis (~60-90 seconds)
-
-**Alt-Opinion:** For uncertain or high-stakes questions, I can provide a contrasting perspective from a different model family.
-
-**Current Models Available:**
-${enabledModels.map(m => `- ${m.displayName} (${m.personality.codename})`).join('\n')}`,
-    version,
-    lastUpdated: now,
-  }
-
-  return [...modelEntries, modelSummary]
-}
-
 // =============================================================================
 // SELF-KNOWLEDGE RETRIEVAL
 // =============================================================================
@@ -242,26 +159,29 @@ export function getSelfKnowledgeForQuery(query: string): string {
 
   const relevantSections: string[] = []
 
-  // Check if user is asking about OSQR's identity/capabilities
-  const identityKeywords = ['who are you', 'what are you', 'tell me about yourself', 'how do you work', 'what can you do']
-  const modelKeywords = ['model', 'claude', 'gpt', 'gemini', 'grok', 'which ai', 'what ai']
+  // Keywords for different types of self-referential questions
+  const constitutionKeywords = ['values', 'believe', 'never do', 'commitment', 'promise', 'constitution', 'principles']
+  const identityKeywords = ['who are you', 'what are you', 'tell me about yourself', 'what can you do']
   const capabilityKeywords = ['capability', 'level', 'ladder', 'stage', 'assessment']
   const frameworkKeywords = ['framework', 'principle', 'ethics', 'coaching', 'leverage', 'decision']
+  const philosophyKeywords = ['philosophy', 'growth', 'how do you think', 'approach', 'how do you help']
 
-  // Identity questions
-  if (identityKeywords.some(kw => lowerQuery.includes(kw))) {
-    selfKnowledge.identity.forEach(entry => {
+  // Constitution/values questions - share the constitution
+  if (constitutionKeywords.some(kw => lowerQuery.includes(kw)) ||
+      philosophyKeywords.some(kw => lowerQuery.includes(kw))) {
+    selfKnowledge.constitution.forEach(entry => {
       relevantSections.push(`### ${entry.title}\n\n${entry.content}`)
     })
   }
 
-  // Model questions
-  if (modelKeywords.some(kw => lowerQuery.includes(kw))) {
-    // Add model orchestration summary
-    const orchestration = selfKnowledge.models.find(m => m.id === 'osqr-model-orchestration')
-    if (orchestration) {
-      relevantSections.push(`### ${orchestration.title}\n\n${orchestration.content}`)
-    }
+  // Identity questions - include constitution + voice
+  if (identityKeywords.some(kw => lowerQuery.includes(kw))) {
+    selfKnowledge.constitution.forEach(entry => {
+      relevantSections.push(`### ${entry.title}\n\n${entry.content}`)
+    })
+    selfKnowledge.identity.forEach(entry => {
+      relevantSections.push(`### ${entry.title}\n\n${entry.content}`)
+    })
   }
 
   // Capability questions
@@ -291,9 +211,9 @@ export function getSelfKnowledgeForQuery(query: string): string {
 export function isAskingAboutOSQR(query: string): boolean {
   const lowerQuery = query.toLowerCase()
   const osqrKeywords = [
-    'osqr', 'who are you', 'what are you', 'about yourself',
-    'how do you work', 'what models', 'which ai', 'your capabilities',
-    'command center', 'panel mode', 'thoughtful mode', 'contemplate'
+    'osqr', 'oscar', 'who are you', 'what are you', 'about yourself',
+    'how do you work', 'your values', 'your capabilities', 'what do you believe',
+    'your philosophy', 'your commitments', 'what will you never'
   ]
 
   return osqrKeywords.some(kw => lowerQuery.includes(kw))
@@ -302,6 +222,7 @@ export function isAskingAboutOSQR(query: string): boolean {
 /**
  * Get complete OSQR architecture summary
  * Used when user asks "How does OSQR work?"
+ * NOTE: Does not include model details - those are implementation
  */
 export function getOSQRArchitectureSummary(): string {
   return `## How OSQR Works
@@ -316,19 +237,11 @@ This is shared across all users - it's what makes me "OSQR".
 Everything I know about YOU - your goals, projects, documents, conversation history.
 This is unique to you and never shared.
 
-### Multi-Model Intelligence
-
-I don't rely on a single AI. I coordinate multiple models:
-- **Claude** (Anthropic) - Deep reasoning, nuance, safety
-- **GPT-4** (OpenAI) - Versatility, coding, structure
-- **Gemini** (Google) - Technical, long-context, STEM
-- **Grok** (xAI) - Speed, contrarian perspectives
-
 ### Response Modes
 
-**Quick Mode** - Single fast model, immediate response
-**Thoughtful Mode** - 3-model panel discussion + synthesis
-**Contemplate Mode** - Extended multi-round reasoning
+**Quick Mode** - Direct, efficient response for straightforward questions
+**Thoughtful Mode** - Deeper consideration with multiple perspectives
+**Contemplate Mode** - Extended reasoning for complex problems
 
 ### Key Features
 
@@ -337,10 +250,11 @@ I don't rely on a single AI. I coordinate multiple models:
 - **Profile** - I learn your communication style and expertise
 - **TIL (Temporal Intelligence)** - I remember patterns over time
 
-### My Promise
+### My Commitments
 
 I optimize for long-term integrity, not short-term wins.
 I teach thinking, not dependency.
 I meet you where you are, without shame.
+I will never sell your data, deceive you, or remove your agency.
 Your data stays yours - delete everything anytime.`
 }
