@@ -11,6 +11,7 @@ import { assembleContext, parseSystemMode } from '@/lib/context/auto-context'
 import { extractMSCUpdates, mightContainMSCContent } from '@/lib/msc/auto-updater'
 import { updateIdentityFromConversation } from '@/lib/identity/dimensions'
 import { trackConversation, getTILContext } from '@/lib/til'
+import { runSecretaryCheck } from '@/lib/til/secretary-checklist'
 import { isPlanningRequest } from '@/lib/til/planner'
 import { isAuditRequest } from '@/lib/til/self-audit'
 import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
@@ -345,9 +346,12 @@ export async function POST(req: NextRequest) {
       let autoRoutedReason = ''
       let effectiveMode: ResponseMode = mode
 
+      // Downgrade to Quick mode for simple questions that don't need multi-model synthesis
+      // Self-referential questions (about OSQR) ALWAYS use Quick mode - constitution is in the prompt
       const shouldDowngrade = (
         (mode === 'thoughtful' || mode === 'contemplate') &&
         (
+          questionType === 'self_referential' || // Always quick for identity questions
           (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) ||
           (systemMode && complexity <= 3)
         )
@@ -356,12 +360,79 @@ export async function POST(req: NextRequest) {
       if (shouldDowngrade) {
         effectiveMode = 'quick'
         autoRouted = true
-        autoRoutedReason = systemMode
-          ? "Found the answer in indexed documentation."
-          : "Simple question - used Quick mode for faster response."
+        if (questionType === 'self_referential') {
+          autoRoutedReason = "Identity question - I know who I am!"
+        } else if (systemMode) {
+          autoRoutedReason = "Found the answer in indexed documentation."
+        } else {
+          autoRoutedReason = "Simple question - used Quick mode for faster response."
+        }
       }
 
       const userLevel = workspace?.capabilityLevel ?? 0
+
+      // 8b. Repeated question detection
+      // If user asks the same question twice, offer to expand or repeat
+      let isRepeatedQuestion = false
+      let previousAnswer: string | null = null
+      if (conversationHistory && conversationHistory.length >= 2) {
+        // Check last few user messages for similarity
+        const userMessages = conversationHistory.filter(m => m.role === 'user')
+        const lastUserMessage = userMessages[userMessages.length - 1]?.content?.toLowerCase().trim()
+        const currentMessage = message.toLowerCase().trim()
+
+        // Simple similarity check - exact match or very close
+        if (lastUserMessage && (
+          lastUserMessage === currentMessage ||
+          // Check if one contains the other (handles slight variations)
+          (lastUserMessage.length > 10 && currentMessage.includes(lastUserMessage)) ||
+          (currentMessage.length > 10 && lastUserMessage.includes(currentMessage))
+        )) {
+          isRepeatedQuestion = true
+          // Get the previous answer
+          const lastAssistantMessage = conversationHistory.filter(m => m.role === 'assistant').pop()
+          previousAnswer = lastAssistantMessage?.content || null
+        }
+      }
+
+      // Handle repeated questions - ask if user wants expansion or repetition
+      if (isRepeatedQuestion && previousAnswer) {
+        const thread = await prisma.chatThread.create({
+          data: { workspaceId, title: message.slice(0, 100), mode: 'panel' },
+        })
+
+        await prisma.chatMessage.create({
+          data: { threadId: thread.id, role: 'user', content: message },
+        })
+
+        const repeatResponse = `I notice you've asked this question again. Would you like me to:
+
+1. **Expand** on my previous answer with more detail
+2. **Approach it differently** with a new perspective
+3. **Repeat** the same answer
+
+Just let me know how I can help further!`
+
+        await prisma.chatMessage.create({
+          data: {
+            threadId: thread.id,
+            role: 'assistant',
+            provider: 'osqr-system',
+            content: repeatResponse,
+            metadata: { isRepeatedQuestion: true },
+          },
+        })
+
+        await sendEvent('metadata', {
+          threadId: thread.id,
+          routing: { questionType, complexity, autoRouted: true, autoRoutedReason: 'Repeated question detected', requestedMode: mode, effectiveMode: 'quick' },
+          isRepeatedQuestion: true,
+        })
+        await sendEvent('text', { chunk: repeatResponse })
+        await sendEvent('done', { messageId: thread.id })
+        await writer.close()
+        return
+      }
 
       // 9. Fetch agents
       const agents = await prisma.agent.findMany({
@@ -640,6 +711,15 @@ export async function POST(req: NextRequest) {
           await trackConversation(workspaceId, message, cleanAnswer, { mode })
         } catch (e) {
           console.error('[TIL] Error:', e)
+        }
+
+        // Secretary Checklist: Detect commitments, deadlines, follow-ups, dependencies
+        // Runs asynchronously - doesn't block the response
+        try {
+          const combinedMessage = `User: ${message}\n\nOSQR: ${cleanAnswer}`
+          await runSecretaryCheck(workspaceId, combinedMessage, thread.id)
+        } catch (e) {
+          console.error('[Secretary] Error:', e)
         }
 
         const fullConversation = [
