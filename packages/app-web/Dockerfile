@@ -39,7 +39,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Install dumb-init for proper signal handling on Railway
-RUN apk add --no-cache dumb-init
+# Install openssl for Prisma
+RUN apk add --no-cache dumb-init openssl
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
@@ -51,6 +52,20 @@ COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/standalone
 COPY --from=builder /app/packages/app-web/public ./packages/app-web/public
 COPY --from=builder --chown=nextjs:nodejs /app/packages/app-web/.next/static ./packages/app-web/.next/static
 
+# Copy Prisma schema and migrations for runtime migrations
+COPY --from=builder /app/packages/app-web/prisma ./packages/app-web/prisma
+COPY --from=builder /app/packages/app-web/node_modules/.prisma ./packages/app-web/node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+
+# Create startup script that runs migrations then starts the server
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo 'echo "Running Prisma migrations..."' >> /app/start.sh && \
+    echo 'cd /app/packages/app-web && npx prisma migrate deploy' >> /app/start.sh && \
+    echo 'echo "Migrations complete. Starting server..."' >> /app/start.sh && \
+    echo 'exec node /app/packages/app-web/server.js' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
 USER nextjs
 
 # Railway automatically injects PORT - no EXPOSE needed
@@ -60,5 +75,5 @@ ENV HOSTNAME="0.0.0.0"
 # Use dumb-init as PID 1 to properly handle signals
 # This fixes the SIGTERM issue on Railway
 ENTRYPOINT ["dumb-init", "--"]
-# In pnpm monorepo, standalone server.js is at packages/app-web/server.js
-CMD ["node", "packages/app-web/server.js"]
+# Run migrations and start server
+CMD ["/app/start.sh"]
