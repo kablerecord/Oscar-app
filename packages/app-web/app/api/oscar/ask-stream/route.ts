@@ -426,7 +426,7 @@ Just let me know how I can help further!`
         await sendEvent('metadata', {
           threadId: thread.id,
           routing: { questionType, complexity, autoRouted: true, autoRoutedReason: 'Repeated question detected', requestedMode: mode, effectiveMode: 'quick' },
-          isRepeatedQuestion: true,
+          // Note: isRepeatedQuestion flag removed - the response text handles it naturally
         })
         await sendEvent('text', { chunk: repeatResponse })
         await sendEvent('done', { messageId: thread.id })
