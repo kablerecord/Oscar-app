@@ -34,7 +34,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Get queue status first (fast operation)
+    // Recovery: Reset stuck tasks (running for >10 minutes) back to pending
+    // This handles cases where Railway killed the process mid-task
+    const stuckThreshold = new Date(Date.now() - 10 * 60 * 1000) // 10 minutes
+    const stuckRecovery = await prisma.backgroundTask.updateMany({
+      where: {
+        type: 'index-document',
+        status: 'running',
+        startedAt: { lt: stuckThreshold }
+      },
+      data: {
+        status: 'pending',
+        startedAt: null,
+        error: 'Task was stuck and has been reset for retry',
+        updatedAt: new Date()
+      }
+    })
+
+    if (stuckRecovery.count > 0) {
+      console.log(`[Cron] Recovered ${stuckRecovery.count} stuck tasks`)
+    }
+
+    // Get queue status (fast operation)
     const [pending, running, failed] = await Promise.all([
       prisma.backgroundTask.count({
         where: { type: 'index-document', status: 'pending' }
@@ -63,6 +84,7 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'Processing started',
       queue: { pending, running, failed },
+      recovered: stuckRecovery.count,
       timestamp: new Date().toISOString()
     })
 
