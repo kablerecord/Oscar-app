@@ -960,3 +960,41 @@ model TribunalPackPurchase {
   @@index([userId])
   @@index([status])
 }
+
+// ============================================
+// User Feedback System (V1 Polish)
+// ============================================
+// @see docs/builds/V1_POLISH_BUILD_PLAN.md
+
+model UserFeedback {
+  id              String   @id @default(cuid())
+  userId          String
+  workspaceId     String?
+
+  // Feedback content
+  rating          Int?     // 1-5 scale, null for text-only feedback
+  sentiment       String?  // positive, negative, neutral
+  message         String?  // Optional text feedback
+
+  // Source tracking (for training pattern)
+  source          FeedbackSource
+
+  // Context
+  messageId       String?  // Which message triggered feedback
+  conversationId  String?  // Which conversation
+  responseMode    String?  // quick, thoughtful, contemplate
+  pageUrl         String?  // Where user was when feedback submitted
+
+  createdAt       DateTime @default(now())
+
+  @@index([userId])
+  @@index([source])
+  @@index([sentiment])
+  @@index([createdAt])
+}
+
+enum FeedbackSource {
+  BUTTON          // Clicked feedback button
+  NATURAL_LANGUAGE // Said "leave feedback" or similar in chat
+  RESPONSE_RATING // Thumbs up/down on response
+}

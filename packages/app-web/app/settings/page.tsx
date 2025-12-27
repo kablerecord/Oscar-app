@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2 } from 'lucide-react'
+import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle } from 'lucide-react'
 import { MainLayout } from '@/components/layout/MainLayout'
 
 interface UserData {
@@ -19,6 +19,20 @@ interface InsightPreferences {
   maxPerHour: number
   minIntervalMinutes: number
   mutedCategories: string[]
+}
+
+type PrivacyTier = 'A' | 'B' | 'C'
+
+interface PrivacySettings {
+  privacyTier: PrivacyTier
+  consentTimestamp: string
+  consentVersion: string
+  summary: {
+    title: string
+    description: string
+    dataCollected: string[]
+    benefits: string[]
+  }
 }
 
 export default function SettingsPage() {
@@ -42,6 +56,13 @@ export default function SettingsPage() {
 
   // Use Knowledge Base state (persisted in localStorage)
   const [useKnowledgeBase, setUseKnowledgeBase] = useState(true)
+
+  // Privacy settings state
+  const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null)
+  const [savingPrivacy, setSavingPrivacy] = useState(false)
+  const [showDeleteDataModal, setShowDeleteDataModal] = useState(false)
+  const [deletingData, setDeletingData] = useState(false)
+  const [deleteDataSuccess, setDeleteDataSuccess] = useState(false)
 
   useEffect(() => {
     async function fetchUserData() {
@@ -84,11 +105,75 @@ export default function SettingsPage() {
     }
   }, [])
 
+  // Fetch privacy settings
+  useEffect(() => {
+    async function fetchPrivacySettings() {
+      try {
+        const res = await fetch('/api/user/privacy')
+        if (res.ok) {
+          const data = await res.json()
+          setPrivacySettings(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch privacy settings:', error)
+      }
+    }
+    fetchPrivacySettings()
+  }, [])
+
   // Toggle Use Knowledge Base setting
   const toggleUseKnowledgeBase = () => {
     const newValue = !useKnowledgeBase
     setUseKnowledgeBase(newValue)
     localStorage.setItem('osqr-use-knowledge-base', String(newValue))
+  }
+
+  // Update privacy tier
+  const updatePrivacyTier = async (tier: PrivacyTier) => {
+    setSavingPrivacy(true)
+    try {
+      const res = await fetch('/api/user/privacy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tier }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setPrivacySettings(data)
+      }
+    } catch (error) {
+      console.error('Failed to update privacy tier:', error)
+    } finally {
+      setSavingPrivacy(false)
+    }
+  }
+
+  // Delete telemetry data
+  const handleDeleteTelemetryData = async () => {
+    setDeletingData(true)
+    try {
+      const res = await fetch('/api/user/privacy', {
+        method: 'DELETE',
+      })
+      if (res.ok) {
+        setDeleteDataSuccess(true)
+        // Refresh privacy settings
+        const refreshRes = await fetch('/api/user/privacy')
+        if (refreshRes.ok) {
+          const data = await refreshRes.json()
+          setPrivacySettings(data)
+        }
+        // Close modal after delay
+        setTimeout(() => {
+          setShowDeleteDataModal(false)
+          setDeleteDataSuccess(false)
+        }, 2000)
+      }
+    } catch (error) {
+      console.error('Failed to delete telemetry data:', error)
+    } finally {
+      setDeletingData(false)
+    }
   }
 
   // Update insight preferences
@@ -494,6 +579,170 @@ export default function SettingsPage() {
           )}
         </section>
 
+        {/* Privacy Tier Section */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-emerald-500/20 rounded-lg">
+              <Shield className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Privacy Settings</h2>
+              <p className="text-sm text-neutral-400">Control how OSQR learns from your usage</p>
+            </div>
+          </div>
+
+          {privacySettings ? (
+            <div className="space-y-6">
+              {/* Tier Selection */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-3">Learning Level</label>
+                <div className="space-y-3">
+                  {/* Tier A */}
+                  <button
+                    onClick={() => updatePrivacyTier('A')}
+                    disabled={savingPrivacy}
+                    className={`w-full text-left px-4 py-4 rounded-lg transition-all ${
+                      privacySettings.privacyTier === 'A'
+                        ? 'bg-emerald-500/20 ring-1 ring-emerald-500/50'
+                        : 'bg-neutral-800 hover:bg-neutral-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${privacySettings.privacyTier === 'A' ? 'text-emerald-300' : 'text-white'}`}>
+                            Local Only
+                          </p>
+                          {privacySettings.privacyTier === 'A' && (
+                            <span className="text-xs bg-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded">Current</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-neutral-400 mt-1">
+                          OSQR does not learn from your behavior. Maximum privacy.
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        privacySettings.privacyTier === 'A'
+                          ? 'border-emerald-500 bg-emerald-500'
+                          : 'border-neutral-600'
+                      }`}>
+                        {privacySettings.privacyTier === 'A' && (
+                          <Check className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Tier B */}
+                  <button
+                    onClick={() => updatePrivacyTier('B')}
+                    disabled={savingPrivacy}
+                    className={`w-full text-left px-4 py-4 rounded-lg transition-all ${
+                      privacySettings.privacyTier === 'B'
+                        ? 'bg-blue-500/20 ring-1 ring-blue-500/50'
+                        : 'bg-neutral-800 hover:bg-neutral-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${privacySettings.privacyTier === 'B' ? 'text-blue-300' : 'text-white'}`}>
+                            Personal Learning
+                          </p>
+                          <span className="text-xs bg-blue-500/30 text-blue-300 px-2 py-0.5 rounded">Recommended</span>
+                          {privacySettings.privacyTier === 'B' && (
+                            <span className="text-xs bg-blue-500/30 text-blue-300 px-2 py-0.5 rounded">Current</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-neutral-400 mt-1">
+                          OSQR learns your preferences to personalize your experience. Data stays private to you.
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        privacySettings.privacyTier === 'B'
+                          ? 'border-blue-500 bg-blue-500'
+                          : 'border-neutral-600'
+                      }`}>
+                        {privacySettings.privacyTier === 'B' && (
+                          <Check className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+
+                  {/* Tier C */}
+                  <button
+                    onClick={() => updatePrivacyTier('C')}
+                    disabled={savingPrivacy}
+                    className={`w-full text-left px-4 py-4 rounded-lg transition-all ${
+                      privacySettings.privacyTier === 'C'
+                        ? 'bg-purple-500/20 ring-1 ring-purple-500/50'
+                        : 'bg-neutral-800 hover:bg-neutral-700'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${privacySettings.privacyTier === 'C' ? 'text-purple-300' : 'text-white'}`}>
+                            Global Learning
+                          </p>
+                          {privacySettings.privacyTier === 'C' && (
+                            <span className="text-xs bg-purple-500/30 text-purple-300 px-2 py-0.5 rounded">Current</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-neutral-400 mt-1">
+                          Help improve OSQR for everyone. Anonymized patterns contribute to global learning.
+                        </p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        privacySettings.privacyTier === 'C'
+                          ? 'border-purple-500 bg-purple-500'
+                          : 'border-neutral-600'
+                      }`}>
+                        {privacySettings.privacyTier === 'C' && (
+                          <Check className="h-3 w-3 text-white" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+
+                {savingPrivacy && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-neutral-400 mt-4">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving...
+                  </div>
+                )}
+              </div>
+
+              {/* Delete Telemetry Data */}
+              <div className="border-t border-neutral-800 pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white font-medium">Delete Learning Data</p>
+                    <p className="text-sm text-neutral-400">
+                      Remove all telemetry and behavioral data OSQR has collected about you
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowDeleteDataModal(true)}
+                    className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Delete Data
+                  </button>
+                </div>
+                <p className="text-xs text-neutral-500 mt-2">
+                  This only deletes telemetry data, not your conversations or documents.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+            </div>
+          )}
+        </section>
+
         {/* Data & Privacy Section */}
         <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-6">
@@ -671,6 +920,68 @@ export default function SettingsPage() {
                 <h3 className="text-xl font-bold text-white mb-2">Done</h3>
                 <p className="text-neutral-400">Your data has been permanently deleted. Redirecting...</p>
               </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Telemetry Data Modal */}
+      {showDeleteDataModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => !deletingData && setShowDeleteDataModal(false)} />
+
+          <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-700 rounded-2xl p-6 shadow-xl">
+            {deleteDataSuccess ? (
+              <div className="text-center py-8">
+                <div className="mx-auto w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                  <Check className="h-8 w-8 text-green-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Data Deleted</h3>
+                <p className="text-neutral-400">Your telemetry data has been removed.</p>
+              </div>
+            ) : deletingData ? (
+              <div className="text-center py-8">
+                <Loader2 className="h-10 w-10 animate-spin text-neutral-400 mx-auto mb-4" />
+                <h3 className="text-xl font-bold text-white mb-2">Deleting...</h3>
+                <p className="text-neutral-400">Removing your telemetry data.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 bg-amber-500/20 rounded-full">
+                    <AlertTriangle className="h-6 w-6 text-amber-500" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white">Delete Learning Data?</h3>
+                </div>
+
+                <p className="text-neutral-300 mb-4">
+                  This will delete all telemetry and behavioral data that OSQR has collected about you, including:
+                </p>
+                <ul className="text-sm text-neutral-400 list-disc list-inside mb-6 space-y-1">
+                  <li>Mode preference patterns</li>
+                  <li>Usage timing data</li>
+                  <li>Feature adoption records</li>
+                  <li>Session patterns</li>
+                </ul>
+                <p className="text-sm text-neutral-500 mb-6">
+                  Your conversations, documents, and profile will not be affected.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteDataModal(false)}
+                    className="flex-1 px-4 py-3 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleDeleteTelemetryData}
+                    className="flex-1 px-4 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Delete Data
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </div>

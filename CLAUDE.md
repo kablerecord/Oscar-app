@@ -278,11 +278,9 @@ When user says "build the insights system" or similar, read that doc first. It h
 
 ---
 
-## V1.5 Implementation-Ready Specs
+## V1.5 Implementation Status
 
-These specs are **fully designed and ready to build**. No more questions needed — just say "build [system name]" and follow the build order in each spec.
-
-### User Intelligence Profile (UIP)
+### User Intelligence Profile (UIP) ✅ COMPLETE
 **Spec:** `docs/architecture/UIP_SPEC.md`
 **What it is:** OSQR's continuously updating mentorship rulebook. Learns how to work with each user over time. Not psychology — Mentorship-as-Code.
 
@@ -293,13 +291,23 @@ These specs are **fully designed and ready to build**. No more questions needed 
 - Confidence decay: Old signals decay over time
 - Privacy Tier integration: Tier A/B/C controls what gets collected
 
-**Build order:** Schema → UIP service → Reflection Engine → Elicitation → Behavior Adapters → Telemetry integration
+**Implementation:** All components built and wired. See `lib/uip/` for service, elicitation, reflection, and adapters.
 
-**Replaces:** `docs/features/USER_INTELLIGENCE_ARTIFACTS.md` (deprecated)
+### Behavioral Intelligence Layer (BIL) ✅ COMPLETE
+**Spec:** `docs/features/BEHAVIORAL_INTELLIGENCE_LAYER.md`
+**What it is:** Telemetry and pattern detection for personalization. Feeds UIP with behavioral signals.
+
+**Components:**
+- TelemetryCollector: Database-backed event collection with privacy tier enforcement
+- PatternAggregator: Detects mode preference, usage time, feature adoption, engagement, satisfaction patterns
+- UserBehaviorModel: Builds user profiles from patterns, calculates churn risk and upsell readiness
+- PrivacyTierManager: Enforces A/B/C tier data collection rules
+
+**Implementation:** All components built. See `lib/telemetry/`
 
 ---
 
-### Render System
+### Render System 🟡 PARTIAL
 **Spec:** `docs/features/RENDER_SYSTEM_SPEC.md`
 **What it is:** First execution surface where OSQR produces visible artifacts (images, charts). "Gives intelligence a place to land."
 
@@ -310,6 +318,13 @@ These specs are **fully designed and ready to build**. No more questions needed 
 - State machine: IDLE → RENDERING → COMPLETE_AWAITING_VIEW → VIEWING → UPDATING → ERROR/CANCELLED
 - Client-side rendering from stored spec (no server execution, no sandboxing)
 - Conversation linking: Artifacts belong to conversations, "make it blue" updates most recently viewed
+
+**Implementation Status:**
+- Intent detection: ✅ Complete (`lib/render/intent-detection.ts`)
+- Types & interfaces: ✅ Complete (`lib/render/types.ts`)
+- Service wiring: ❌ Not wired to ask route
+- Image generation: ❌ Not integrated
+- Chart generation: ❌ Not integrated
 
 **Build order:** Database & API → Render Intent Detection → Image Artifact → Chart Artifact → Render Surface → State Machine → Bubble Integration → Iteration Flow → Error Handling
 
@@ -399,3 +414,24 @@ This contains 48 curated research documents from NotebookLM covering:
 - LLM research and fine-tuning
 
 **If something is unclear in these docs**, ask Kable — he can query the NotebookLM project for deeper detail.
+
+---
+
+## Self-Audit Protocol
+
+When Kable pastes a **REBUILD document** from OSQR, follow the protocol at:
+
+**Location:** `docs/audits/OSQR_SELF_AUDIT_PROTOCOL.md`
+
+This protocol defines:
+- How OSQR audits himself (finding format, severity levels, evidence requirements)
+- How Claude in VS Code executes the fixes (in order, with verification)
+- The completion report format
+
+**The workflow:**
+1. OSQR runs audit → produces REBUILD document
+2. Kable pastes REBUILD document to Claude in VS Code
+3. Claude reads the protocol, reads CLAUDE.md, executes fixes in order
+4. Claude reports completion
+
+**Finding types:** MISSING | MISALIGNED | BROKEN | INCOMPLETE | UNTESTED | CONFLICT | DRIFT | DELETE

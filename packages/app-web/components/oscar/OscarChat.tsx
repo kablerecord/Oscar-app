@@ -10,6 +10,7 @@ import { ShareActions } from '@/components/share/ShareActions'
 import { getNextQuestion, getTotalQuestions, type ProfileQuestion } from '@/lib/profile/questions'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import { CouncilCarousel, CouncilModeBadge, type ModelResponse } from '@/components/council/CouncilCarousel'
+import { FeedbackButton } from '@/components/chat/FeedbackButton'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
 
 interface CouncilData {
@@ -560,6 +561,12 @@ export function OscarChat({ workspaceId, userTier = 'pro' }: OscarChatProps) {
         onAnswer={handleProfileAnswer}
         onSkip={handleProfileSkip}
         onClose={handleProfileClose}
+      />
+
+      {/* Feedback Button (training pattern: teach users to use natural language) */}
+      <FeedbackButton
+        workspaceId={workspaceId}
+        responseMode={responseMode}
       />
     </div>
   )

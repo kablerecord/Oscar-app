@@ -18,6 +18,18 @@ import { routeQuestion } from '@/lib/ai/model-router'
 // getCachedContext and getVaultStats available for future fast-path optimization
 import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary } from '@/lib/oscar/cross-session-memory'
 
+// ==========================================================================
+// UIP (User Intelligence Profile) Integration
+// Mentorship-as-Code layer for adaptive AI behavior
+// ==========================================================================
+import {
+  getUIPContext,
+  processSignalsForUser,
+  incrementSessionCount,
+} from '@/lib/uip/service'
+import { extractSignalsFromMessage } from '@/lib/uip/signal-processor'
+import { shouldAskQuestion, formatElicitationQuestion } from '@/lib/uip/elicitation'
+
 // @osqr/core Integration
 import { checkInput, checkOutput, getDeclineMessage } from '@/lib/osqr/constitutional-wrapper'
 import { shouldUseFastPath } from '@/lib/osqr/router-wrapper'
@@ -41,6 +53,9 @@ import {
   storeMessageWithContext,
 } from '@/lib/osqr/memory-wrapper'
 import { hasFeature as hasTierFeature, type TierName } from '@/lib/tiers/config'
+
+// Behavioral Intelligence Layer - Telemetry
+import { getTelemetryCollector } from '@/lib/telemetry/TelemetryCollector'
 
 const RequestSchema = z.object({
   message: z.string().min(1),
@@ -131,6 +146,31 @@ export async function POST(req: NextRequest) {
 
       await recordRequest({ userId, ip, endpoint: 'oscar/ask-stream' })
 
+      // ==========================================================================
+      // UIP: Get User Intelligence Profile for adaptive behavior
+      // This personalizes responses based on learned user preferences
+      // ==========================================================================
+      let uipContext: Awaited<ReturnType<typeof getUIPContext>> | null = null
+      let elicitationQuestion: string | null = null
+
+      try {
+        // Get UIP context for this user
+        uipContext = await getUIPContext(userId)
+
+        // Check if we should ask an elicitation question (phases 2-4)
+        const elicitationDecision = await shouldAskQuestion(userId)
+        if (elicitationDecision.shouldAsk && elicitationDecision.question) {
+          elicitationQuestion = formatElicitationQuestion(elicitationDecision.question)
+        }
+
+        if (uipContext.shouldPersonalize) {
+          console.log('[Stream][UIP] Profile loaded - personalizing response (confidence:', uipContext.confidence.toFixed(2) + ')')
+        }
+      } catch (uipError) {
+        console.error('[Stream][UIP] Error loading profile:', uipError)
+        // Continue without UIP - it's non-blocking
+      }
+
       const body = await req.json()
       const {
         message: rawMessage,
@@ -219,6 +259,22 @@ export async function POST(req: NextRequest) {
           await writer.close()
           return
         }
+      }
+
+      // ==========================================================================
+      // BIL: Track mode selection for behavioral learning
+      // ==========================================================================
+      try {
+        const collector = getTelemetryCollector()
+        await collector.trackModeSelected(
+          userId,
+          workspaceId,
+          mode as 'quick' | 'thoughtful' | 'contemplate',
+          false // wasAutoSuggested - not implemented yet
+        )
+      } catch (telemetryError) {
+        // Non-blocking - continue without telemetry
+        console.error('[Stream][BIL] Telemetry error:', telemetryError)
       }
 
       // 4. Parse system mode
@@ -377,7 +433,28 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const contextParts = [autoContext.context, tilContext, memoryContext, crossProjectContext].filter(Boolean)
+      // ==========================================================================
+      // UIP: Add personalization context to system prompt
+      // ==========================================================================
+      let uipContextString: string | undefined
+      if (uipContext?.shouldPersonalize && uipContext.summary) {
+        uipContextString = uipContext.summary
+
+        // Add behavioral guidance based on UIP adapters
+        if (uipContext.adapters.verbosityMultiplier < 0.8) {
+          uipContextString += '\n\nGuidance: This user prefers concise, brief responses. Keep answers short and to the point.'
+        } else if (uipContext.adapters.verbosityMultiplier > 1.3) {
+          uipContextString += '\n\nGuidance: This user prefers detailed explanations. Provide thorough, comprehensive responses.'
+        }
+
+        if (uipContext.adapters.proactivityLevel > 0.7) {
+          uipContextString += '\n\nGuidance: This user appreciates proactive suggestions. Feel free to offer additional insights and recommendations.'
+        } else if (uipContext.adapters.proactivityLevel < 0.3) {
+          uipContextString += '\n\nGuidance: This user prefers direct answers. Avoid unsolicited advice unless directly relevant.'
+        }
+      }
+
+      const contextParts = [autoContext.context, tilContext, memoryContext, crossProjectContext, uipContextString].filter(Boolean)
       const context = contextParts.join('\n\n---\n\n') || undefined
 
       // Create thread for this conversation
@@ -408,6 +485,12 @@ export async function POST(req: NextRequest) {
         budgetStatus: budgetStatus || undefined,
         degraded: throttleResult?.degraded || false,
         usedCrossProjectContext: !!crossProjectContext,
+        // UIP: Include personalization status
+        uip: uipContext?.shouldPersonalize ? {
+          personalized: true,
+          confidence: uipContext.confidence,
+          suggestedMode: uipContext.adapters.suggestedMode,
+        } : undefined,
       })
 
       // 12. Stream the response
@@ -500,10 +583,18 @@ export async function POST(req: NextRequest) {
         )
       }
 
-      // 14. Send done event with final data
+      // 14. Send elicitation question if applicable (before done event)
+      if (elicitationQuestion) {
+        // Send a separator and the elicitation question as additional text
+        await sendEvent('text', { chunk: '\n\n---\n\n' })
+        await sendEvent('text', { chunk: elicitationQuestion })
+      }
+
+      // 15. Send done event with final data
       await sendEvent('done', {
         messageId: osqrMessage.id,
         artifacts: artifacts.length > 0 ? artifacts : undefined,
+        hasElicitation: !!elicitationQuestion,
       })
 
       await writer.close()
@@ -579,6 +670,17 @@ export async function POST(req: NextRequest) {
           } catch (e) {
             console.error('[Temporal] Error:', e)
           }
+        }
+
+        // UIP: Extract signals from conversation and process for profile learning
+        try {
+          const signals = extractSignalsFromMessage(message, thread.id, osqrMessage.id)
+          if (signals.length > 0) {
+            await processSignalsForUser(userId, signals)
+            console.log(`[Stream][UIP] Processed ${signals.length} signals from conversation`)
+          }
+        } catch (e) {
+          console.error('[Stream][UIP] Signal processing error:', e)
         }
       })
 

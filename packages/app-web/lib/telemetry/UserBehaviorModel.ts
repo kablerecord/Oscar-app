@@ -6,7 +6,7 @@
  *
  * @see docs/BEHAVIORAL_INTELLIGENCE_LAYER.md
  *
- * STATUS: STUB - Implementation pending
+ * STATUS: IMPLEMENTED - Profile built from PatternAggregator patterns
  */
 
 import { Pattern, PatternAggregator, getPatternAggregator } from './PatternAggregator'
@@ -88,10 +88,150 @@ export class UserBehaviorModel {
     // Get patterns from aggregator
     const patterns = await this.patternAggregator.analyzeUser(userId)
 
-    // TODO: Build profile from patterns
-    // For now, return default profile
+    // Start with default profile
+    const profile = this.getDefaultProfile(userId)
 
-    return this.getDefaultProfile(userId)
+    // If no patterns detected, return default
+    if (patterns.length === 0) {
+      return profile
+    }
+
+    // Map each pattern type to profile fields
+    for (const pattern of patterns) {
+      switch (pattern.type) {
+        case 'mode_preference': {
+          const data = pattern.data as {
+            preferredMode: 'quick' | 'thoughtful' | 'contemplate'
+            distribution: { quick: number; thoughtful: number; contemplate: number }
+          }
+          profile.preferredMode = data.preferredMode
+          profile.modeUsageDistribution = data.distribution
+          break
+        }
+
+        case 'usage_time': {
+          const data = pattern.data as {
+            peakHours: number[]
+            averageSessionDuration: number
+            sessionsPerWeek: number
+            mostActiveDay: number
+          }
+          profile.peakUsageHours = data.peakHours
+          profile.averageSessionDuration = data.averageSessionDuration
+          profile.sessionsPerWeek = data.sessionsPerWeek
+          profile.mostActiveDay = data.mostActiveDay
+          break
+        }
+
+        case 'feature_adoption': {
+          const data = pattern.data as {
+            featuresDiscovered: string[]
+            featuresUsedRegularly: string[]
+            adoptionRate: number
+          }
+          profile.featuresDiscovered = data.featuresDiscovered
+          profile.featuresUsedRegularly = data.featuresUsedRegularly
+          profile.featureAdoptionRate = data.adoptionRate
+          break
+        }
+
+        case 'engagement_trend': {
+          const data = pattern.data as {
+            trend: 'increasing' | 'stable' | 'declining'
+            weekOverWeekChange: number
+          }
+          // Map trend to engagement level
+          if (data.trend === 'increasing' || data.weekOverWeekChange > 20) {
+            profile.engagementLevel = 'high'
+          } else if (data.trend === 'declining' || data.weekOverWeekChange < -20) {
+            profile.engagementLevel = 'low'
+          } else {
+            profile.engagementLevel = 'medium'
+          }
+          break
+        }
+
+        case 'satisfaction_trend': {
+          const data = pattern.data as {
+            trend: 'improving' | 'stable' | 'declining'
+            positiveRate: number
+            totalFeedbackCount: number
+          }
+          profile.satisfactionTrend = data.trend
+          profile.positiveRate = data.positiveRate / 100 // Convert percentage to 0-1
+          profile.feedbackFrequency = data.totalFeedbackCount / 4 // Approximate weekly rate
+          break
+        }
+
+        case 'friction_point': {
+          // Friction points contribute to churn risk calculation below
+          break
+        }
+      }
+    }
+
+    // Derive churn risk from multiple signals
+    profile.churnRisk = this.calculateChurnRisk(profile, patterns)
+
+    // Derive upsell readiness
+    profile.upsellReadiness = this.calculateUpsellReadiness(profile)
+
+    return profile
+  }
+
+  /**
+   * Calculate churn risk from profile and patterns
+   */
+  private calculateChurnRisk(
+    profile: UserBehaviorProfile,
+    patterns: Pattern[]
+  ): 'high' | 'medium' | 'low' | 'unknown' {
+    let riskSignals = 0
+
+    // Low engagement = risk
+    if (profile.engagementLevel === 'low') riskSignals++
+
+    // Declining satisfaction = risk
+    if (profile.satisfactionTrend === 'declining') riskSignals++
+
+    // Low feature adoption = risk
+    if (profile.featureAdoptionRate < 0.3) riskSignals++
+
+    // Multiple friction points = risk
+    const frictionPatterns = patterns.filter((p) => p.type === 'friction_point')
+    if (frictionPatterns.length >= 2) riskSignals++
+
+    // Low positive rate = risk
+    if (profile.positiveRate > 0 && profile.positiveRate < 0.5) riskSignals++
+
+    if (riskSignals >= 3) return 'high'
+    if (riskSignals >= 1) return 'medium'
+    if (profile.engagementLevel === 'unknown') return 'unknown'
+    return 'low'
+  }
+
+  /**
+   * Calculate upsell readiness from profile
+   */
+  private calculateUpsellReadiness(
+    profile: UserBehaviorProfile
+  ): 'ready' | 'not_ready' | 'unknown' {
+    // High engagement + high satisfaction + high feature adoption = ready
+    const isHighEngagement = profile.engagementLevel === 'high'
+    const isHighSatisfaction =
+      profile.satisfactionTrend === 'improving' || profile.positiveRate > 0.7
+    const isHighAdoption = profile.featureAdoptionRate > 0.5
+
+    if (isHighEngagement && isHighSatisfaction && isHighAdoption) {
+      return 'ready'
+    }
+
+    // Not enough data
+    if (profile.engagementLevel === 'unknown') {
+      return 'unknown'
+    }
+
+    return 'not_ready'
   }
 
   /**

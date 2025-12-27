@@ -2,7 +2,8 @@
 
 import { useState, createContext, useContext } from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, FolderOpen, FileText } from 'lucide-react'
+import { Plus, FolderOpen, FileText, Shield } from 'lucide-react'
+import Link from 'next/link'
 import { FileUploader } from './FileUploader'
 import { FolderUploader } from './FolderUploader'
 import { UploadStatusProvider } from './UploadStatusContext'
@@ -88,6 +89,13 @@ export function VaultPageClient({ workspaceId, children }: VaultPageClientProps)
               <p className="mt-2 text-sm sm:text-base text-slate-400">
                 Browse and manage your indexed documents. OSQR uses this knowledge to give you personalized answers.
               </p>
+              <Link
+                href="/settings#privacy"
+                className="inline-flex items-center gap-1.5 mt-2 text-xs text-emerald-400/80 hover:text-emerald-400 transition-colors"
+              >
+                <Shield className="h-3.5 w-3.5" />
+                <span>Your documents are encrypted and private</span>
+              </Link>
             </div>
 
             {/* Upload button - always visible, consistent size, doesn't expand */}

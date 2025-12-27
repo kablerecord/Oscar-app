@@ -30,6 +30,9 @@ export type TelemetryEventType =
   | 'response_feedback'
   | 'refinement_feedback'
   | 'panel_comparison'
+  | 'feedback_button_clicked'    // User clicked feedback button
+  | 'feedback_natural_language'  // User said "leave feedback" in chat
+  | 'feedback_submitted'         // Feedback was actually submitted
   // Category C: Progress Events
   | 'onboarding_progress'
   | 'capability_assessment'
@@ -60,6 +63,7 @@ const EVENT_PRIVACY_REQUIREMENTS: Record<TelemetryEventType, PrivacyTier> = {
   onboarding_progress: 'A',
   capability_assessment: 'A',
   subscription_change: 'A',
+  feedback_submitted: 'A', // Always track feedback (user explicitly wants to share)
 
   // Tier B events (require opt-in)
   mode_selected: 'B',
@@ -68,6 +72,8 @@ const EVENT_PRIVACY_REQUIREMENTS: Record<TelemetryEventType, PrivacyTier> = {
   response_feedback: 'B',
   refinement_feedback: 'B',
   panel_comparison: 'B',
+  feedback_button_clicked: 'B',    // Track button usage patterns
+  feedback_natural_language: 'B',  // Track natural language feedback patterns
 }
 
 // =============================================================================
@@ -215,6 +221,41 @@ export class TelemetryCollector {
       timestamp: new Date(),
       userId,
       data: { sessionId, durationSeconds },
+    })
+  }
+
+  async trackFeedbackButtonClicked(userId: string, workspaceId?: string): Promise<void> {
+    await this.track({
+      eventType: 'feedback_button_clicked',
+      timestamp: new Date(),
+      userId,
+      workspaceId,
+      data: {},
+    })
+  }
+
+  async trackFeedbackNaturalLanguage(userId: string, workspaceId?: string): Promise<void> {
+    await this.track({
+      eventType: 'feedback_natural_language',
+      timestamp: new Date(),
+      userId,
+      workspaceId,
+      data: {},
+    })
+  }
+
+  async trackFeedbackSubmitted(
+    userId: string,
+    workspaceId: string | undefined,
+    source: 'button' | 'natural_language' | 'response_rating',
+    sentiment?: 'positive' | 'negative' | 'neutral'
+  ): Promise<void> {
+    await this.track({
+      eventType: 'feedback_submitted',
+      timestamp: new Date(),
+      userId,
+      workspaceId,
+      data: { source, sentiment },
     })
   }
 

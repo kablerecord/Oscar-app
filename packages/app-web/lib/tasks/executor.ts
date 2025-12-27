@@ -304,3 +304,34 @@ function chunkText(text: string, chunkSize: number, overlap: number): string[] {
  * This is the background job version that continues even if browser closes
  */
 registerTaskHandler('index-document', indexDocumentHandler)
+
+/**
+ * UIP Reflection task - runs prospective reflection to synthesize signals into UIP updates
+ * This is the background job that processes accumulated signals and updates dimension scores
+ */
+registerTaskHandler('uip-reflection', async (task, ctx) => {
+  const { profileId, trigger } = task.payload
+
+  ctx.log(`Starting UIP reflection for profile: ${profileId} (trigger: ${trigger})`)
+  ctx.updateProgress(10, 'Loading profile')
+
+  // Import reflection engine
+  const { runReflection } = await import('../uip/reflection')
+
+  ctx.updateProgress(30, 'Processing signals')
+
+  const result = await runReflection(profileId)
+
+  ctx.updateProgress(100, 'Reflection complete')
+
+  return {
+    profileId,
+    trigger,
+    signalsProcessed: result.signalsProcessed,
+    dimensionsUpdated: result.dimensionsUpdated,
+    elicitationCandidates: result.elicitationCandidates.length,
+    success: result.success,
+    errors: result.errors,
+    completedAt: new Date().toISOString(),
+  }
+})

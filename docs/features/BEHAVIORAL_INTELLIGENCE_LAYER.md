@@ -204,11 +204,11 @@ See [PRIVACY_TIERS.md](../architecture/PRIVACY_TIERS.md) for full specification.
 
 | Component | Status | File |
 |-----------|--------|------|
-| TelemetryCollector | Stub | `lib/telemetry/TelemetryCollector.ts` |
-| PatternAggregator | Stub | `lib/telemetry/PatternAggregator.ts` |
-| UserBehaviorModel | Stub | `lib/telemetry/UserBehaviorModel.ts` |
-| PrivacyTierManager | Stub | `lib/telemetry/PrivacyTierManager.ts` |
-| Event database schema | Not started | - |
+| TelemetryCollector | **Complete** | `lib/telemetry/TelemetryCollector.ts` |
+| PatternAggregator | **Complete** | `lib/telemetry/PatternAggregator.ts` |
+| UserBehaviorModel | **Complete** | `lib/telemetry/UserBehaviorModel.ts` |
+| PrivacyTierManager | **Complete** | `lib/telemetry/PrivacyTierManager.ts` |
+| Event database schema | **Complete** | `prisma/schema.prisma` (TelemetryEvent model) |
 | Admin dashboard | Not started | - |
 
 ---

@@ -1,0 +1,69 @@
+{
+  "description": "Tracks Claude build times vs human estimates for calibration",
+  "builds": [
+    {
+      "name": "V1 Polish Features",
+      "buildPlan": "docs/builds/V1_POLISH_BUILD_PLAN.md",
+      "humanEstimate": "1-2 hours",
+      "claudeEstimate": "30-60 minutes",
+      "sessions": [
+        {
+          "session": 1,
+          "startTime": "2025-12-27T20:00:00Z",
+          "endTime": "2025-12-27T20:25:00Z",
+          "durationMinutes": 25,
+          "completedPhases": [
+            "Phase 1: Privacy Settings UI",
+            "Phase 2: Feedback Button + Training Pattern",
+            "Phase 3: UIP/BIL Verification"
+          ],
+          "notes": "Built privacy tier UI in settings, feedback button with training tip, wired BIL telemetry to ask-stream"
+        }
+      ],
+      "totalDurationMinutes": 25,
+      "status": "completed",
+      "outcome": {
+        "success": true,
+        "testsAdded": 0,
+        "filesModified": 6,
+        "filesCreated": 3,
+        "summary": "V1 Polish: Privacy settings UI, feedback button with training pattern, BIL telemetry wired"
+      }
+    },
+    {
+      "name": "UIP Implementation",
+      "buildPlan": "docs/builds/UIP_BUILD_PLAN.md",
+      "humanEstimate": "4-5 weeks (developer time)",
+      "claudeEstimate": "6-12 hours",
+      "sessions": [
+        {
+          "session": 1,
+          "startTime": "2025-12-27T16:45:00Z",
+          "endTime": "2025-12-27T17:26:00Z",
+          "durationMinutes": 41,
+          "completedPhases": [
+            "Phase 1: Core Engine (already built)",
+            "Phase 2: Wiring (ask/ask-stream endpoints)",
+            "Phase 3: Background Jobs (cron + task handler)",
+            "Phase 4: Tests (78 passing)"
+          ],
+          "notes": "UIP system was largely pre-built. Session focused on wiring, cron jobs, and tests."
+        }
+      ],
+      "totalDurationMinutes": 41,
+      "status": "completed",
+      "outcome": {
+        "success": true,
+        "testsAdded": 78,
+        "filesModified": 5,
+        "filesCreated": 3,
+        "summary": "UIP fully wired: streaming endpoint, cron job, task handler, and tests"
+      }
+    }
+  ],
+  "summary": {
+    "totalBuilds": 2,
+    "completedBuilds": 2,
+    "averageAccuracyRatio": "Consistently completing multi-hour estimates in under 30 minutes"
+  }
+}

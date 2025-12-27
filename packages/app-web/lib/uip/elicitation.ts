@@ -121,9 +121,11 @@ export async function shouldAskQuestion(userId: string): Promise<ElicitationDeci
     return { shouldAsk: false, reason: 'First session - building trust' }
   }
 
-  // Rule: Max 1 question per session (tracked via sessionCount vs questionsAsked)
-  // This is a simplification - in production you'd track per-session
-  const questionsThisSession = 0 // Would need session tracking
+  // Rule: Max 1 question per session
+  // Check if we already asked a question in this session
+  const questionsThisSession = profile.elicitationResponses.filter(
+    (r) => r.sessionNumber === profile.sessionCount
+  ).length
 
   if (questionsThisSession >= 1) {
     return { shouldAsk: false, reason: 'Already asked question this session' }

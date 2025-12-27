@@ -1,8 +1,8 @@
 # User Intelligence Profile (UIP) Specification
 
-**Status:** Architecture Complete | Implementation: Not Started
-**Version:** 1.0
-**Last Updated:** 2025-12-26
+**Status:** Architecture Complete | Implementation: **Complete**
+**Version:** 1.1
+**Last Updated:** 2025-12-27
 **Replaces:** [USER_INTELLIGENCE_ARTIFACTS.md](../features/USER_INTELLIGENCE_ARTIFACTS.md) (deprecated)
 **Related:** [PRIVACY_TIERS.md](./PRIVACY_TIERS.md), [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md)
 
@@ -477,6 +477,37 @@ See [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER
 - No semantic inference of sensitive traits
 - Requires Tier B minimum
 
+### D. Meandering Conversations (High Signal)
+
+**Philosophy:** The highest-signal learning happens when users aren't trying to be understood.
+
+"Drive-to-work" style conversations — talking while commuting, walking, exercising, or winding down — reveal more than structured interactions:
+
+| Characteristic | Why It Matters |
+|----------------|----------------|
+| Less performative | Users aren't optimizing their answers |
+| Less goal-oriented | Not focused on a specific task outcome |
+| More honest | Defenses down, real thoughts surface |
+| More pattern-rich | Repetition reveals what actually matters |
+
+**OSQR's role in meandering mode:**
+- Participate naturally, don't steer toward extraction
+- Notice patterns across time ("You've mentioned X three times this week")
+- Connect dots the user might miss ("Your energy drops when you talk about Y")
+- Remember preferences stated casually ("You said you hate morning meetings")
+
+**Encouraging meandering:**
+OSQR can gently invite open-ended conversation:
+> "How's the drive going?"
+> "What's on your mind today?"
+> "Anything you're chewing on?"
+
+No visible extraction goal. Just presence.
+
+**Privacy Tier:** B (requires opt-in for cross-session pattern detection)
+
+See [SPOKEN-ARCHITECTURE-V3.md](../vision/SPOKEN-ARCHITECTURE-V3.md) for the full philosophy of invisible learning.
+
 ---
 
 ## UIP Gap Detection
@@ -511,6 +542,47 @@ When OSQR detects a knowledge gap that would materially improve responses:
 - Decay calculations
 - Prospective Reflection outputs
 - Internal domain weights
+
+---
+
+## Schema Evolution
+
+The 8 UIP domains are a starting point, not a final answer. OSQR is allowed to discover new dimensions that don't fit the existing structure.
+
+### Provisional Domains
+
+When OSQR notices a recurring theme that doesn't map to existing domains:
+
+1. **Create provisional bucket** — `provisional.<auto_tag>` (e.g., `provisional.maker_manager_balance`)
+2. **Track with lower confidence** — Initial confidence capped at 0.5
+3. **Monitor utility** — Does this bucket improve guidance quality?
+4. **Promote or retire** — After sufficient evidence, either:
+   - Promote to real domain (requires spec update)
+   - Merge into existing domain
+   - Retire (let it decay away)
+
+### Promotion Criteria
+
+A provisional domain can be promoted when:
+- Used in 10+ sessions with positive signal
+- Correlates with improved response quality (fewer corrections, more positive feedback)
+- Doesn't overlap significantly with existing domains
+- Can be cleanly defined with clear signals and adapters
+
+### Evolution Principles
+
+- **Accept ambiguity** — Some things don't fit neatly; that's okay
+- **Allow contradiction** — Humans are inconsistent; that's data, not error
+- **Retire irrelevant dimensions** — What mattered last year might not matter now
+- **Grow carefully** — New domains add complexity; only promote what's clearly useful
+
+### Domain Retirement
+
+A domain or field can be retired when:
+- Confidence has decayed below 0.3 for 90+ days
+- No signals have updated it in 6+ months
+- User explicitly requests removal
+- Privacy Tier change makes it uncollectable
 
 ---
 
@@ -579,6 +651,7 @@ UIP is successful if:
 
 ## Related Documents
 
+- [SPOKEN-ARCHITECTURE-V3.md](../vision/SPOKEN-ARCHITECTURE-V3.md) — Philosophy of invisible learning (the "why" behind UIP)
 - [PRIVACY_TIERS.md](./PRIVACY_TIERS.md) — Privacy tier definitions and enforcement
 - [BEHAVIORAL_INTELLIGENCE_LAYER.md](../features/BEHAVIORAL_INTELLIGENCE_LAYER.md) — Telemetry infrastructure
 - [KNOWLEDGE_ARCHITECTURE.md](./KNOWLEDGE_ARCHITECTURE.md) — PKV specification
@@ -591,3 +664,4 @@ UIP is successful if:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2025-12-26 | Initial consolidated spec. Replaces USER_INTELLIGENCE_ARTIFACTS.md |
+| 1.1 | 2025-12-27 | Added: Meandering Conversations (data channel D), Schema Evolution (provisional domains). Links to Spoken Architecture v3 |
