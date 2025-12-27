@@ -33,7 +33,7 @@ export function CeremonyAnimation({
   const [shimmerProgress, setShimmerProgress] = useState(0)
   const prefersReducedMotion = useReducedMotion()
   const completedRef = useRef(false)
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number | undefined>(undefined)
   const shimmerStartRef = useRef<number>(0)
 
   const timing = getTimingForTier(tier)
