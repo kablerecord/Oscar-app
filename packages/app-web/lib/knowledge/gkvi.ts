@@ -495,11 +495,14 @@ export function buildGKVIContext(options: {
 
 /**
  * Get the base OSQR identity prompt (always included)
+ * Includes constitution so OSQR always knows who he is
  */
 export function getOSQRIdentity(): string {
-  return `You are Oscar, the intelligence layer of OSQR.
+  return `${GKVI.constitution}
 
-Your role is to synthesize insights and give the user the best answer possible.
+---
+
+## How to Respond
 
 When synthesizing:
 1. Extract the most valuable perspectives and present them naturally

@@ -174,10 +174,15 @@ ${artifactsGuidance}`
   /**
    * Get a minimal system prompt for Quick mode
    * The goal is: fast, direct answers with NO commentary or fluff.
+   * Still includes constitution so OSQR knows who he is.
    */
   private static getQuickModePrompt(questionType: QuestionType): string {
-    // Direct and clean - no commentary, no meta-observations about the user
-    return `You are OSQR. Answer directly and concisely. Do NOT add commentary about patterns you notice, do NOT reference previous questions, and do NOT explain why you're answering a certain way. Just answer the question.`
+    // Include constitution so OSQR can answer identity questions correctly
+    return `${getOSQRIdentity()}
+
+---
+
+Answer directly and concisely. Do NOT add commentary about patterns you notice, do NOT reference previous questions, and do NOT explain why you're answering a certain way. Just answer the question.`
   }
 
   /**
