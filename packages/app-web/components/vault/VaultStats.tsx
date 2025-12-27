@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
-import { FileText, Upload, Brain, AlertCircle, Loader2, AlertTriangle } from 'lucide-react'
+import { FileText, Upload, Brain, AlertCircle, Loader2 } from 'lucide-react'
 import { useUploadStatus } from './UploadStatusContext'
 
 interface VaultStatsProps {
@@ -11,172 +11,96 @@ interface VaultStatsProps {
   workspaceId: string
 }
 
-interface ReindexState {
-  isReindexing: boolean
-  currentDoc: string | null
-  progress: number
-  total: number
-  indexed: number
-  error: string | null
+interface IndexingStatus {
+  totalDocuments: number
+  indexedDocuments: number
+  unindexedCount: number
+  indexedPercent: number
+  pendingTasks: number
+  runningTasks: number
+  failedTasks: number
+  isIndexing: boolean
+  currentDocument: string | null
+  recentFailures: Array<{ id: string; title?: string; error?: string }>
 }
 
-export function VaultStats({ totalDocuments, indexedDocuments, workspaceId }: VaultStatsProps) {
+export function VaultStats({ totalDocuments: initialTotal, indexedDocuments: initialIndexed, workspaceId }: VaultStatsProps) {
   const { activeJob } = useUploadStatus()
-  const [reindexState, setReindexState] = useState<ReindexState>({
-    isReindexing: false,
-    currentDoc: null,
-    progress: 0,
-    total: 0,
-    indexed: 0,
-    error: null,
+
+  // Track indexing status from background jobs
+  const [indexingStatus, setIndexingStatus] = useState<IndexingStatus>({
+    totalDocuments: initialTotal,
+    indexedDocuments: initialIndexed,
+    unindexedCount: initialTotal - initialIndexed,
+    indexedPercent: initialTotal > 0 ? Math.round((initialIndexed / initialTotal) * 100) : 100,
+    pendingTasks: 0,
+    runningTasks: 0,
+    failedTasks: 0,
+    isIndexing: false,
+    currentDocument: null,
+    recentFailures: [],
   })
-  const hasTriggeredReindex = useRef(false)
-  const abortControllerRef = useRef<AbortController | null>(null)
 
-  const indexedPercent = totalDocuments > 0 ? Math.round((indexedDocuments / totalDocuments) * 100) : 0
-  const isAllIndexed = indexedPercent === 100
-  const unindexedCount = totalDocuments - indexedDocuments
+  const prevIsIndexing = useRef(false)
 
-  // Active upload state
+  // Fetch status from the polling API
+  const fetchStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/vault/indexing-status?workspaceId=${workspaceId}`)
+      if (res.ok) {
+        const data: IndexingStatus = await res.json()
+        setIndexingStatus(data)
+
+        // If indexing just completed, reload the page to get fresh data
+        if (prevIsIndexing.current && !data.isIndexing && data.indexedPercent === 100) {
+          window.location.reload()
+        }
+        prevIsIndexing.current = data.isIndexing
+      }
+    } catch (error) {
+      console.error('Failed to fetch indexing status:', error)
+    }
+  }, [workspaceId])
+
+  // Poll for status every 2 seconds when there's work to do
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null
+
+    // Initial fetch
+    fetchStatus()
+
+    // Start polling if not fully indexed or if there are pending/running tasks
+    const needsPolling = initialIndexed < initialTotal || indexingStatus.isIndexing
+
+    if (needsPolling) {
+      interval = setInterval(fetchStatus, 2000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [workspaceId, initialTotal, initialIndexed, fetchStatus, indexingStatus.isIndexing])
+
+  // Active upload state from context
   const isUploading = activeJob?.status === 'uploading'
-  const isIndexing = activeJob?.status === 'indexing'
-  const isActive = isUploading || isIndexing
+  const isActiveUploadIndexing = activeJob?.status === 'indexing'
+  const isActive = isUploading || isActiveUploadIndexing
 
-  // Incomplete indexing (not active, but not 100%)
-  const hasIncompleteIndexing = !isActive && !reindexState.isReindexing && totalDocuments > 0 && !isAllIndexed
+  // Background indexing state
+  const isBackgroundIndexing = indexingStatus.isIndexing
+
+  // Display values
+  const { totalDocuments, indexedDocuments, indexedPercent, pendingTasks, runningTasks, failedTasks, currentDocument } = indexingStatus
 
   // Upload stats from active job
   const uploadProgress = activeJob?.progress || 0
-  const errorCount = activeJob?.errorCount || 0
+  const errorCount = (activeJob?.errorCount || 0) + failedTasks
   const completedFiles = activeJob?.completedFiles || 0
   const totalFiles = activeJob?.totalFiles || 0
   const indexedFiles = activeJob?.indexedFiles || 0
 
-  // Start reindexing unindexed documents
-  const startReindexing = useCallback(async () => {
-    if (reindexState.isReindexing || isActive) return
-
-    abortControllerRef.current = new AbortController()
-
-    setReindexState({
-      isReindexing: true,
-      currentDoc: null,
-      progress: 0,
-      total: 0,
-      indexed: 0,
-      error: null,
-    })
-
-    try {
-      const response = await fetch('/api/vault/reindex-pending', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId }),
-        signal: abortControllerRef.current.signal,
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to start reindexing')
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error('No response stream')
-
-      const decoder = new TextDecoder()
-      let buffer = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n\n')
-        buffer = lines.pop() || ''
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const event = JSON.parse(line.slice(6))
-
-              if (event.type === 'start') {
-                setReindexState(prev => ({
-                  ...prev,
-                  total: event.total,
-                }))
-              } else if (event.type === 'indexing') {
-                setReindexState(prev => ({
-                  ...prev,
-                  currentDoc: event.title,
-                  progress: event.progress,
-                  total: event.total,
-                }))
-              } else if (event.type === 'doc_complete') {
-                setReindexState(prev => ({
-                  ...prev,
-                  indexed: event.indexed,
-                  progress: event.progress,
-                }))
-              } else if (event.type === 'doc_error') {
-                console.error(`Failed to index: ${event.title}`, event.error)
-              } else if (event.type === 'complete') {
-                setReindexState(prev => ({
-                  ...prev,
-                  isReindexing: false,
-                  currentDoc: null,
-                  indexed: event.indexed,
-                }))
-                // Reload page to get fresh counts
-                if (event.indexed > 0) {
-                  window.location.reload()
-                }
-              } else if (event.type === 'error') {
-                setReindexState(prev => ({
-                  ...prev,
-                  isReindexing: false,
-                  error: event.error,
-                }))
-              }
-            } catch {
-              // Ignore parse errors
-            }
-          }
-        }
-      }
-    } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        setReindexState(prev => ({
-          ...prev,
-          isReindexing: false,
-          error: error instanceof Error ? error.message : 'Reindexing failed',
-        }))
-      }
-    }
-  }, [workspaceId, reindexState.isReindexing, isActive])
-
-  // Auto-trigger reindexing when there are incomplete documents
-  useEffect(() => {
-    if (hasIncompleteIndexing && !hasTriggeredReindex.current && !isActive) {
-      hasTriggeredReindex.current = true
-      // Small delay to let the page settle
-      const timer = setTimeout(() => {
-        startReindexing()
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [hasIncompleteIndexing, isActive, startReindexing])
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      abortControllerRef.current?.abort()
-    }
-  }, [])
-
-  // Calculate display values
-  const displayIsReindexing = reindexState.isReindexing
-  const reindexProgress = reindexState.total > 0
-    ? Math.round((reindexState.progress / reindexState.total) * 100)
-    : 0
+  // Incomplete indexing (not active, but not 100%)
+  const hasIncompleteIndexing = !isActive && !isBackgroundIndexing && totalDocuments > 0 && indexedPercent < 100
 
   return (
     <Card className="p-4 w-fit">
@@ -220,24 +144,22 @@ export function VaultStats({ totalDocuments, indexedDocuments, workspaceId }: Va
 
               {/* Indexed status */}
               <div className="flex items-center gap-1.5">
-                {isIndexing || displayIsReindexing ? (
+                {isActiveUploadIndexing || isBackgroundIndexing ? (
                   <Loader2 className="h-3.5 w-3.5 text-purple-400 animate-spin" />
                 ) : (
-                  <Brain className={`h-3.5 w-3.5 ${isAllIndexed ? 'text-emerald-400' : 'text-emerald-400'}`} />
+                  <Brain className="h-3.5 w-3.5 text-emerald-400" />
                 )}
                 <span className="text-sm text-slate-300">Indexed</span>
                 <span className={`text-sm font-semibold ${
-                  isIndexing || displayIsReindexing ? 'text-purple-400' : 'text-emerald-400'
+                  isActiveUploadIndexing || isBackgroundIndexing ? 'text-purple-400' : 'text-emerald-400'
                 }`}>
-                  {isIndexing ? `${uploadProgress}%` :
-                   displayIsReindexing ? `${reindexProgress}%` :
-                   `${indexedPercent}%`}
+                  {isActiveUploadIndexing ? `${uploadProgress}%` : `${indexedPercent}%`}
                 </span>
-                {isIndexing && (
-                  <span className="text-xs text-slate-500">({indexedFiles}/{completedFiles - errorCount})</span>
+                {isActiveUploadIndexing && (
+                  <span className="text-xs text-slate-500">({indexedFiles}/{completedFiles - (activeJob?.errorCount || 0)})</span>
                 )}
-                {displayIsReindexing && reindexState.total > 0 && (
-                  <span className="text-xs text-slate-500">({reindexState.progress}/{reindexState.total})</span>
+                {isBackgroundIndexing && (pendingTasks > 0 || runningTasks > 0) && (
+                  <span className="text-xs text-slate-500">({pendingTasks + runningTasks} queued)</span>
                 )}
               </div>
 
@@ -252,29 +174,29 @@ export function VaultStats({ totalDocuments, indexedDocuments, workspaceId }: Va
           </div>
         </div>
 
-        {/* Progress bar for reindexing */}
-        {displayIsReindexing && (
+        {/* Progress bar for background indexing */}
+        {isBackgroundIndexing && (
           <div className="pt-1">
             <div className="flex items-center justify-between text-xs mb-1.5">
               <span className="text-purple-400 flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                {reindexState.currentDoc
-                  ? `Indexing "${reindexState.currentDoc.length > 30 ? reindexState.currentDoc.slice(0, 30) + '...' : reindexState.currentDoc}"`
-                  : 'Starting indexing...'}
+                {currentDocument
+                  ? `Indexing "${currentDocument.length > 30 ? currentDocument.slice(0, 30) + '...' : currentDocument}"`
+                  : `Processing ${pendingTasks + runningTasks} documents...`}
               </span>
-              <span className="text-slate-500">{reindexState.progress}/{reindexState.total}</span>
+              <span className="text-slate-500">{indexedDocuments}/{totalDocuments}</span>
             </div>
             <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-purple-500 to-purple-400 transition-all"
-                style={{ width: `${reindexProgress}%` }}
+                style={{ width: `${indexedPercent}%` }}
               />
             </div>
           </div>
         )}
 
-        {/* Progress bar for incomplete indexing (when not actively reindexing) */}
-        {hasIncompleteIndexing && !displayIsReindexing && (
+        {/* Progress bar for incomplete indexing (not actively processing) */}
+        {hasIncompleteIndexing && (
           <div className="pt-1">
             <div className="flex items-center justify-between text-xs mb-1.5">
               <span className="text-emerald-400 flex items-center gap-1">
@@ -292,7 +214,7 @@ export function VaultStats({ totalDocuments, indexedDocuments, workspaceId }: Va
           </div>
         )}
 
-        {/* Progress bar for active indexing */}
+        {/* Progress bar for active upload/indexing */}
         {isActive && (
           <div className="pt-1">
             <div className="flex items-center justify-between text-xs mb-1.5">
