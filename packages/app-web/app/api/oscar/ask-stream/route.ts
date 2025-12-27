@@ -405,13 +405,7 @@ export async function POST(req: NextRequest) {
           data: { threadId: thread.id, role: 'user', content: message },
         })
 
-        const repeatResponse = `I notice you've asked this question again. Would you like me to:
-
-1. **Expand** on my previous answer with more detail
-2. **Approach it differently** with a new perspective
-3. **Repeat** the same answer
-
-Just let me know how I can help further!`
+        const repeatResponse = `I notice you've asked this question again. Would you like me to expand on my previous answer, approach it from a different angle, or just repeat what I said? Let me know how I can help.`
 
         await prisma.chatMessage.create({
           data: {
