@@ -42,6 +42,8 @@ import {
 import { buildCompleteContext } from '@/lib/knowledge/pkv'
 import { buildGKVIContext, getOSQRIdentity } from '@/lib/knowledge/gkvi'
 import { trackConversation, getTILContext } from '@/lib/til'
+import { isGapAnalysisIntent, parseGapIntent } from './intent-handlers/gap-intent'
+import { analyzeKnowledgeGaps } from '@/lib/knowledge/gap-analysis'
 import type { ProviderType } from './types'
 
 // =============================================================================
@@ -76,6 +78,7 @@ export interface OSQRThinkOutput {
     confidence: number
     usedSelfKnowledge: boolean
     usedPKV: boolean
+    usedGapAnalysis: boolean
     tilTracked: boolean
   }
 }
@@ -108,6 +111,11 @@ export interface OSQRContext {
  */
 export async function think(input: OSQRThinkInput): Promise<OSQRThinkOutput> {
   const startTime = Date.now()
+
+  // 0. Check for special intent: Gap Analysis
+  if (isGapAnalysisIntent(input.message)) {
+    return handleGapAnalysisIntent(input, startTime)
+  }
 
   // 1. Analyze the question
   const routing = routeQuestion(input.message)
@@ -205,6 +213,63 @@ export async function think(input: OSQRThinkInput): Promise<OSQRThinkOutput> {
       confidence: synthesis.confidence,
       usedSelfKnowledge: selfKnowledge.length > 0,
       usedPKV: context.pkvContext.length > 0,
+      usedGapAnalysis: false,
+      tilTracked,
+    },
+  }
+}
+
+/**
+ * Handle gap analysis intent - special path for "What am I missing?" queries
+ */
+async function handleGapAnalysisIntent(
+  input: OSQRThinkInput,
+  startTime: number
+): Promise<OSQRThinkOutput> {
+  const intentContext = parseGapIntent(input.message)
+
+  // Run gap analysis
+  const gapResult = await analyzeKnowledgeGaps(input.workspaceId, {
+    userId: input.userId,
+    topN: intentContext.topN || 5,
+  })
+
+  // Track in TIL
+  let tilTracked = false
+  try {
+    await trackConversation(input.workspaceId, input.message, gapResult.summary)
+    tilTracked = true
+  } catch {
+    // TIL tracking is non-critical
+  }
+
+  // Create a routing decision for gap analysis
+  const routing: RoutingDecision = {
+    questionType: 'analysis',
+    complexity: 3,
+    confidence: 0.9,
+    modeSuggestion: 'thoughtful',
+    recommendedModel: {
+      provider: 'anthropic',
+      model: 'claude-sonnet',
+      reason: 'Gap analysis uses internal logic',
+    },
+    alternativeModels: [],
+  }
+
+  return {
+    response: gapResult.summary,
+    mode: 'thoughtful',
+    routing,
+    modelsUsed: ['OSQR Gap Analysis Engine'],
+    latencyMs: Date.now() - startTime,
+    metadata: {
+      questionType: 'analysis',
+      complexity: 3,
+      confidence: gapResult.hasGoals && gapResult.hasDocs ? 0.85 : 0.5,
+      usedSelfKnowledge: false,
+      usedPKV: true,
+      usedGapAnalysis: true,
       tilTracked,
     },
   }
