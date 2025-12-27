@@ -419,8 +419,8 @@ export async function POST(req: NextRequest) {
 
         await sendEvent('metadata', {
           threadId: thread.id,
-          routing: { questionType, complexity, autoRouted: true, autoRoutedReason: 'Repeated question detected', requestedMode: mode, effectiveMode: 'quick' },
-          // Note: isRepeatedQuestion flag removed - the response text handles it naturally
+          routing: { questionType, complexity, autoRouted: false, requestedMode: 'quick', effectiveMode: 'quick' },
+          // No special flags - the response text handles repeated questions naturally
         })
         await sendEvent('text', { chunk: repeatResponse })
         await sendEvent('done', { messageId: thread.id })
