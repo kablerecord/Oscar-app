@@ -284,6 +284,10 @@ function determineMode(
   complexity: number,
   questionType: QuestionType
 ): ResponseMode {
+  // Self-referential questions (about OSQR) always use Quick mode
+  // Constitution is already in the prompt, no need for multi-model synthesis
+  if (questionType === 'self_referential') return 'quick'
+
   // Always contemplate for very complex high-stakes questions
   if (suggestion === 'contemplate') return 'contemplate'
 
