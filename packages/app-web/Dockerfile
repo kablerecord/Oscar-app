@@ -59,10 +59,11 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
 # Create startup script that runs migrations then starts the server
+# Migrations are optional - if they fail, server still starts (for db push setups)
 RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'echo "Running Prisma migrations..."' >> /app/start.sh && \
-    echo 'cd /app/packages/app-web && npx prisma migrate deploy' >> /app/start.sh && \
-    echo 'echo "Migrations complete. Starting server..."' >> /app/start.sh && \
+    echo 'echo "Attempting Prisma migrations..."' >> /app/start.sh && \
+    echo 'cd /app/packages/app-web && npx prisma migrate deploy 2>&1 || echo "Migration skipped (may be using db push)"' >> /app/start.sh && \
+    echo 'echo "Starting server..."' >> /app/start.sh && \
     echo 'exec node /app/packages/app-web/server.js' >> /app/start.sh && \
     chmod +x /app/start.sh
 
