@@ -13,7 +13,7 @@
 
 import { prisma } from '../db/prisma'
 import { extractDomains, KnowledgeDomain, invalidateDomainCache } from './domain-extractor'
-import { getExpectedDomains, getGoalsFromMSC, getGoalsFromUIP, ExpectedDomain } from './goal-domain-map'
+import { getExpectedDomains, getGoalsFromMSC, getGoalsFromUIP, ExpectedDomain, GoalDomainContext } from './goal-domain-map'
 import { assembleUIP } from '../uip/service'
 
 // =============================================================================
@@ -257,7 +257,7 @@ export async function analyzeKnowledgeGaps(
 
   // 2. Get user's goals
   const mscGoals = await getGoalsFromMSC(workspaceId)
-  let uipContext = { goals: [] as string[], role: undefined as string | undefined }
+  let uipContext: GoalDomainContext = { goals: [] }
 
   if (options?.userId) {
     uipContext = await getGoalsFromUIP(options.userId)

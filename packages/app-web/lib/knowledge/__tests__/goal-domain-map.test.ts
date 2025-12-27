@@ -261,8 +261,8 @@ describe('Goal-Domain Mapping', () => {
   describe('getGoalsFromMSC', () => {
     it('should fetch active goals from MSC', async () => {
       vi.mocked(prisma.mSCItem.findMany).mockResolvedValue([
-        { id: '1', content: 'Launch product', category: 'goal', status: 'active', workspaceId: 'ws', createdAt: new Date(), updatedAt: new Date(), isPinned: false, description: null, dueDate: null },
-        { id: '2', content: 'Raise funding', category: 'goal', status: 'active', workspaceId: 'ws', createdAt: new Date(), updatedAt: new Date(), isPinned: false, description: null, dueDate: null },
+        { id: '1', content: 'Launch product', category: 'goal', status: 'active', workspaceId: 'ws', createdAt: new Date(), updatedAt: new Date(), isPinned: false, description: null, dueDate: null, sortOrder: 0 },
+        { id: '2', content: 'Raise funding', category: 'goal', status: 'active', workspaceId: 'ws', createdAt: new Date(), updatedAt: new Date(), isPinned: false, description: null, dueDate: null, sortOrder: 1 },
       ])
 
       const goals = await getGoalsFromMSC('test-workspace')
@@ -282,15 +282,23 @@ describe('Goal-Domain Mapping', () => {
 
   describe('getGoalsFromUIP', () => {
     it('should extract goals from UIP dimensions', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(prisma.userIntelligenceProfile.findUnique).mockResolvedValue({
         id: 'profile-1',
         userId: 'user-1',
         workspaceId: 'ws-1',
         privacyTier: 'B',
+        consentedAt: null,
         sessionCount: 5,
         signalCount: 10,
         firstSeenAt: new Date(),
         lastActiveAt: new Date(),
+        lastReflectionAt: null,
+        nextReflectionAt: null,
+        elicitationPhase: 0,
+        questionsAsked: 0,
+        questionsSkipped: 0,
+        profileSummary: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         dimensions: [
@@ -315,7 +323,7 @@ describe('Goal-Domain Mapping', () => {
             updatedAt: new Date(),
           },
         ],
-      })
+      } as any)
 
       const context = await getGoalsFromUIP('user-1')
 
@@ -324,15 +332,23 @@ describe('Goal-Domain Mapping', () => {
     })
 
     it('should extract role from identity dimension', async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.mocked(prisma.userIntelligenceProfile.findUnique).mockResolvedValue({
         id: 'profile-1',
         userId: 'user-1',
         workspaceId: null,
         privacyTier: 'B',
+        consentedAt: null,
         sessionCount: 5,
         signalCount: 10,
         firstSeenAt: new Date(),
         lastActiveAt: new Date(),
+        lastReflectionAt: null,
+        nextReflectionAt: null,
+        elicitationPhase: 0,
+        questionsAsked: 0,
+        questionsSkipped: 0,
+        profileSummary: null,
         createdAt: new Date(),
         updatedAt: new Date(),
         dimensions: [
@@ -352,7 +368,7 @@ describe('Goal-Domain Mapping', () => {
             updatedAt: new Date(),
           },
         ],
-      })
+      } as any)
 
       const context = await getGoalsFromUIP('user-1')
 

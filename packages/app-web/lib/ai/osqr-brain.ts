@@ -245,7 +245,7 @@ async function handleGapAnalysisIntent(
 
   // Create a routing decision for gap analysis
   const routing: RoutingDecision = {
-    questionType: 'analysis',
+    questionType: 'analytical',
     complexity: 3,
     confidence: 0.9,
     modeSuggestion: 'thoughtful',
@@ -255,6 +255,7 @@ async function handleGapAnalysisIntent(
       reason: 'Gap analysis uses internal logic',
     },
     alternativeModels: [],
+    shouldSuggestAltOpinion: false,
   }
 
   return {
@@ -264,7 +265,7 @@ async function handleGapAnalysisIntent(
     modelsUsed: ['OSQR Gap Analysis Engine'],
     latencyMs: Date.now() - startTime,
     metadata: {
-      questionType: 'analysis',
+      questionType: 'analytical',
       complexity: 3,
       confidence: gapResult.hasGoals && gapResult.hasDocs ? 0.85 : 0.5,
       usedSelfKnowledge: false,

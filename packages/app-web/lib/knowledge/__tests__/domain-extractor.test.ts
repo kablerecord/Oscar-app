@@ -50,6 +50,24 @@ vi.mock('../topic-cache', () => ({
 
 import { prisma } from '@/lib/db/prisma'
 
+// Helper to create mock documents with all required fields
+function createMockDocument(partial: { id: string; title: string; textContent: string; metadata?: unknown; updatedAt?: Date }) {
+  return {
+    id: partial.id,
+    title: partial.title,
+    textContent: partial.textContent,
+    metadata: partial.metadata ?? null,
+    updatedAt: partial.updatedAt ?? new Date(),
+    createdAt: new Date(),
+    workspaceId: 'test-workspace',
+    projectId: null,
+    sourceType: 'manual',
+    originalFilename: null,
+    mimeType: null,
+    contentHash: null,
+  }
+}
+
 describe('Domain Extractor', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -119,20 +137,16 @@ describe('Domain Extractor', () => {
 
     it('should extract Technical/Frontend domain from React docs', async () => {
       vi.mocked(prisma.document.findMany).mockResolvedValue([
-        {
+        createMockDocument({
           id: 'doc-1',
           title: 'React Component Architecture',
           textContent: 'Building React components with TypeScript and Next.js hooks',
-          metadata: null,
-          updatedAt: new Date(),
-        },
-        {
+        }),
+        createMockDocument({
           id: 'doc-2',
           title: 'Frontend State Management',
           textContent: 'Using React context and zustand for frontend state',
-          metadata: null,
-          updatedAt: new Date(),
-        },
+        }),
       ])
 
       const result = await extractDomains('test-workspace')
@@ -147,20 +161,16 @@ describe('Domain Extractor', () => {
 
     it('should extract Business/Marketing domain from marketing docs', async () => {
       vi.mocked(prisma.document.findMany).mockResolvedValue([
-        {
+        createMockDocument({
           id: 'doc-1',
           title: 'SEO Strategy Guide',
           textContent: 'Complete guide to SEO and content marketing strategies',
-          metadata: null,
-          updatedAt: new Date(),
-        },
-        {
+        }),
+        createMockDocument({
           id: 'doc-2',
           title: 'Marketing Automation',
           textContent: 'Email marketing automation and conversion optimization',
-          metadata: null,
-          updatedAt: new Date(),
-        },
+        }),
       ])
 
       const result = await extractDomains('test-workspace')
@@ -172,13 +182,11 @@ describe('Domain Extractor', () => {
     it('should calculate coverage depth correctly', async () => {
       // 10+ docs with 6+ topics should be "deep"
       // Need variety in content to get enough topics
-      const manyDocs = Array.from({ length: 12 }, (_, i) => ({
+      const manyDocs = Array.from({ length: 12 }, (_, i) => createMockDocument({
         id: `doc-${i}`,
         title: `React Guide ${i}`,
         // Varied content to ensure 6+ unique topics
         textContent: `React frontend typescript component hooks state management redux context api testing jest ${i % 3 === 0 ? 'nextjs' : 'webpack'} css tailwind`,
-        metadata: null,
-        updatedAt: new Date(),
       }))
 
       vi.mocked(prisma.document.findMany).mockResolvedValue(manyDocs)
@@ -194,10 +202,10 @@ describe('Domain Extractor', () => {
 
     it('should return top documents for each domain', async () => {
       vi.mocked(prisma.document.findMany).mockResolvedValue([
-        { id: 'doc-1', title: 'API Design Guide', textContent: 'REST API backend design patterns', metadata: null, updatedAt: new Date() },
-        { id: 'doc-2', title: 'Database Schema', textContent: 'PostgreSQL database backend optimization', metadata: null, updatedAt: new Date() },
-        { id: 'doc-3', title: 'Authentication Flow', textContent: 'Backend API authentication with JWT', metadata: null, updatedAt: new Date() },
-        { id: 'doc-4', title: 'Caching Strategy', textContent: 'Redis caching for backend API performance', metadata: null, updatedAt: new Date() },
+        createMockDocument({ id: 'doc-1', title: 'API Design Guide', textContent: 'REST API backend design patterns' }),
+        createMockDocument({ id: 'doc-2', title: 'Database Schema', textContent: 'PostgreSQL database backend optimization' }),
+        createMockDocument({ id: 'doc-3', title: 'Authentication Flow', textContent: 'Backend API authentication with JWT' }),
+        createMockDocument({ id: 'doc-4', title: 'Caching Strategy', textContent: 'Redis caching for backend API performance' }),
       ])
 
       const result = await extractDomains('test-workspace')
@@ -211,7 +219,7 @@ describe('Domain Extractor', () => {
 
     it('should use cache on subsequent calls', async () => {
       vi.mocked(prisma.document.findMany).mockResolvedValue([
-        { id: 'doc-1', title: 'Test Doc', textContent: 'React frontend content', metadata: null, updatedAt: new Date() },
+        createMockDocument({ id: 'doc-1', title: 'Test Doc', textContent: 'React frontend content' }),
       ])
 
       // First call
@@ -254,9 +262,9 @@ describe('Domain Extractor', () => {
     describe('Scenario 1: AI Founder with Technical Docs', () => {
       it('should identify technical domains but miss business domains', async () => {
         vi.mocked(prisma.document.findMany).mockResolvedValue([
-          { id: 'doc-1', title: 'React Architecture', textContent: 'React frontend typescript component architecture', metadata: null, updatedAt: new Date() },
-          { id: 'doc-2', title: 'OpenAI Integration', textContent: 'OpenAI API LLM integration with AI agents', metadata: null, updatedAt: new Date() },
-          { id: 'doc-3', title: 'Database Schema', textContent: 'PostgreSQL database backend schema design', metadata: null, updatedAt: new Date() },
+          createMockDocument({ id: 'doc-1', title: 'React Architecture', textContent: 'React frontend typescript component architecture' }),
+          createMockDocument({ id: 'doc-2', title: 'OpenAI Integration', textContent: 'OpenAI API LLM integration with AI agents' }),
+          createMockDocument({ id: 'doc-3', title: 'Database Schema', textContent: 'PostgreSQL database backend schema design' }),
         ])
 
         const result = await extractDomains('founder-workspace')
@@ -274,8 +282,8 @@ describe('Domain Extractor', () => {
     describe('Scenario 2: Marketer with Marketing Docs', () => {
       it('should identify marketing domains', async () => {
         vi.mocked(prisma.document.findMany).mockResolvedValue([
-          { id: 'doc-1', title: 'SEO Strategy', textContent: 'SEO marketing growth content strategy', metadata: null, updatedAt: new Date() },
-          { id: 'doc-2', title: 'Content Calendar', textContent: 'Content marketing social media calendar', metadata: null, updatedAt: new Date() },
+          createMockDocument({ id: 'doc-1', title: 'SEO Strategy', textContent: 'SEO marketing growth content strategy' }),
+          createMockDocument({ id: 'doc-2', title: 'Content Calendar', textContent: 'Content marketing social media calendar' }),
         ])
 
         const result = await extractDomains('marketer-workspace')
