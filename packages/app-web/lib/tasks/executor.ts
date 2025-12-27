@@ -1,4 +1,5 @@
 import { claimNextTask, completeTask, failTask, type Task } from './queue'
+import { indexDocumentHandler } from './handlers/index-document'
 
 /**
  * Task Executor (J-3 Implementation)
@@ -297,3 +298,9 @@ function chunkText(text: string, chunkSize: number, overlap: number): string[] {
 
   return chunks
 }
+
+/**
+ * Index document task - creates embeddings for a document's chunks
+ * This is the background job version that continues even if browser closes
+ */
+registerTaskHandler('index-document', indexDocumentHandler)
