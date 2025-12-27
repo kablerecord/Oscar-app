@@ -13,6 +13,7 @@ export * from './pattern-detector'
 export * from './insights-generator'
 export * from './cognitive-tracker'
 export * from './insight-queue'
+export * from './secretary-checklist'
 
 // Import for internal use
 import { recordEvent, getOrCreateSession } from './session-tracker'

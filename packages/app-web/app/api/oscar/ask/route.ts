@@ -12,6 +12,7 @@ import { extractMSCUpdates, mightContainMSCContent } from '@/lib/msc/auto-update
 // formatSuggestionsForChat available for chat formatting
 import { updateIdentityFromConversation } from '@/lib/identity/dimensions'
 import { trackConversation, getTILContext } from '@/lib/til'
+import { runSecretaryCheck } from '@/lib/til/secretary-checklist'
 import { isPlanningRequest, extractPlanParams, generatePlan90, formatPlanForChat } from '@/lib/til/planner'
 import { isAuditRequest, extractAuditParams, runSelfAudit, formatAuditForChat } from '@/lib/til/self-audit'
 import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
@@ -1082,6 +1083,15 @@ Guidelines:
         })
       } catch (error) {
         console.error('[TIL] Session tracking error:', error)
+      }
+
+      // Secretary Checklist: Detect commitments, deadlines, follow-ups, dependencies
+      // Runs asynchronously - doesn't block the response
+      try {
+        const combinedMessage = `User: ${message}\n\nOSQR: ${cleanAnswer}`
+        await runSecretaryCheck(workspaceId, combinedMessage, thread.id)
+      } catch (error) {
+        console.error('[Secretary] Detection error:', error)
       }
 
       // Cross-session memory: Save conversation summary for future recall

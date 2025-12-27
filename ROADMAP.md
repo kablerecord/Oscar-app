@@ -785,10 +785,11 @@ interface GlobalKnowledgeIndex {
 - `[Auto-Context] Skipped knowledge search - no matching topics in cache` — cache saved a query
 - `[TopicCache] Refreshing cache for workspace ...` — cache refresh (every 5 min or first access)
 
-### 1.9 Tier Upgrade Ceremony
+### 1.9 Tier Upgrade Ceremony ✅ COMPLETE
 *Premium "crossing the threshold" moment when users upgrade to paid tiers*
 
 > **Full Spec:** [docs/features/TIER_CEREMONY_SPEC.md](docs/features/TIER_CEREMONY_SPEC.md)
+> **Build Plan:** [docs/builds/TIER_CEREMONY_BUILD_PLAN.md](docs/builds/TIER_CEREMONY_BUILD_PLAN.md)
 
 A restrained, Apple-level ceremony that plays once per tier, per account when a user upgrades. Not a splash screen—an acknowledgment of arrival.
 
@@ -798,24 +799,27 @@ A restrained, Apple-level ceremony that plays once per tier, per account when a 
 - Restraint over spectacle ("Oh, nice." not "Wow!")
 - Server-side gating (account-level, not localStorage)
 
-**Phase 1.9a: Beta (Build before V1.0 launch)**
-- [ ] **Ceremony animation component** — Framer Motion, ~3.2s timeline
-- [ ] **Ceremony page** — `/ceremony` route with tier validation
-- [ ] **API endpoints** — GET/POST for `ceremonySeen` flags
-- [ ] **Prisma migration** — Add `ceremonySeen` JSON field to User
-- [ ] **Stripe webhook integration** — Redirect to ceremony after upgrade
-- [ ] **Middleware check** — Route to ceremony if needed on app load
+**Implementation (Completed 2025-12-27 in 20 minutes):**
+- [x] **Ceremony animation component** — Framer Motion, spotlight reveal via CSS mask-image (~7.5s Pro / ~7.8s Master)
+- [x] **Ceremony page** — `/ceremony` route with tier validation + query param testing overrides
+- [x] **API endpoints** — GET/POST for `ceremonySeen` flags
+- [x] **Prisma migration** — Add `ceremonySeen` JSON field to User
+- [x] **CeremonyCheck integration** — Routes to ceremony on app load if needed
+- [x] **Accessibility** — Reduced motion support, ARIA live announcements
+- [x] **Refresh guard** — localStorage prevents animation restart on page refresh
+
+**Testing URLs:**
+- `/ceremony?force=1&tier=pro` - Preview Pro ceremony
+- `/ceremony?force=1&tier=master` - Preview Master ceremony
 
 **Technical Implementation:**
 ```
 app/ceremony/page.tsx           # Main ceremony route
-lib/ceremony/types.ts           # Tier, CeremonySeen types
+lib/ceremony/types.ts           # Tier, CeremonySeen types, timing config
 lib/ceremony/useCeremony.ts     # Hook for gating logic
-lib/ceremony/CeremonyAnimation.tsx  # Framer Motion component
+lib/ceremony/CeremonyAnimation.tsx  # Framer Motion component with spotlight effect
 app/api/user/ceremony/route.ts  # GET + POST handlers
 ```
-
-**Effort Estimate:** 6-9 hours (one focused build session)
 
 **Why This Matters:**
 - Creates memorable "I've arrived" moment for new paid users

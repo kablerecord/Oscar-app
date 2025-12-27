@@ -30,6 +30,7 @@ model User {
   password           String?
   image              String?
   encryptionKey      Json? // Wrapped DEK for per-user encryption (v1.1)
+  ceremonySeen       Json? // Tracks which tier ceremonies have been shown: { pro?: boolean, master?: boolean }
   createdAt          DateTime                @default(now())
   updatedAt          DateTime                @updatedAt
   accounts           Account[]

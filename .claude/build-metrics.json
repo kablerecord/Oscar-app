@@ -59,11 +59,58 @@
         "filesCreated": 3,
         "summary": "UIP fully wired: streaming endpoint, cron job, task handler, and tests"
       }
+    },
+    {
+      "name": "Tier Upgrade Ceremony",
+      "buildPlan": "docs/builds/TIER_CEREMONY_BUILD_PLAN.md",
+      "humanEstimate": "6-9 hours",
+      "claudeEstimate": "45-90 minutes",
+      "sessions": [
+        {
+          "session": 1,
+          "startTime": "2025-12-27T21:30:00Z",
+          "endTime": "2025-12-27T21:50:00Z",
+          "durationMinutes": 20,
+          "completedPhases": [
+            "Phase 1: Database + Types",
+            "Phase 2: API Routes (GET + POST)",
+            "Phase 3: Install Framer Motion",
+            "Phase 4: Ceremony Animation Component",
+            "Phase 5: Ceremony Hook",
+            "Phase 6: Ceremony Page",
+            "Phase 7: Integration (CeremonyCheck in PanelClientWrapper)"
+          ],
+          "notes": "Initial build of ceremony system"
+        },
+        {
+          "session": 2,
+          "startTime": "2025-12-27T22:00:00Z",
+          "endTime": "2025-12-27T22:30:00Z",
+          "durationMinutes": 30,
+          "completedPhases": [
+            "Animation refinement: spotlight effect tuning",
+            "Timing adjustment: 4s shimmer, 1s beat, 1s tier fade",
+            "Fixed shimmer sizing (switched to percentage-based positioning)",
+            "Fixed OSQR position jump (tier name always in DOM with opacity animation)",
+            "Documentation updates"
+          ],
+          "notes": "Refined animation timing and visual effects based on user testing. Changed from vw units to percentage-based mask positioning for consistent spotlight width."
+        }
+      ],
+      "totalDurationMinutes": 50,
+      "status": "completed",
+      "outcome": {
+        "success": true,
+        "testsAdded": 0,
+        "filesModified": 5,
+        "filesCreated": 6,
+        "summary": "Tier Upgrade Ceremony: ~7.5s spotlight reveal animation with CSS mask-image, API routes, hook, CeremonyCheck integration, accessibility support, documentation updated"
+      }
     }
   ],
   "summary": {
-    "totalBuilds": 2,
-    "completedBuilds": 2,
+    "totalBuilds": 3,
+    "completedBuilds": 3,
     "averageAccuracyRatio": "Consistently completing multi-hour estimates in under 30 minutes"
   }
 }

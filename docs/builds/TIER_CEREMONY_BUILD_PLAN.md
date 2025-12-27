@@ -1,8 +1,9 @@
 # Tier Upgrade Ceremony Build Plan
 
 **Created:** 2025-12-27
-**Status:** READY TO BUILD
+**Status:** ✅ COMPLETED
 **Estimated Time:** 45-90 minutes Claude time
+**Actual Time:** 20 minutes (Session 1)
 **Human Estimate:** 6-9 hours (from spec)
 **Priority:** V1.0 Launch Polish
 
@@ -12,7 +13,7 @@
 
 **IMPORTANT:** Record start/end times in `.claude/build-metrics.json`
 
-**Session 1:** ____-__-__T__:__:__Z - ____-__-__T__:__:__Z (____ minutes)
+**Session 1:** 2025-12-27T21:30:00Z - 2025-12-27T21:50:00Z (20 minutes) ✅
 
 ---
 
@@ -111,15 +112,16 @@ cd packages/app-web && pnpm add framer-motion
 **Files to create:**
 - [ ] `lib/ceremony/CeremonyAnimation.tsx`
 
-**Timeline (3.2 seconds total):**
-| Phase | Time | Description |
-|-------|------|-------------|
-| 1. Black | 0 → 250ms | Pure black screen |
-| 2. Mark appears | 250ms → 800ms | OSQR wordmark fades in (dim) |
-| 3. Shimmer | 800ms → 1600ms | Gradient sweep left → right |
-| 4. Beat | 1600ms → 1900ms | Brief darkness/settle |
-| 5. Tier name | 1900ms → 2400ms | "Pro." or "Master." appears |
-| 6. Fade to app | 2400ms → 3200ms | Ceremony dissolves |
+**Timeline (~7.5 seconds for Pro, ~7.8 seconds for Master):**
+| Phase | Pro Time | Master Time | Description |
+|-------|----------|-------------|-------------|
+| 1. Black | 500ms | 600ms | Pure black screen |
+| 2. Shimmer | 4000ms | 4000ms | Spotlight sweep left → right reveals OSQR |
+| 3. Beat | 1000ms | 1000ms | OSQR fully visible, brief pause |
+| 4. Tier name | 1000ms | 1000ms | "Pro." or "Master." fades in below |
+| 5. Fade to app | 1000ms | 1200ms | Ceremony dissolves |
+
+**Animation technique:** CSS mask-image with animated spotlight position reveals letters as light passes over them
 
 **Visual specs:**
 - Background: Pure black (#000000) → subtle charcoal (#0a0a0a)
@@ -217,28 +219,28 @@ interface CeremonyAnimationProps {
 
 ## Build Order
 
-1. [ ] Database schema + migration
-2. [ ] Types file
-3. [ ] API route (GET + POST)
-4. [ ] Install Framer Motion
-5. [ ] Animation component
-6. [ ] Ceremony hook
-7. [ ] Ceremony page
-8. [ ] Layout integration (redirect to ceremony if needed)
-9. [ ] Verification + testing
+1. [x] Database schema + migration
+2. [x] Types file
+3. [x] API route (GET + POST)
+4. [x] Install Framer Motion
+5. [x] Animation component
+6. [x] Ceremony hook
+7. [x] Ceremony page
+8. [x] Layout integration (CeremonyCheck in PanelClientWrapper)
+9. [x] Verification + testing
 
 ---
 
 ## Success Criteria
 
-- [ ] `/ceremony?force=1&tier=pro` shows Pro ceremony
-- [ ] `/ceremony?force=1&tier=master` shows Master ceremony
-- [ ] Ceremony plays exactly once per tier (database-backed)
-- [ ] Page refresh during ceremony doesn't break (localStorage guard)
-- [ ] Reduced motion users see static version
-- [ ] All existing tests still pass
-- [ ] No TypeScript errors
-- [ ] Build completes successfully
+- [x] `/ceremony?force=1&tier=pro` shows Pro ceremony
+- [x] `/ceremony?force=1&tier=master` shows Master ceremony
+- [x] Ceremony plays exactly once per tier (database-backed via `ceremonySeen` JSON field)
+- [x] Page refresh during ceremony doesn't break (localStorage guard)
+- [x] Reduced motion users see static version
+- [x] All existing tests still pass
+- [x] No TypeScript errors
+- [x] Build completes successfully
 
 ---
 

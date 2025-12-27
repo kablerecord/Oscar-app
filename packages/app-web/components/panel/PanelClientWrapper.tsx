@@ -6,6 +6,7 @@ import { RefineFireChat, type RefineFireChatHandle } from '@/components/oscar/Re
 import type { HighlightTarget } from '@/components/layout/RightPanelBar'
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts'
 import { KeyboardShortcutsModal, SuggestShortcutModal } from '@/components/shortcuts/KeyboardShortcutsModal'
+import { CeremonyCheck } from '@/lib/ceremony/CeremonyCheck'
 
 interface PanelClientWrapperProps {
   user: {
@@ -64,7 +65,7 @@ export function PanelClientWrapper({
   }, [])
 
   return (
-    <>
+    <CeremonyCheck>
       <MainLayout
         user={user}
         workspaceName={workspaceName}
@@ -107,6 +108,6 @@ export function PanelClientWrapper({
         onClose={() => setShowSuggestModal(false)}
         userEmail={user.email}
       />
-    </>
+    </CeremonyCheck>
   )
 }

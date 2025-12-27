@@ -158,18 +158,19 @@ Example: `/ceremony?force=1&tier=master`
 
 ## Ceremony Timeline
 
-**Total duration: ~3.2 seconds**
+**Total duration: ~7.5 seconds (Pro) / ~7.8 seconds (Master)**
 
-All tiers use the **same structure**:
+All tiers use the **same structure** with slight timing variations:
 
-| Phase | Time | Description |
-|-------|------|-------------|
-| 1. Black | 0 → 250ms | Pure black screen |
-| 2. Mark appears | 250ms → 800ms | OSQR wordmark fades in (dim) |
-| 3. Shimmer | 800ms → 1600ms | Gradient sweep left → right across mark |
-| 4. Beat | 1600ms → 1900ms | Brief darkness/settle |
-| 5. Tier name | 1900ms → 2400ms | "Pro." or "Master." appears below mark |
-| 6. Fade to app | 2400ms → 3200ms | Ceremony dissolves into real app |
+| Phase | Pro Time | Master Time | Description |
+|-------|----------|-------------|-------------|
+| 1. Black | 500ms | 600ms | Pure black screen |
+| 2. Shimmer | 4000ms | 4000ms | Spotlight sweep left → right reveals OSQR letters |
+| 3. Beat | 1000ms | 1000ms | OSQR fully visible, brief pause |
+| 4. Tier name | 1000ms | 1000ms | "Pro." or "Master." fades in below mark |
+| 5. Fade to app | 1000ms | 1200ms | Ceremony dissolves into real app |
+
+**Animation technique:** CSS mask-image creates a spotlight effect where letters are only visible where the light hits them, like a flashlight scanning across in a dark room.
 
 ---
 
@@ -211,17 +212,17 @@ All tiers use the **same structure**:
 
 **Feeling:** "I'm in."
 
-- Standard shimmer speed
+- 500ms black intro, 4s shimmer reveal, 1s beat, 1s tier fade, 1s fadeout
 - Text: "Pro."
-- No additional elements
+- Total: ~7.5 seconds
 
 ### Master Ceremony
 
 **Feeling:** "Deeper."
 
-- Shimmer slightly slower (900ms instead of 800ms)
+- 600ms black intro (100ms longer), 4s shimmer reveal, 1s beat, 1s tier fade, 1.2s fadeout (200ms longer)
 - Text: "Master."
-- Optional: Shimmer has slightly more weight (gradient more pronounced)
+- Total: ~7.8 seconds
 
 **What Master does NOT have:**
 - Multi-mind echoes
@@ -424,4 +425,5 @@ This is a "last 5%" feature—high impact, low urgency. Perfect for the final po
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | Dec 2024 | Initial specification |
+| 1.1 | Dec 2024 | **IMPLEMENTED** - Updated timing (7.5s Pro, 7.8s Master), spotlight reveal effect using CSS mask-image |
 
