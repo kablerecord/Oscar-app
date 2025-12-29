@@ -40,34 +40,6 @@ export function GameRenderer({ content, onStateChange }: GameRendererProps) {
     onStateChange?.(newState)
   }, [onStateChange])
 
-  // Handle keyboard input
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const controlType = config.controls === 'dpad-ab' ? 'dpad-ab' : 'arrows'
-      const input = keyToDPadInput(e.key, controlType)
-
-      if (!input) return
-
-      e.preventDefault()
-
-      if (input.type === 'a') {
-        // A button = confirm/select
-        handleAction()
-      } else if (input.type === 'b') {
-        // B button = cancel/reset
-        handleReset()
-      } else {
-        // Direction
-        if (state.grid) {
-          setCursor(prev => handleDPadInput(prev, input, state.grid!))
-        }
-      }
-    }
-
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [state, cursor, config.controls])
-
   // Handle action (A button or click)
   const handleAction = useCallback(() => {
     if (state.status !== 'playing') return
@@ -107,6 +79,34 @@ export function GameRenderer({ content, onStateChange }: GameRendererProps) {
       setCursor(prev => handleDPadInput(prev, input, state.grid!))
     }
   }, [state.grid, handleAction, handleReset])
+
+  // Handle keyboard input
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const controlType = config.controls === 'dpad-ab' ? 'dpad-ab' : 'arrows'
+      const input = keyToDPadInput(e.key, controlType)
+
+      if (!input) return
+
+      e.preventDefault()
+
+      if (input.type === 'a') {
+        // A button = confirm/select
+        handleAction()
+      } else if (input.type === 'b') {
+        // B button = cancel/reset
+        handleReset()
+      } else {
+        // Direction
+        if (state.grid) {
+          setCursor(prev => handleDPadInput(prev, input, state.grid!))
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [state, config.controls, handleAction, handleReset])
 
   // Get theme colors
   const getThemeColors = () => {
