@@ -1,8 +1,60 @@
 # OSQR Implementation Roadmap
 
 **Generated from:** OSQR Master Plan (175K characters, 25K words)
-**Last updated:** 2025-12-16
+**Last updated:** 2025-12-29
 **Owner:** Kable Record
+
+---
+
+## Current Development State (Dec 29, 2025)
+
+### V1.5 Progress Summary
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| **UIP (User Intelligence Profile)** | ✅ Complete | All components wired |
+| **BIL (Behavioral Intelligence Layer)** | ✅ Complete | Telemetry + patterns |
+| **Secretary Checklist** | ✅ Complete | All 12 categories, 65 tests |
+| **Render System** | ✅ Complete | Intent, images, charts, templates (listings, table, game) |
+| **Template System** | ✅ Complete | 3 templates, state persistence, bubble preview |
+| **Deep Research System** | 📋 Scaffolded | Needs Tavily API + Inngest |
+| **Import Interview** | 📋 Spec Ready | Not started |
+| **Auto-Organization** | ❌ Not Started | Auto-title, project linking |
+
+### V1.6 Progress Summary
+
+| Component | Status | Notes |
+|-----------|--------|-------|
+| **Depth-Aware Intelligence** | ✅ Complete | All 8 phases implemented |
+| - Phase 1: Data Model | ✅ Complete | Prisma models, migration applied, indexes created |
+| - Phase 2: Vault Inventory | ✅ Complete | `lib/depth-aware/vault-inventory.ts` |
+| - Phase 3: Answer Cache | ✅ Complete | `lib/depth-aware/answer-cache.ts` |
+| - Phase 4: Escalation Detection | ✅ Complete | `lib/depth-aware/escalation.ts` |
+| - Phase 5: Validation & Invalidation | ✅ Complete | `lib/depth-aware/validation.ts` |
+| - Phase 6: Retrieval Sub-Agent | ✅ Complete | `lib/depth-aware/retrieval-agent.ts` |
+| - Phase 7: UX Integration | ✅ Complete | `lib/depth-aware/orchestrator.ts`, wired to ask-stream |
+| - Phase 8: Global Cache Seeding | ✅ Complete | `lib/depth-aware/global-cache-seed.ts`, 25 questions |
+
+> **Build Spec:** `docs/builds/DEPTH_AWARE_INTELLIGENCE_BUILD.md`
+> **Admin API:** `POST /api/admin/seed-cache` to seed global cache
+
+### Next Steps (Pick One)
+
+1. **V1.1 AI Feature Parity** - Voice, images, web search, code execution
+2. **Deep Research** - Set up Tavily + Inngest, build research flow
+3. **Import Interview** - Build ChatGPT/Claude import workflow
+4. **Auto-Organization** - Auto-title, project linking
+
+### Key Files for Resume
+- `docs/builds/INSIGHTS_SECRETARY_BUILD.md` - Secretary Checklist (complete)
+- `docs/builds/RENDER_TEMPLATE_BUILD_PLAN.md` - Render + Template System (complete)
+- `docs/features/RENDER_SYSTEM_SPEC.md` - Render System spec
+- `docs/features/TEMPLATE_SYSTEM_SPEC.md` - Template System spec
+- `docs/features/OSQR_DEEP_RESEARCH_SPEC.md` - Deep Research spec
+- `lib/til/secretary-checklist.ts` - 12 detection categories
+- `lib/til/__tests__/secretary-checklist.test.ts` - 65 passing tests
+- `lib/render/` - Render system implementation
+- `components/render/` - Template renderers (listings, table, game)
 
 This roadmap extracts actionable implementation items from the OSQR Master Plan document, organized by development phase. Each item maps back to specific sections in the master plan.
 
@@ -558,7 +610,9 @@ This roadmap defines **WHAT** to build. The Development Philosophy document defi
 |---------|-------|------------------|
 | **V1.0** | Core OSQR | Web app, PKV, multi-model routing, Refine→Fire, **Tier Upgrade Ceremony** |
 | **V1.1** | AI Feature Parity | Voice input, image analysis, image generation, web search, code execution |
-| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction, Auto-Organization, Secretary Checklist, Import Interviews, **Deep Research System**, **Tribunal Mode**, **Render System**, ~~UIP~~ ✅, ~~BIL~~ ✅ |
+| **V1.5** | Plugin Foundations + Intelligence | Plugin architecture, TIL, Proactive Insights, Cognitive Profiles, Fourth Gen extraction, Auto-Organization, ~~Secretary Checklist~~ ✅, Import Interviews, **Deep Research System**, **Tribunal Mode**, **Render System**, ~~UIP~~ ✅, ~~BIL~~ ✅ |
+| **V1.6** | Depth-Aware Intelligence | Vault Inventory Layer, Semantic Answer Cache, Escalation Detection, Retrieval Sub-Agent |
+| **V1.9** | System Health Check | Review global cache hit rates, check Postgres latency, rebalance topic clusters. See `docs/builds/DEPTH_AWARE_INTELLIGENCE_BUILD.md` |
 | **V2.0** | Creator Marketplace | Marketplace launch, creator onboarding, plugin ecosystem |
 | **V3.0** | VS Code OSQR | Full VS Code extension, Builder Plugin, Queue System, **Execution Orchestrator** |
 | **V4.0** | Privacy Phone | OSQR-native phone, intelligence utility model, US manufacturing |
@@ -1301,20 +1355,41 @@ Needed:
 ### 3.3.2 Secretary Checklist (Insights System Extension) ⭐ V1.5
 
 > **Full Spec:** [docs/features/OSQR_SECRETARY_CHECKLIST_ADDENDUM.md](docs/features/OSQR_SECRETARY_CHECKLIST_ADDENDUM.md)
+> **Build Doc:** [docs/builds/INSIGHTS_SECRETARY_BUILD.md](docs/builds/INSIGHTS_SECRETARY_BUILD.md)
 
-**Status:** Spec complete, ready for implementation
+**Status:** ✅ FULLY COMPLETE (2025-12-27) — All 12 detectors built and tested
 
 **What it is:** OSQR continuously runs the mental checklist a world-class executive assistant uses to keep their executive on track.
 
 **Core Principle:**
 > Anything a diligent assistant would do if they were paying attention to everything you said — OSQR should do automatically.
 
-**Checklist Categories:**
-- [ ] **Follow-ups** - Open decisions, abandoned discussions, paused implementations
-- [ ] **Commitments** - Things you said you'd do, promises made
-- [ ] **Contradictions** - When you say things that conflict with past statements
-- [ ] **Calendar awareness** - Upcoming events, preparation reminders
-- [ ] **Pattern alerts** - Recurring issues, blind spots, habits
+**Checklist Categories (All Complete):**
+- [x] **Commitments** - Things you said you'd do ("I'll...", "I need to...")
+- [x] **Deadlines** - Dates and timeframes ("by Friday", "January 15")
+- [x] **Follow-ups** - Open decisions, abandoned discussions
+- [x] **Dependencies** - Blocked items ("once X is done", "waiting on...")
+- [x] **Contradictions** - When you say things that conflict with past statements
+- [x] **Open questions** - Unresolved decisions ("Should we...?", "Which option...?")
+- [x] **People waiting** - Others waiting for responses ("I'll get back to [person]...")
+- [x] **Recurring patterns** - Topics/habits that come up repeatedly
+- [x] **Stale decisions** - Old decisions that may need revisiting
+- [x] **Context decay** - Information that may be outdated
+- [x] **Unfinished work** - Incomplete artifacts (TODO, WIP, drafts)
+- [x] **Pattern breaks** - Anomalies from usual behavior ("I forgot to...", "I missed...")
+
+**Future Enhancements (Not in current scope):**
+- [ ] **Calendar awareness** - Upcoming events, preparation reminders (requires calendar integration)
+- [ ] **Settings UI** - Per-category toggle controls
+- [ ] **Database persistence** - Currently uses in-memory queue
+
+**Implementation Details:**
+- Detection runs asynchronously after each conversation (doesn't block responses)
+- Insights surface after 30 seconds of idle time (feels like an insight, not immediate reaction)
+- Pull-based UX: Bubble pulses amber, user clicks to engage
+- Mini-conversation stays in sidebar (not redirected to main panel)
+- Feedback recorded for engagement tracking
+- All 12 detectors run in parallel with appropriate surface timing per category
 
 ### 3.3.3 Import Interview Subsystem ⭐ V1.5
 

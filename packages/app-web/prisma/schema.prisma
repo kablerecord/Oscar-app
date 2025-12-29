@@ -325,6 +325,7 @@ model Artifact {
 enum ArtifactType {
   IMAGE
   CHART
+  TEMPLATE  // v1.5.1: Template-based artifacts (listings, table, game)
   CODE      // Source code (any language)
   DOCUMENT  // Markdown/text documents
   DIAGRAM   // Mermaid diagrams
@@ -400,15 +401,17 @@ model MSCCategory {
 
 // Access Codes for early access signup
 model AccessCode {
-  id        String   @id @default(cuid())
-  code      String   @unique
+  id        String    @id @default(cuid())
+  code      String    @unique
   label     String? // Who this code is for (e.g., "Jesse", "Mom")
-  maxUses   Int      @default(1) // How many times this code can be used
-  useCount  Int      @default(0) // How many times it's been used
+  maxUses   Int       @default(1) // How many times this code can be used
+  useCount  Int       @default(0) // How many times it's been used
   usedBy    String[] // Emails of users who used it (array for multi-use codes)
-  createdAt DateTime @default(now())
+  expiresAt DateTime? // Optional expiration date for time-limited codes
+  createdAt DateTime  @default(now())
 
   @@index([code])
+  @@index([expiresAt])
 }
 
 // Password Reset Tokens (v1.1)
@@ -998,4 +1001,143 @@ enum FeedbackSource {
   BUTTON          // Clicked feedback button
   NATURAL_LANGUAGE // Said "leave feedback" or similar in chat
   RESPONSE_RATING // Thumbs up/down on response
+}
+
+// ============================================
+// Depth-Aware Intelligence System (V1.6)
+// ============================================
+// @see docs/builds/DEPTH_AWARE_INTELLIGENCE_BUILD.md
+//
+// Three-layer knowledge system:
+// - Layer 1: Always-on (inventory, cache) - milliseconds
+// - Layer 2: Awareness scan (topic overlap) - fast
+// - Layer 3: Deep retrieval (full PKV search) - expensive
+
+// Document Inventory - lightweight awareness of vault contents
+// Allows OSQR to know WHAT exists without reading documents
+model DocumentInventory {
+  id              String   @id @default(cuid())
+  userId          String
+  documentId      String   @unique
+
+  // Lightweight metadata (always loaded)
+  title           String
+  fileName        String
+  fileType        String
+  uploadedAt      DateTime
+  updatedAt       DateTime @updatedAt
+
+  // Auto-generated summaries (created on upload)
+  autoSummary     String   @db.Text  // 2-3 sentence summary via Haiku
+  topicTags       String[] // Auto-extracted topics
+
+  // Clustering for fast relevance scoring
+  topicClusterId  String?
+  clusterCentroid Unsupported("vector")? // Embedding of document's "center"
+
+  // Relations
+  cluster         TopicCluster? @relation(fields: [topicClusterId], references: [id])
+
+  @@index([userId])
+  @@index([topicClusterId])
+}
+
+// Topic clusters group related documents for fast relevance detection
+model TopicCluster {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String   // Auto-generated cluster name
+  centroid    Unsupported("vector")? // Average embedding of cluster
+  documentCount Int    @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Rebalancing tracking
+  lastRebalancedAt DateTime?
+  documentsSinceRebalance Int @default(0) // Trigger rebalance at 20
+
+  documents   DocumentInventory[]
+
+  @@index([userId])
+}
+
+// Semantic Answer Cache - remembers Q&A pairs
+// Supports both exact match (hash) and similar match (embedding)
+model AnswerCache {
+  id                String            @id @default(cuid())
+
+  // Scope: GLOBAL (OSQR-wide) or USER (per-user)
+  scope             AnswerCacheScope
+  userId            String?           // null for GLOBAL scope
+
+  // The cached Q&A pair
+  questionHash      String            // SHA-256 of normalized question (exact match)
+  questionText      String            @db.Text
+  questionEmbedding Unsupported("vector")? // For similar match
+  answerText        String            @db.Text
+
+  // Confidence & validity
+  confidenceScore   Float             @default(1.0)  // Decays over time
+  createdAt         DateTime          @default(now())
+  lastUsedAt        DateTime          @default(now())
+  lastValidatedAt   DateTime          @default(now())
+  expiresAt         DateTime?
+
+  // Invalidation tracking
+  isValid           Boolean           @default(true)
+  invalidatedAt     DateTime?
+  invalidationReason String?
+
+  // Source traceability
+  sourceDocumentIds String[]  // Which docs informed this answer
+  sourceConversationId String?
+
+  // Usage analytics
+  hitCount          Int               @default(0)
+  acceptanceRate    Float?            // Did users accept or ask follow-up?
+  lastHitAt         DateTime?
+
+  // Invalidation events (for audit trail)
+  invalidationEvents CacheInvalidationEvent[]
+
+  @@unique([scope, questionHash])
+  @@index([userId])
+  @@index([scope])
+  @@index([isValid])
+  @@index([userId, lastUsedAt]) // For LRU eviction
+  @@index([lastHitAt]) // For tracking stale entries
+}
+
+enum AnswerCacheScope {
+  GLOBAL  // OSQR-wide answers (modes, pricing, features)
+  USER    // This user's previously answered questions
+}
+
+// Cache invalidation events for audit trail
+model CacheInvalidationEvent {
+  id            String              @id @default(cuid())
+  cacheEntryId  String
+
+  triggerType   InvalidationTrigger
+  triggerSource String?             // documentId, userId, etc.
+  reason        String
+
+  createdAt     DateTime            @default(now())
+
+  cacheEntry    AnswerCache         @relation(fields: [cacheEntryId], references: [id], onDelete: Cascade)
+
+  @@index([cacheEntryId])
+  @@index([triggerType])
+  @@index([createdAt])
+}
+
+enum InvalidationTrigger {
+  TIME_DECAY          // Answer too old (confidence dropped)
+  DOCUMENT_CHANGE     // Source document was updated
+  DOCUMENT_ADDED      // New doc on same topic uploaded
+  USER_CORRECTION     // User said "that's wrong"
+  SEMANTIC_CONFLICT   // New info contradicts cached answer
+  LRU_EVICTION        // Evicted due to cache size limits
+  MANUAL              // Admin invalidation
 }

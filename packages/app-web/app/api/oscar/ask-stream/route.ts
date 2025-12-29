@@ -58,6 +58,14 @@ import { hasFeature as hasTierFeature, type TierName } from '@/lib/tiers/config'
 // Behavioral Intelligence Layer - Telemetry
 import { getTelemetryCollector } from '@/lib/telemetry/TelemetryCollector'
 
+// Depth-Aware Intelligence (V1.6)
+import {
+  getDepthAwareContext,
+  cacheGeneratedAnswer,
+  formatForPrompt,
+  buildResponseMetadata,
+} from '@/lib/depth-aware'
+
 const RequestSchema = z.object({
   message: z.string().min(1),
   workspaceId: z.string(),
@@ -299,6 +307,110 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // ==========================================================================
+      // RENDER INTENT DETECTION: Check if user wants to create visual content
+      // Handles "/render", "draw me", "visualize", "make a chart", templates, games etc.
+      // ==========================================================================
+      const { detectAnyRenderIntent, detectIterationIntent } = await import('@/lib/render/intent-detection')
+      const renderIntent = detectAnyRenderIntent(message)
+      const iterationIntent = detectIterationIntent(message)
+
+      if (renderIntent.detected) {
+        // User wants to create a new render (image, chart, or template)
+        const renderMessage = renderIntent.type === 'template'
+          ? "Setting up your template..."
+          : "Rendering..."
+
+        // Create or use existing thread for the render conversation
+        let threadId = conversationId
+        if (!threadId) {
+          const thread = await prisma.chatThread.create({
+            data: {
+              workspaceId,
+              title: message.slice(0, 50) + (message.length > 50 ? '...' : ''),
+              mode: 'panel',
+            },
+          })
+          threadId = thread.id
+        }
+
+        // Save user message
+        await prisma.chatMessage.create({
+          data: {
+            threadId,
+            role: 'user',
+            provider: 'user',
+            content: message,
+          },
+        })
+
+        // Save assistant render message (will be updated when render completes)
+        const assistantMessage = await prisma.chatMessage.create({
+          data: {
+            threadId,
+            role: 'assistant',
+            provider: 'osqr-render',
+            content: renderMessage,
+            metadata: { renderPending: true, renderType: renderIntent.type },
+          },
+        })
+
+        await sendEvent('metadata', {
+          renderPending: true,
+          threadId,
+          messageId: assistantMessage.id,
+          renderIntent: {
+            type: renderIntent.type,
+            prompt: message,
+            confidence: renderIntent.confidence,
+          },
+        })
+        await sendEvent('text', { chunk: renderMessage })
+        await sendEvent('done', { renderPending: true, threadId, messageId: assistantMessage.id })
+        await writer.close()
+        return
+      }
+
+      if (iterationIntent.isIteration && conversationId) {
+        // User wants to modify a recent render ("make it blue", "add more data")
+
+        // Save user message
+        await prisma.chatMessage.create({
+          data: {
+            threadId: conversationId,
+            role: 'user',
+            provider: 'user',
+            content: message,
+          },
+        })
+
+        // Save assistant iteration message
+        const assistantMessage = await prisma.chatMessage.create({
+          data: {
+            threadId: conversationId,
+            role: 'assistant',
+            provider: 'osqr-render',
+            content: "Updating the render...",
+            metadata: { renderPending: true, iterationType: iterationIntent.iterationType },
+          },
+        })
+
+        await sendEvent('metadata', {
+          renderPending: true,
+          threadId: conversationId,
+          messageId: assistantMessage.id,
+          iterationIntent: {
+            modification: message,
+            conversationId,
+            type: iterationIntent.iterationType,
+          },
+        })
+        await sendEvent('text', { chunk: "Updating the render..." })
+        await sendEvent('done', { renderPending: true, threadId: conversationId, messageId: assistantMessage.id })
+        await writer.close()
+        return
+      }
+
       // 6. Safety check
       const safetyResult = performSafetyCheck(message)
       if (!safetyResult.proceedWithNormalFlow) {
@@ -370,6 +482,80 @@ export async function POST(req: NextRequest) {
       }
 
       const userLevel = workspace?.capabilityLevel ?? 0
+
+      // ==========================================================================
+      // DEPTH-AWARE INTELLIGENCE: Check cache and vault awareness
+      // Layer 1: Answer cache (exact + similar match)
+      // Layer 2: Vault awareness (topic overlap)
+      // Layer 3: Deep retrieval (triggered by consent or mode)
+      // ==========================================================================
+      let depthAwareResult: Awaited<ReturnType<typeof getDepthAwareContext>> | null = null
+
+      try {
+        depthAwareResult = await getDepthAwareContext({
+          userId,
+          question: message,
+          mode: effectiveMode as 'quick' | 'thoughtful' | 'contemplate' | 'council',
+          conversationHistory: conversationHistory?.map(m => ({
+            role: m.role,
+            content: m.content,
+          })),
+          skipCache: false,
+          forceRetrieval: effectiveMode === 'council', // Council always retrieves
+          cacheNewAnswers: true,
+        })
+
+        // If we got a valid cache hit, we can return early
+        if (depthAwareResult.cachedAnswer && depthAwareResult.metadata.knowledgeSource === 'cache') {
+          console.log('[Stream][DepthAware] Cache hit! Returning cached answer')
+
+          const thread = await prisma.chatThread.create({
+            data: { workspaceId, title: message.slice(0, 100), mode: 'panel' },
+          })
+
+          await prisma.chatMessage.create({
+            data: { threadId: thread.id, role: 'user', content: message },
+          })
+
+          const cachedResponse = depthAwareResult.cachedAnswer
+          const osqrMessage = await prisma.chatMessage.create({
+            data: {
+              threadId: thread.id,
+              role: 'assistant',
+              provider: 'osqr-cache',
+              content: cachedResponse,
+              metadata: {
+                cached: true,
+                cacheSource: depthAwareResult.cacheHit?.scope,
+                cacheConfidence: depthAwareResult.cacheHit?.confidenceScore,
+              },
+            },
+          })
+
+          await sendEvent('metadata', {
+            threadId: thread.id,
+            routing: { questionType, complexity, autoRouted: true, autoRoutedReason: 'Cache hit', requestedMode: mode, effectiveMode: 'quick' },
+            depthAware: buildResponseMetadata(depthAwareResult).depthAware,
+          })
+
+          // Stream the cached answer
+          for (let i = 0; i < cachedResponse.length; i += 50) {
+            await sendEvent('text', { chunk: cachedResponse.slice(i, i + 50) })
+          }
+
+          await sendEvent('done', { messageId: osqrMessage.id, cached: true })
+          await writer.close()
+          return
+        }
+
+        // Log depth-aware decision
+        if (depthAwareResult.metadata.suggestedPrompt) {
+          console.log(`[Stream][DepthAware] Vault awareness: ${depthAwareResult.vaultAwareness.relevantDocuments} relevant docs found`)
+        }
+      } catch (depthAwareError) {
+        console.error('[Stream][DepthAware] Error:', depthAwareError)
+        // Continue without depth-aware - it's non-blocking
+      }
 
       // 8b. Repeated question detection
       // If user asks the same question twice, offer to expand or repeat
@@ -519,7 +705,15 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const contextParts = [autoContext.context, tilContext, memoryContext, crossProjectContext, uipContextString].filter(Boolean)
+      // ==========================================================================
+      // DEPTH-AWARE: Add vault context if retrieval happened
+      // ==========================================================================
+      let depthAwareContextString: string | undefined
+      if (depthAwareResult?.vaultContext) {
+        depthAwareContextString = formatForPrompt(depthAwareResult)
+      }
+
+      const contextParts = [autoContext.context, tilContext, memoryContext, crossProjectContext, uipContextString, depthAwareContextString].filter(Boolean)
       const context = contextParts.join('\n\n---\n\n') || undefined
 
       // Create thread for this conversation
@@ -556,6 +750,8 @@ export async function POST(req: NextRequest) {
           confidence: uipContext.confidence,
           suggestedMode: uipContext.adapters.suggestedMode,
         } : undefined,
+        // Depth-Aware: Include vault awareness
+        depthAware: depthAwareResult ? buildResponseMetadata(depthAwareResult).depthAware : undefined,
       })
 
       // 12. Stream the response
@@ -566,6 +762,7 @@ export async function POST(req: NextRequest) {
         includeDebate,
         mode: effectiveMode,
         userLevel,
+        conversationHistory,
       }
 
       let fullResponse = ''
@@ -744,6 +941,20 @@ export async function POST(req: NextRequest) {
           } catch (e) {
             console.error('[Temporal] Error:', e)
           }
+        }
+
+        // Depth-Aware: Cache the generated answer for future similar questions
+        try {
+          // Only cache if not already a cache hit and answer is substantial
+          if (!depthAwareResult?.metadata.cacheHit && cleanAnswer.length > 100) {
+            await cacheGeneratedAnswer(message, cleanAnswer, userId, {
+              conversationId: thread.id,
+              sourceDocumentIds: depthAwareResult?.retrievalResult?.sourceDocuments,
+            })
+            console.log('[Stream][DepthAware] Cached new answer')
+          }
+        } catch (e) {
+          console.error('[DepthAware] Cache error:', e)
         }
 
         // UIP: Extract signals from conversation and process for profile learning
