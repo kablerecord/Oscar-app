@@ -19,7 +19,6 @@ import type {
   FocusModeName,
   BubbleFeedback,
   DeferOption,
-  InterruptBudget,
   FocusModeConfig,
 } from '../types';
 
@@ -28,7 +27,6 @@ import { DEFAULT_ENGINE_CONFIG, DEFAULT_USER_STATE, FOCUS_MODES } from '../const
 import {
   calculateConfidenceScore,
   calculateConfidenceBreakdown,
-  getVisualState,
 } from '../scoring';
 
 import {
@@ -43,7 +41,6 @@ import {
 import {
   getFocusMode,
   shouldSurfaceItem,
-  filterItemsForFocusMode,
   getQueuedItems,
   getEffectiveVisualState,
 } from '../budget/focusMode';

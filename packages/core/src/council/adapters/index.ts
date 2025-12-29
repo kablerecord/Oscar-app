@@ -4,10 +4,10 @@
  * Unified interface for all model adapters.
  */
 
-import { BaseModelAdapter, AdapterConfig, ProviderResponse } from './base';
-import { ClaudeAdapter, ClaudeConfig, createClaudeAdapter } from './claude';
-import { GPT4Adapter, GPT4Config, createGPT4Adapter } from './gpt4';
-import { GeminiAdapter, GeminiConfig, createGeminiAdapter } from './gemini';
+import { BaseModelAdapter } from './base';
+import { ClaudeConfig, createClaudeAdapter } from './claude';
+import { GPT4Config, createGPT4Adapter } from './gpt4';
+import { GeminiConfig, createGeminiAdapter } from './gemini';
 import type { ModelId, ModelResponse } from '../types';
 
 // Re-export types

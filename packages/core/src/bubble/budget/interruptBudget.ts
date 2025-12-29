@@ -7,8 +7,6 @@
 
 import type {
   InterruptBudget,
-  DailyBudget,
-  HourlyBudget,
   BudgetConsumptionResult,
   BubbleItem,
   FocusModeName,
@@ -299,7 +297,7 @@ export function getBudgetUtilization(budget: InterruptBudget): {
  */
 export function formatBudgetStatus(budget: InterruptBudget): string {
   const currentBudget = applyResets(budget);
-  const { daily, hourly } = getBudgetUtilization(currentBudget);
+  const { daily } = getBudgetUtilization(currentBudget);
 
   return `Daily: ${currentBudget.daily.used}/${currentBudget.daily.total} (${daily}%) | Hourly: ${currentBudget.hourly.current}/${currentBudget.hourly.available}`;
 }

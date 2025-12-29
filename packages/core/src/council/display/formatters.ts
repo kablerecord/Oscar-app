@@ -6,9 +6,6 @@
 
 import type {
   CouncilDeliberation,
-  CouncilSummary,
-  ModelResponse,
-  ArbitrationEntry,
   DisplayState,
 } from '../types';
 import { buildCouncilSummary } from './states';
@@ -29,7 +26,7 @@ export interface FormatOptions {
  */
 export function formatDefaultView(
   deliberation: CouncilDeliberation,
-  options: FormatOptions = {}
+  _options: FormatOptions = {}
 ): string {
   const lines: string[] = [];
 
@@ -57,7 +54,7 @@ export function formatDefaultView(
  */
 export function formatExpandedView(
   deliberation: CouncilDeliberation,
-  options: FormatOptions = {}
+  _options: FormatOptions = {}
 ): string {
   const lines: string[] = [];
   const summary = buildCouncilSummary(deliberation);
@@ -123,7 +120,7 @@ export function formatExpandedView(
  */
 export function formatDisagreementView(
   deliberation: CouncilDeliberation,
-  options: FormatOptions = {}
+  _options: FormatOptions = {}
 ): string {
   const lines: string[] = [];
   const summary = buildCouncilSummary(deliberation);

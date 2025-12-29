@@ -34,7 +34,7 @@ export function createHistoryEntry(
   item: BubbleItem,
   action: 'dismissed' | 'engaged' | 'deferred',
   timeToAction: number,
-  feedback?: BubbleFeedback
+  _feedback?: BubbleFeedback
 ): BubbleHistory {
   return {
     itemId: item.id,

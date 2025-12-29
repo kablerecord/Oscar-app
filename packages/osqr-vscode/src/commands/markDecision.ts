@@ -89,7 +89,7 @@ export class MarkDecisionCommand {
           cancellable: false,
         },
         async () => {
-          const result = await this.apiClient.markDecision(decisionText!, {
+          await this.apiClient.markDecision(decisionText!, {
             messageId: options?.messageId,
             conversationId: options?.conversationId,
             tags,

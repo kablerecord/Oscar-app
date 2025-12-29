@@ -5,7 +5,6 @@
  * Handles chat, decisions, and usage tracking.
  */
 
-import * as vscode from 'vscode'
 import { AuthProvider } from './AuthProvider'
 import { getApiUrl, getConfig } from '../utils/config'
 import { captureWorkspaceContext } from '../utils/context'

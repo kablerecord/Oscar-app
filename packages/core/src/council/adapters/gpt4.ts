@@ -48,7 +48,7 @@ export class GPT4Adapter extends BaseModelAdapter {
    */
   async query(
     prompt: string,
-    context?: { systemPrompt?: string; history?: Array<{ role: string; content: string }> }
+    _context?: { systemPrompt?: string; history?: Array<{ role: string; content: string }> }
   ): Promise<ProviderResponse> {
     // Mock implementation - in production, this would call the actual API
     if (!this.apiKey) {
