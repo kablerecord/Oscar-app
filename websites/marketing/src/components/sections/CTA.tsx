@@ -29,7 +29,7 @@ export function CTA() {
             {/* CTA Button */}
             <a
               href={`${APP_URL}/signup`}
-              className="inline-flex items-center justify-center font-semibold rounded-lg px-6 py-3 text-base bg-white text-blue-600 hover:bg-blue-50 transition-all duration-200 shadow-lg"
+              className="inline-flex items-center justify-center font-semibold rounded-lg px-6 py-3 text-base bg-white text-blue-600 hover:bg-blue-50 transition-all duration-200 shadow-lg cursor-pointer"
             >
               Get Started
             </a>

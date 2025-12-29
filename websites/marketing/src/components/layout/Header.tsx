@@ -49,7 +49,7 @@ export function Header() {
             </a>
             <a
               href={`${APP_URL}/signup`}
-              className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:bg-blue-600 hover:shadow-blue-500/40"
+              className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:bg-blue-600 hover:shadow-blue-500/40 cursor-pointer"
             >
               Get Started
             </a>
@@ -58,7 +58,7 @@ export function Header() {
           {/* Mobile menu button */}
           <button
             type="button"
-            className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-slate-400 hover:text-white"
+            className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-slate-400 hover:text-white cursor-pointer"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             <span className="sr-only">Open menu</span>
@@ -99,7 +99,7 @@ export function Header() {
               </a>
               <a
                 href={`${APP_URL}/signup`}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white"
+                className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white cursor-pointer"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Get Started
