@@ -11,6 +11,8 @@ import {
   Flag,
   Hash,
   Loader2,
+  MessageSquare,
+  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -48,6 +50,10 @@ export function ResponseActions({
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [flagged, setFlagged] = useState(false)
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
+  const [showCommentForm, setShowCommentForm] = useState(false)
+  const [comment, setComment] = useState('')
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [commentSubmitted, setCommentSubmitted] = useState(false)
 
   // Copy to clipboard
   const handleCopy = async () => {
@@ -142,6 +148,37 @@ export function ResponseActions({
       onFlag?.(messageId)
     } catch (err) {
       console.error('Failed to flag message:', err)
+    }
+  }
+
+  // Handle comment submission
+  const handleSubmitComment = async () => {
+    if (!comment.trim()) return
+
+    setIsSubmittingComment(true)
+
+    try {
+      await fetch('/api/chat/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messageId,
+          workspaceId,
+          feedback: feedback || undefined,
+          comment: comment.trim(),
+        }),
+      })
+
+      setCommentSubmitted(true)
+      setTimeout(() => {
+        setShowCommentForm(false)
+        setComment('')
+        setCommentSubmitted(false)
+      }, 1500)
+    } catch (err) {
+      console.error('Failed to submit comment:', err)
+    } finally {
+      setIsSubmittingComment(false)
     }
   }
 
@@ -249,6 +286,31 @@ export function ResponseActions({
           </TooltipContent>
         </Tooltip>
 
+        {/* Comment Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowCommentForm(!showCommentForm)}
+              className={`h-7 px-2 ${
+                showCommentForm || commentSubmitted
+                  ? 'text-cyan-400 bg-cyan-500/20'
+                  : 'text-slate-400 hover:text-cyan-400 hover:bg-cyan-500/10'
+              }`}
+            >
+              {commentSubmitted ? (
+                <Check className="h-3.5 w-3.5 text-green-400" />
+              ) : (
+                <MessageSquare className="h-3.5 w-3.5" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" className="bg-slate-800 border-slate-700">
+            <p className="text-xs">{commentSubmitted ? 'Comment sent!' : 'Add a comment'}</p>
+          </TooltipContent>
+        </Tooltip>
+
         {/* Admin-only buttons */}
         {isAdmin && (
           <>
@@ -293,6 +355,50 @@ export function ResponseActions({
           </>
         )}
       </div>
+
+      {/* Inline Comment Form */}
+      {showCommentForm && (
+        <div className="mt-2 p-3 bg-slate-800/50 border border-slate-700 rounded-lg animate-in slide-in-from-top-1 fade-in duration-200">
+          <div className="flex items-start gap-2">
+            <textarea
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="What's wrong with this response? How could it be better?"
+              className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 resize-none"
+              rows={2}
+              autoFocus
+            />
+            <div className="flex flex-col gap-1">
+              <Button
+                size="sm"
+                onClick={handleSubmitComment}
+                disabled={isSubmittingComment || !comment.trim()}
+                className="h-8 px-3 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50"
+              >
+                {isSubmittingComment ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  'Send'
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setShowCommentForm(false)
+                  setComment('')
+                }}
+                className="h-8 px-3 text-slate-400 hover:text-slate-200"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            Your feedback helps improve OSQR's responses.
+          </p>
+        </div>
+      )}
     </TooltipProvider>
   )
 }

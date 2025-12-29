@@ -69,23 +69,6 @@ export function ImageRenderer({ content }: ImageRendererProps) {
           </div>
         </button>
 
-        {/* Prompt info */}
-        <div className="mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            <span className="font-medium">Prompt:</span> {content.prompt}
-          </p>
-          {content.revisedPrompt && content.revisedPrompt !== content.prompt && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-              <span className="font-medium">DALL-E interpretation:</span>{' '}
-              {content.revisedPrompt}
-            </p>
-          )}
-          <div className="flex items-center gap-4 mt-3 text-xs text-gray-400">
-            <span>{content.size}</span>
-            <span>{content.style || 'vivid'} style</span>
-            <span>{content.model}</span>
-          </div>
-        </div>
       </div>
 
       {/* Lightbox */}

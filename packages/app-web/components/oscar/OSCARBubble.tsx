@@ -487,7 +487,7 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
     }
   }, [pendingInsight])
 
-  // Handle "Tell me more" - transitions to panel conversation
+  // Handle "Tell me more" - continues the conversation in the bubble
   const handleTellMeMore = useCallback(async () => {
     if (!pendingInsight) return
 
@@ -500,25 +500,45 @@ export const OSCARBubble = forwardRef<OSCARBubbleHandle, OSCARBubbleProps>(funct
         body: JSON.stringify({ action: 'engage' }),
       })
 
-      // Transition: expanded → connected
-      setBubbleState('connected')
+      // Add the insight message as OSQR's opening message in chat history
+      addChatMessage(pendingInsight.message, 'osqr')
 
-      // Trigger panel conversation with the insight
-      if (onStartConversation) {
-        onStartConversation(pendingInsight)
+      // Add a conversational follow-up to encourage the user to respond
+      const followUp = getInsightFollowUp(pendingInsight)
+      if (followUp) {
+        addChatMessage(followUp, 'osqr')
       }
 
-      // Clean up after a brief delay (let animation play)
-      setTimeout(() => {
-        setPendingInsight(null)
-        setBubbleState('idle')
-      }, 500)
+      // Clear the pending insight (it's now part of the conversation)
+      setPendingInsight(null)
+      setBubbleState('idle')
     } catch (error) {
       console.error('[OSCARBubble] Failed to engage insight:', error)
+      setBubbleState('idle')
     } finally {
       setInsightLoading(false)
     }
-  }, [pendingInsight, onStartConversation])
+  }, [pendingInsight, addChatMessage])
+
+  // Generate a natural follow-up based on insight type
+  const getInsightFollowUp = (insight: PendingInsight): string | null => {
+    switch (insight.category) {
+      case 'next_step':
+        // Commitments, deadlines, dependencies, people waiting, unfinished work
+        return "Want to update me on where that stands? I can help you figure out next steps if needed."
+      case 'clarify':
+        // Follow-ups, open questions, stale decisions
+        return "I can help you pick up where you left off if you'd like."
+      case 'recall':
+        // Recurring patterns, context decay, pattern breaks
+        return "Just wanted to surface this in case it's useful."
+      case 'contradiction':
+        // Contradictions detected
+        return "Want me to help you think through this?"
+      default:
+        return "What are your thoughts on this?"
+    }
+  }
 
   // Handle dismissing an insight (expanded → idle)
   const handleDismissInsight = useCallback(async () => {

@@ -33,7 +33,127 @@ export interface ChartArtifactContent {
   showGrid?: boolean
 }
 
-export type ArtifactContent = ImageArtifactContent | ChartArtifactContent
+// ============================================
+// Template Types (v1.5.1)
+// ============================================
+
+export type TemplateType =
+  | 'listings'      // Card grid with filters, sort, pagination
+  | 'table'         // Data table with sort, filter, export
+  | 'gallery'       // Image/media grid
+  | 'timeline'      // Event timeline
+  | 'game-simple'   // Simple games (tic-tac-toe, memory)
+  | 'dashboard'     // KPI widgets
+  | 'comparison'    // Side-by-side comparison
+
+export interface ListingsConfig {
+  cardFields: string[]          // Which fields to show on cards
+  primaryField: string          // Main title field
+  secondaryField?: string       // Subtitle field
+  priceField?: string           // Price display
+  imageField?: string           // Image URL field
+  filterableFields: string[]
+  sortableFields: string[]
+  pageSize: number
+}
+
+export interface ListingsState {
+  activeFilters: Record<string, unknown>
+  currentSort: { field: string; order: 'asc' | 'desc' }
+  currentPage: number
+}
+
+export interface ListingItem {
+  id: string
+  [key: string]: unknown
+}
+
+export interface TableColumn {
+  key: string
+  label: string
+  type: 'string' | 'number' | 'date' | 'boolean' | 'currency' | 'image'
+  width?: number
+  sortable?: boolean
+  filterable?: boolean
+  format?: string
+}
+
+export interface TableConfig {
+  sortable: boolean
+  filterable: boolean
+  searchable: boolean
+  resizable: boolean
+  exportable: boolean
+  pagination: boolean
+  pageSize: number
+  selectable: boolean
+}
+
+export interface TableState {
+  currentPage: number
+  currentSort?: { column: string; order: 'asc' | 'desc' }
+  activeFilters: Record<string, unknown>
+  searchQuery?: string
+  selectedRows: string[]
+}
+
+export type GameSimpleVariant = 'tic-tac-toe' | 'memory' | 'quiz' | 'custom'
+
+export interface GameSimpleConfig {
+  name: string
+  description?: string
+  players: string[]
+  controls: 'dpad-ab' | 'arrows' | 'touch' | 'mouse'
+  theme: 'default' | 'retro' | 'minimal' | 'dark'
+}
+
+export interface GameSimpleState {
+  grid?: {
+    rows: number
+    cols: number
+    cells: (string | null)[][]
+  }
+  turn?: string
+  score?: Record<string, number>
+  status: 'playing' | 'won' | 'draw' | 'lost'
+  winner?: string
+}
+
+// Template artifact content types
+export interface ListingsArtifactContent {
+  type: 'template'
+  template: 'listings'
+  items: ListingItem[]
+  config: ListingsConfig
+  state: ListingsState
+}
+
+export interface TableArtifactContent {
+  type: 'template'
+  template: 'table'
+  rows: Record<string, unknown>[]
+  columns: TableColumn[]
+  config: TableConfig
+  state: TableState
+}
+
+export interface GameSimpleArtifactContent {
+  type: 'template'
+  template: 'game-simple'
+  variant: GameSimpleVariant
+  config: GameSimpleConfig
+  state: GameSimpleState
+}
+
+export type TemplateArtifactContent =
+  | ListingsArtifactContent
+  | TableArtifactContent
+  | GameSimpleArtifactContent
+
+export type ArtifactContent =
+  | ImageArtifactContent
+  | ChartArtifactContent
+  | TemplateArtifactContent
 
 // ============================================
 // Render Intent Detection

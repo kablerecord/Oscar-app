@@ -91,15 +91,33 @@ You have access to indexed content that includes:
 - **P1 - User Visible:** Feature doesn't match spec, confusing behavior, missing validation
 - **P2 - Cleanup:** Code quality, missing tests, documentation gaps
 
+### Before You Start: Check for Active Audit
+
+**IMPORTANT:** Before starting or continuing an audit, check `docs/audits/active/` for an existing audit file.
+
+If `docs/audits/active/[SPEC_NAME]_AUDIT.md` exists:
+1. **Read it first** — it contains your checkpoint and Claude's notes
+2. **Check Claude's Notes for Oscar** section — follow any special instructions
+3. **Check Resolution Status table** — skip RESOLVED and DEFERRED findings
+4. **Resume from Checkpoint** — don't re-audit completed requirements
+
+If no active audit file exists, create one when you start.
+
+See `docs/builds/SPEC_AUDITOR_BUILD_PLAN.md` for the full Active Audit File format.
+
+---
+
 ### The Audit Process
 
 For each subsystem:
 
-1. **Read the spec** (if it exists). Quote the key requirements.
-2. **Read the code.** Trace the implementation.
-3. **Find the tests** (if they exist). Note coverage gaps.
-4. **Compare.** Does code match spec? Do tests cover the code?
-5. **Produce findings.** Use the format below.
+1. **Check for active audit file** (see above)
+2. **Read the spec** (if it exists). Quote the key requirements.
+3. **Read the code.** Trace the implementation.
+4. **Find the tests** (if they exist). Note coverage gaps.
+5. **Compare.** Does code match spec? Do tests cover the code?
+6. **Produce findings.** Use the format below.
+7. **Update active audit file** with checkpoint and findings.
 
 ---
 

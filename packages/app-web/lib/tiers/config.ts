@@ -281,6 +281,17 @@ export function getMonthlyTokenLimit(tier: TierName): number {
 }
 
 /**
+ * Get effective monthly token limit including referral bonus
+ * @param tier - User's subscription tier
+ * @param referralBonusPercent - Percentage bonus from referrals (0-50)
+ */
+export function getEffectiveTokenLimit(tier: TierName, referralBonusPercent: number = 0): number {
+  const baseLimit = getMonthlyTokenLimit(tier)
+  const bonusMultiplier = 1 + (Math.min(referralBonusPercent, 50) / 100)
+  return Math.floor(baseLimit * bonusMultiplier)
+}
+
+/**
  * Format token count for display (e.g., 2500000 -> "2.5M")
  */
 export function formatTokenCount(tokens: number): string {

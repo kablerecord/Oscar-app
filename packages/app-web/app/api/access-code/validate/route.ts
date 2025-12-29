@@ -48,11 +48,20 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Check if code has expired
+    if (accessCode.expiresAt && new Date() > accessCode.expiresAt) {
+      return NextResponse.json(
+        { valid: false, error: 'This access code has expired' },
+        { status: 400, headers: corsHeaders }
+      )
+    }
+
     // Code is valid and has uses remaining
     return NextResponse.json({
       valid: true,
       code: accessCode.code,
       usesRemaining: accessCode.maxUses - accessCode.useCount,
+      expiresAt: accessCode.expiresAt?.toISOString() || null,
     }, { headers: corsHeaders })
   } catch (error) {
     console.error('Access code validation error:', error)

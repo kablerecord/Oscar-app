@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
-import { getTierConfig, type TierName } from '@/lib/tiers/config'
+import { getTierConfig, getEffectiveTokenLimit, type TierName } from '@/lib/tiers/config'
 
 /**
  * GET /api/usage
@@ -37,15 +37,22 @@ export async function GET(_req: NextRequest) {
 
     const userId = session.user.id
 
-    // Get user's workspace to determine tier
-    const workspace = await prisma.workspace.findFirst({
-      where: { ownerId: userId },
-      orderBy: { createdAt: 'asc' },
-      select: { tier: true },
-    })
+    // Get user's workspace to determine tier and referral bonus
+    const [workspace, user] = await Promise.all([
+      prisma.workspace.findFirst({
+        where: { ownerId: userId },
+        orderBy: { createdAt: 'asc' },
+        select: { tier: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { referralBonusPercent: true },
+      }),
+    ])
 
     const tierName = (workspace?.tier || 'pro') as TierName
     const tierConfig = getTierConfig(tierName)
+    const referralBonusPercent = user?.referralBonusPercent || 0
 
     // Get current month in YYYY-MM format
     const now = new Date()
@@ -82,8 +89,9 @@ export async function GET(_req: NextRequest) {
       }
     }
 
-    // Get limit from tier config
-    const limit = tierConfig.limits.monthlyTokenLimit || 2_500_000 // Default to Pro limit
+    // Get limit from tier config, including referral bonus
+    const baseLimit = tierConfig.limits.monthlyTokenLimit || 2_500_000 // Default to Pro limit
+    const limit = getEffectiveTokenLimit(tierName, referralBonusPercent)
 
     // Calculate percentage (cap at 100 for display, but actual can exceed)
     const percentage = limit > 0 ? Math.round((totalUsed / limit) * 100) : 0
@@ -94,6 +102,8 @@ export async function GET(_req: NextRequest) {
     return NextResponse.json({
       used: totalUsed,
       limit,
+      baseLimit,
+      referralBonusPercent,
       percentage: Math.min(percentage, 100), // Cap display at 100%
       overLimit: totalUsed > limit,
       resetDate: resetDate.toISOString(),

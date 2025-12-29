@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import bcrypt from 'bcryptjs'
+import { validateReferralCode, createReferral } from '@/lib/referrals/service'
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password, name, accessCode } = await req.json()
+    const { email, password, name, accessCode, referralCode } = await req.json()
 
     if (!email || !password) {
       return NextResponse.json(
@@ -137,6 +138,18 @@ export async function POST(req: NextRequest) {
           usedBy: { push: email },
         },
       })
+    }
+
+    // Create referral record if a valid referral code was provided
+    if (referralCode) {
+      const referralValidation = await validateReferralCode(referralCode)
+      if (referralValidation.valid && referralValidation.referrerId) {
+        // Don't let users refer themselves
+        if (referralValidation.referrerId !== user.id) {
+          await createReferral(referralValidation.referrerId, user.id, referralCode)
+          console.log(`Referral created: ${referralValidation.referrerId} referred ${user.id}`)
+        }
+      }
     }
 
     return NextResponse.json({

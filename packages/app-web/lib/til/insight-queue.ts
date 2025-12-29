@@ -113,7 +113,7 @@ export const DEFAULT_INSIGHT_PREFERENCES: InsightPreferences = {
   bubbleMode: 'on',
   maxPerSession: 10,
   maxPerHour: 3,              // Interrupt budget
-  minIntervalMinutes: 10,
+  minIntervalMinutes: 0,      // TESTING: Set to 0 for immediate surfacing (production: 10)
   preferredTriggers: ['session_start', 'idle', 'contextual'],
   mutedCategories: [],
   categoryEngagement: {
@@ -158,7 +158,17 @@ const PRIORITY_WEIGHTS = {
 // In-Memory Queue (for session-level state)
 // ============================================
 
-const sessionQueues = new Map<string, InsightDeliveryState>()
+// Use global singleton to survive module reloads in Next.js dev mode
+// This ensures the queue persists across API route calls and server actions
+declare global {
+  // eslint-disable-next-line no-var
+  var insightSessionQueues: Map<string, InsightDeliveryState> | undefined
+}
+
+// Check if we already have a global queue instance
+const existingQueue = globalThis.insightSessionQueues
+const sessionQueues = existingQueue ?? new Map<string, InsightDeliveryState>()
+globalThis.insightSessionQueues = sessionQueues
 
 function getOrCreateSessionQueue(workspaceId: string): InsightDeliveryState {
   if (!sessionQueues.has(workspaceId)) {
@@ -356,26 +366,17 @@ export function getNextInsight(
   const prefs = queue.userPreferences
 
   // Check if insights are enabled
-  if (!prefs.enabled) {
-    return null
-  }
+  if (!prefs.enabled) return null
 
   // Never interrupt active conversation
-  if (context?.isConversationActive) {
-    return null
-  }
+  if (context?.isConversationActive) return null
 
   // Focus mode integration - bubble goes dormant
-  if (context?.isFocusMode) {
-    return null
-  }
+  if (context?.isFocusMode) return null
 
   // Check engagement-based surfacing
   const surfaceCheck = canSurfaceInsight(workspaceId)
-  if (!surfaceCheck.canSurface) {
-    console.log(`[TIL/InsightQueue] Cannot surface: ${surfaceCheck.reason}`)
-    return null
-  }
+  if (!surfaceCheck.canSurface) return null
 
   // Check session limit
   if (prefs.maxPerSession > 0 && queue.sessionInsightsDelivered >= prefs.maxPerSession) {
@@ -385,18 +386,15 @@ export function getNextInsight(
   // Check minimum interval
   if (queue.lastDeliveryAt) {
     const minutesSinceLast = (Date.now() - queue.lastDeliveryAt.getTime()) / (1000 * 60)
-    if (minutesSinceLast < prefs.minIntervalMinutes) {
-      return null
-    }
+    if (minutesSinceLast < prefs.minIntervalMinutes) return null
   }
 
   // Check if trigger is enabled
-  if (!prefs.preferredTriggers.includes(trigger)) {
-    return null
-  }
+  if (!prefs.preferredTriggers.includes(trigger)) return null
 
   // Filter eligible insights
   const now = new Date()
+
   const eligible = queue.pending.filter(insight => {
     // Not expired
     if (insight.expiresAt <= now) return false
@@ -415,26 +413,20 @@ export function getNextInsight(
 
     // Idle time check
     if (trigger === 'idle' && insight.minIdleSeconds) {
-      if (!context?.idleSeconds || context.idleSeconds < insight.minIdleSeconds) {
-        return false
-      }
+      if (!context?.idleSeconds || context.idleSeconds < insight.minIdleSeconds) return false
     }
 
     // Context tag check
     if (trigger === 'contextual' && insight.contextTags) {
       if (!context?.currentTopic) return false
       const topicLower = context.currentTopic.toLowerCase()
-      if (!insight.contextTags.some(tag => topicLower.includes(tag.toLowerCase()))) {
-        return false
-      }
+      if (!insight.contextTags.some(tag => topicLower.includes(tag.toLowerCase()))) return false
     }
 
     return true
   })
 
-  if (eligible.length === 0) {
-    return null
-  }
+  if (eligible.length === 0) return null
 
   // Sort by priority (highest first), then by category engagement rate
   eligible.sort((a, b) => {

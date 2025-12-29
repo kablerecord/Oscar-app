@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { cn } from '@/lib/utils'
 import {
   Zap,
@@ -191,6 +191,17 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
   const [pendingInsight, setPendingInsight] = useState<PendingInsight | null>(null)
   const [osqrChatInput, setOsqrChatInput] = useState('')
   const [osqrChatLoading, setOsqrChatLoading] = useState(false)
+  // Insight conversation state - for "Tell me more" flow within the sidebar
+  const [insightConversation, setInsightConversation] = useState<{ role: 'osqr' | 'user'; message: string }[]>([])
+  const [insightChatInput, setInsightChatInput] = useState('')
+  const insightChatRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when conversation updates
+  useEffect(() => {
+    if (insightChatRef.current) {
+      insightChatRef.current.scrollTop = insightChatRef.current.scrollHeight
+    }
+  }, [insightConversation, osqrChatLoading])
 
   // Load hidden panels from localStorage
   useEffect(() => {
@@ -324,7 +335,7 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
     }
   }
 
-  // Handle insight engagement - tell me more
+  // Handle insight engagement - tell me more (stays in sidebar)
   const handleInsightEngage = async () => {
     if (!pendingInsight) return
 
@@ -335,16 +346,73 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
         body: JSON.stringify({ action: 'engage' }),
       })
 
-      // Send to panel
-      if (onAskOSQR) {
-        onAskOSQR(`Tell me more about: ${pendingInsight.title}`)
-      }
+      // Start a conversation in the sidebar instead of sending to panel
+      const followUp = getInsightFollowUp(pendingInsight.type)
+      setInsightConversation([
+        { role: 'osqr', message: pendingInsight.message },
+        { role: 'osqr', message: followUp },
+      ])
 
+      // Clear the pending insight card (conversation takes over)
       setPendingInsight(null)
-      setActiveSection(null)
     } catch (error) {
       console.error('Failed to engage insight:', error)
     }
+  }
+
+  // Generate a natural follow-up based on insight type
+  const getInsightFollowUp = (type: string): string => {
+    switch (type) {
+      case 'commitment':
+        return "Want to update me on where that stands? I can help you figure out next steps if needed."
+      case 'deadline':
+        return "How's this looking? If you need to adjust the timeline, I can help you think through it."
+      case 'follow_up':
+        return "I can help you pick up where you left off if you'd like."
+      case 'dependency':
+        return "Is there anything blocking this that I can help you work through?"
+      case 'next_step':
+        return "What's the next thing you want to tackle here?"
+      default:
+        return "What are your thoughts on this?"
+    }
+  }
+
+  // Handle insight conversation reply
+  const handleInsightReply = async () => {
+    if (!insightChatInput.trim() || osqrChatLoading) return
+
+    const userMessage = insightChatInput.trim()
+    setInsightChatInput('')
+    setOsqrChatLoading(true)
+
+    // Add user message to conversation
+    setInsightConversation(prev => [...prev, { role: 'user', message: userMessage }])
+
+    try {
+      const res = await fetch('/api/chat/quick', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: userMessage }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data.response) {
+          setInsightConversation(prev => [...prev, { role: 'osqr', message: data.response }])
+        }
+      }
+    } catch (error) {
+      console.error('Failed to get response:', error)
+      setInsightConversation(prev => [...prev, { role: 'osqr', message: "Sorry, I couldn't process that. Try again?" }])
+    } finally {
+      setOsqrChatLoading(false)
+    }
+  }
+
+  // Clear insight conversation
+  const handleClearInsightConversation = () => {
+    setInsightConversation([])
   }
 
   // Handle insight dismiss
@@ -721,8 +789,67 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {/* Pending Insight - show if there's one */}
-                {pendingInsight ? (
+                {/* Insight Conversation - show if we're in a "Tell me more" flow */}
+                {insightConversation.length > 0 ? (
+                  <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="h-4 w-4 text-amber-400" />
+                        <h4 className="font-semibold text-sm text-amber-300">Insight Chat</h4>
+                      </div>
+                      <button
+                        onClick={handleClearInsightConversation}
+                        className="cursor-pointer text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                      >
+                        Clear
+                      </button>
+                    </div>
+                    {/* Conversation messages */}
+                    <div ref={insightChatRef} className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+                      {insightConversation.map((msg, i) => (
+                        <div
+                          key={i}
+                          className={`text-sm leading-relaxed ${
+                            msg.role === 'osqr'
+                              ? 'text-slate-200'
+                              : 'text-blue-300 bg-blue-500/10 rounded-lg px-3 py-2'
+                          }`}
+                        >
+                          {msg.message}
+                        </div>
+                      ))}
+                      {osqrChatLoading && (
+                        <div className="flex space-x-1">
+                          <div className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" />
+                          <div className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="h-2 w-2 rounded-full bg-amber-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      )}
+                    </div>
+                    {/* Reply input */}
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={insightChatInput}
+                        onChange={(e) => setInsightChatInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleInsightReply()}
+                        placeholder="Reply to OSQR..."
+                        disabled={osqrChatLoading}
+                        className="w-full px-3 py-2 pr-10 rounded-lg bg-slate-700/50 border border-amber-500/30 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 disabled:opacity-50"
+                      />
+                      {insightChatInput.trim() && (
+                        <button
+                          onClick={handleInsightReply}
+                          disabled={osqrChatLoading}
+                          className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md bg-amber-500 hover:bg-amber-600 text-white transition-colors disabled:opacity-50"
+                        >
+                          <Send className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : pendingInsight ? (
+                  /* Pending Insight card - show if there's one */
                   <div className="rounded-xl bg-gradient-to-br from-amber-500/10 to-orange-500/10 border border-amber-500/30 p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Lightbulb className="h-4 w-4 text-amber-400" />

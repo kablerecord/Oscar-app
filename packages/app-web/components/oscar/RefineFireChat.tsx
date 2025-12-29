@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent } from '@/components/ui/card'
@@ -11,8 +12,6 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
-  Lightbulb,
-  GraduationCap,
   PanelRight,
   Sparkles,
   Target,
@@ -32,6 +31,9 @@ import {
   Scale, // Supreme Court icon
   Mic,
   MicOff,
+  ThumbsUp,
+  ThumbsDown,
+  Square, // Stop button icon
 } from 'lucide-react'
 import { RoutingNotification } from '@/components/oscar/RoutingNotification'
 import { ShareActions } from '@/components/share/ShareActions'
@@ -50,6 +52,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { ArtifactPreview } from '@/components/render/ArtifactPreview'
 
 interface AltOpinion {
   answer: string
@@ -93,10 +96,20 @@ interface Message {
     modelUsed: { provider: string; model: string }
     confidence: number
     shouldSuggestAltOpinion: boolean
+    autoRouted?: boolean
+    autoRoutedReason?: string
+    requestedMode?: string
+    effectiveMode?: string
+    complexity?: number
   }
   // v1.1: Message tracking for feedback
   messageId?: string
   tokensUsed?: number
+  // v1.5: Render system - indicates a render artifact was created
+  renderComplete?: {
+    artifactId: string
+    type: 'IMAGE' | 'CHART' | 'TEMPLATE'
+  }
   // I-9: Cross-project memory - indicates response used context from other projects
   usedCrossProjectContext?: boolean
   // I-10: Throttle - indicates response was degraded due to budget
@@ -122,13 +135,6 @@ interface RefineFireChatProps {
 
 type ResponseMode = 'quick' | 'thoughtful' | 'contemplate' | 'supreme'
 type ChatStage = 'input' | 'refining' | 'refined' | 'firing' | 'complete'
-
-// Question complexity detection
-interface ComplexityAnalysis {
-  level: 'simple' | 'moderate' | 'complex'
-  suggestedMode: ResponseMode
-  reason: string
-}
 
 // Question refinement suggestions
 interface RefinementSuggestion {
@@ -246,68 +252,6 @@ function analyzeForRefinement(question: string): RefinementSuggestion | null {
   return null
 }
 
-function analyzeQuestionComplexity(question: string): ComplexityAnalysis {
-  const q = question.toLowerCase().trim()
-  const wordCount = q.split(/\s+/).length
-
-  // Complex indicators
-  const complexPatterns = [
-    /how (should|can|do) i (decide|choose|evaluate|analyze|compare)/,
-    /what('s| is| are) the (best|right|optimal) (way|approach|strategy)/,
-    /pros and cons/,
-    /trade.?offs?/,
-    /long.?term/,
-    /implications/,
-    /strategy|strategic/,
-    /architecture|design pattern/,
-    /should i (start|build|create|implement)/,
-    /how do (successful|great|top)/,
-    /what makes/,
-    /explain.+(in depth|thoroughly|comprehensively)/,
-  ]
-
-  // Simple indicators
-  const simplePatterns = [
-    /^what (is|are|was|were) /,
-    /^who (is|are|was|were) /,
-    /^when (is|are|was|were|did|does) /,
-    /^where (is|are|was|were) /,
-    /^define /,
-    /^list /,
-    /^name /,
-    /syntax/,
-    /example of/,
-    /how to (install|setup|configure|run|start)/,
-  ]
-
-  // Check for complex patterns
-  const hasComplexPattern = complexPatterns.some(p => p.test(q))
-  const hasSimplePattern = simplePatterns.some(p => p.test(q))
-
-  // Determine complexity
-  if (hasComplexPattern || wordCount > 25) {
-    return {
-      level: 'complex',
-      suggestedMode: 'contemplate',
-      reason: 'This question involves strategic thinking or multiple considerations',
-    }
-  }
-
-  if (hasSimplePattern || wordCount < 8) {
-    return {
-      level: 'simple',
-      suggestedMode: 'quick',
-      reason: 'This is a straightforward factual question',
-    }
-  }
-
-  return {
-    level: 'moderate',
-    suggestedMode: 'thoughtful',
-    reason: 'This question could benefit from some analysis',
-  }
-}
-
 // localStorage keys for persistence
 const DRAFT_KEY = (workspaceId: string) => `osqr-draft-${workspaceId}`
 const PENDING_REQUEST_KEY = (workspaceId: string) => `osqr-pending-${workspaceId}`
@@ -322,23 +266,41 @@ export interface RefineFireChatHandle {
 
 export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatProps>(
   function RefineFireChat({ workspaceId, onboardingCompleted = false, userTier = 'free', onHighlightElement }, ref) {
+  const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [chatStage, setChatStage] = useState<ChatStage>('input')
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
   const [isLoading, setIsLoading] = useState(false)
   const [useKnowledge, setUseKnowledge] = useState(true)
-  const [showDebug, setShowDebug] = useState(false)
+  // One-shot toggle to force panel mode for a single question (auto-resets after response)
+  // Also shows the council deliberation when panel responses are returned
+  const [forcePanel, setForcePanel] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showSupremeLockedModal, setShowSupremeLockedModal] = useState(false)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [feedbackMessage, setFeedbackMessage] = useState('')
+  const [feedbackSentiment, setFeedbackSentiment] = useState<'positive' | 'negative' | null>(null)
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
 
   // Streaming state for bubble presence
   const [streamingState, setStreamingState] = useState<'idle' | 'thinking' | 'streaming'>('idle')
+
+  // Render state for image/chart generation
+  const [renderState, setRenderState] = useState<{
+    isRendering: boolean
+    artifactId: string | null
+    error: string | null
+  }>({ isRendering: false, artifactId: null, error: null })
 
   // Voice input state
   const [isRecording, setIsRecording] = useState(false)
   const [isVoiceSupported, setIsVoiceSupported] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+
+  // AbortController for stopping streaming requests
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // OSQR bubble is now the primary greeting - no centered state needed
 
@@ -390,6 +352,136 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   // TODO: Check workspace.hasEarnedSupreme or similar flag from backend
   const hasEarnedSupreme = false
 
+  // ==========================================================================
+  // RENDER HANDLER: Calls /api/render when renderPending is detected
+  // This handles the flow: "Rendering..." -> generate -> "Would you like to see it?"
+  // ==========================================================================
+  const handleRenderRequest = useCallback(async (
+    renderIntent: {
+      type: 'image' | 'chart' | 'template' | null
+      prompt: string
+      confidence?: string
+    } | null,
+    iterationIntent: {
+      modification: string
+      conversationId: string
+      type?: 'image' | 'chart' | null
+    } | null,
+    messageId?: string
+  ) => {
+    if (!renderIntent && !iterationIntent) return
+
+    setRenderState({ isRendering: true, artifactId: null, error: null })
+
+    try {
+      const response = await fetch('/api/render', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: renderIntent?.prompt || iterationIntent?.modification || '',
+          workspaceId,
+          conversationId: iterationIntent?.conversationId,
+          messageId,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Render failed')
+      }
+
+      const data = await response.json()
+
+      if (data.artifact) {
+        setRenderState({ isRendering: false, artifactId: data.artifact.id, error: null })
+
+        const completionMessage = data.message || "Render complete. Would you like to see it?"
+
+        // Update the database message if we have a messageId
+        if (messageId) {
+          try {
+            await fetch(`/api/messages/${messageId}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                content: completionMessage,
+                metadata: {
+                  renderComplete: true,
+                  artifactId: data.artifact.id,
+                  artifactType: data.artifact.type,
+                },
+              }),
+            })
+          } catch (err) {
+            console.error('Failed to update message:', err)
+          }
+        }
+
+        // Update the message to show render complete with action
+        setMessages((prev) => {
+          const updated = [...prev]
+          const lastIdx = updated.length - 1
+          if (lastIdx >= 0 && updated[lastIdx].role === 'osqr') {
+            updated[lastIdx] = {
+              ...updated[lastIdx],
+              content: completionMessage,
+              thinking: false,
+              // Store render info for the UI to display action buttons
+              renderComplete: {
+                artifactId: data.artifact.id,
+                type: data.artifact.type,
+              },
+            }
+          }
+          return updated
+        })
+      }
+    } catch (error) {
+      console.error('Render error:', error)
+      setRenderState({
+        isRendering: false,
+        artifactId: null,
+        error: error instanceof Error ? error.message : 'Render failed',
+      })
+
+      const errorMessage = `Render failed: ${error instanceof Error ? error.message : 'Unknown error'}. Would you like me to try again?`
+
+      // Update the database message with error if we have a messageId
+      if (messageId) {
+        try {
+          await fetch(`/api/messages/${messageId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: errorMessage,
+              metadata: { renderError: true },
+            }),
+          })
+        } catch (err) {
+          console.error('Failed to update message:', err)
+        }
+      }
+
+      setMessages((prev) => {
+        const updated = [...prev]
+        const lastIdx = updated.length - 1
+        if (lastIdx >= 0 && updated[lastIdx].role === 'osqr') {
+          updated[lastIdx] = {
+            ...updated[lastIdx],
+            content: errorMessage,
+            thinking: false,
+          }
+        }
+        return updated
+      })
+    }
+  }, [workspaceId])
+
+  // Navigate to render surface when user clicks "Yes, show me"
+  const handleViewRender = useCallback((artifactId: string) => {
+    router.push(`/r/${artifactId}`)
+  }, [router])
+
   // Load useKnowledge from localStorage (synced with Settings page)
   useEffect(() => {
     const stored = localStorage.getItem('osqr-use-knowledge-base')
@@ -407,10 +499,14 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   }, [])
 
   // Load refinement hints preference from localStorage (synced with Settings page)
+  // Default is now FALSE - hints are opt-in, not opt-out
   useEffect(() => {
     const stored = localStorage.getItem('osqr-show-refinement-hints')
     if (stored !== null) {
       setShowRefinementHints(stored === 'true')
+    } else {
+      // Default to false if no preference is set
+      setShowRefinementHints(false)
     }
     // Listen for storage changes from Settings page
     const handleStorageChange = (e: StorageEvent) => {
@@ -491,7 +587,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   }
 
   const [expandedDebug, setExpandedDebug] = useState<number | null>(null)
-  const [responseMode, setResponseMode] = useState<ResponseMode>('quick')
 
   // Refine state
   const [refineResult, setRefineResult] = useState<RefineResult | null>(null)
@@ -507,13 +602,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [showAltModelDropdown, setShowAltModelDropdown] = useState<number | null>(null)
   const [comparisonViewIdx, setComparisonViewIdx] = useState<number | null>(null)
 
-  // Mode suggestion state
-  const [modeSuggestion, setModeSuggestion] = useState<ComplexityAnalysis | null>(null)
-  const [showModeSuggestion, setShowModeSuggestion] = useState(false)
-
   // Refinement suggestion state
   const [refinementSuggestion, setRefinementSuggestion] = useState<RefinementSuggestion | null>(null)
-  const [showRefinementHints, setShowRefinementHints] = useState(true)
+  const [showRefinementHints, setShowRefinementHints] = useState(false) // Default to false - opt-in
   const [justDismissedHints, setJustDismissedHints] = useState(false)
 
   const [autoDowngradedQuestion, setAutoDowngradedQuestion] = useState<string | null>(null)
@@ -583,32 +674,22 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Analyze question complexity and refinement when input changes (debounced)
+  // Analyze refinement suggestions when input changes (debounced)
+  // Mode suggestion removed - OSQR now auto-routes based on question complexity
   useEffect(() => {
     if (input.trim().length < 3) {
-      setModeSuggestion(null)
-      setShowModeSuggestion(false)
       setRefinementSuggestion(null)
       return
     }
 
     const timer = setTimeout(() => {
-      // Analyze for mode suggestion
-      const analysis = analyzeQuestionComplexity(input)
-      if (analysis.suggestedMode !== responseMode) {
-        setModeSuggestion(analysis)
-        setShowModeSuggestion(true)
-      } else {
-        setShowModeSuggestion(false)
-      }
-
       // Analyze for refinement suggestions
       const refinement = analyzeForRefinement(input)
       setRefinementSuggestion(refinement)
     }, 300) // 300ms debounce for snappier feedback
 
     return () => clearTimeout(timer)
-  }, [input, responseMode])
+  }, [input])
 
   // Scroll to refine card when it appears
   useEffect(() => {
@@ -802,7 +883,6 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     if (typeof window !== 'undefined') {
       localStorage.setItem(PENDING_REQUEST_KEY(workspaceId), JSON.stringify({
         question: finalQuestion,
-        mode: responseMode,
         timestamp: Date.now(),
       }))
       // Clear the draft since we're submitting
@@ -815,8 +895,8 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       { role: 'user', content: finalQuestion, refinedQuestion: refineResult?.originalQuestion !== finalQuestion ? refineResult?.originalQuestion : undefined },
     ])
 
-    // Add "thinking" placeholder with mode (will transition to streaming)
-    setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true, mode: responseMode }])
+    // Add "thinking" placeholder (mode will be set when response arrives)
+    setMessages((prev) => [...prev, { role: 'osqr', content: '', thinking: true }])
 
     // Set bubble to thinking state (purple pulse)
     setStreamingState('thinking')
@@ -830,7 +910,10 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           content: m.content,
         }))
 
-      // Use streaming endpoint
+      // Create abort controller for this request
+      abortControllerRef.current = new AbortController()
+
+      // Use streaming endpoint - OSQR auto-routes unless user forced panel mode
       const response = await fetch('/api/oscar/ask-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -838,10 +921,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           message: finalQuestion,
           workspaceId,
           useKnowledge,
-          includeDebate: showDebug,
-          mode: responseMode,
+          includeDebate: forcePanel, // Show council when panel is forced
+          // Only send mode if user explicitly requested panel mode
+          ...(forcePanel && { mode: 'thoughtful' }),
           conversationHistory,
         }),
+        signal: abortControllerRef.current.signal,
       })
 
       if (!response.ok) {
@@ -863,6 +948,10 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         contextSources?: any
         usedCrossProjectContext?: boolean
         degraded?: boolean
+        renderPending?: boolean
+        messageId?: string
+        renderIntent?: { type: 'image' | 'chart' | 'template' | null; prompt: string; confidence?: string } | null
+        iterationIntent?: { modification: string; conversationId: string; type?: 'image' | 'chart' | null } | null
       } = {}
       let finalData: {
         messageId?: string
@@ -955,6 +1044,18 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                   // Stream complete, finalize the message
                   finalData = data
 
+                  // Check if this is a render request that needs further processing
+                  if (data.renderPending && metadata.renderPending) {
+                    // Call the render API to actually generate the artifact
+                    handleRenderRequest(
+                      metadata.renderIntent || null,
+                      metadata.iterationIntent || null,
+                      data.messageId || metadata.messageId // Pass messageId for persistence
+                    )
+                    // Don't update the message here - handleRenderRequest will do it
+                    break
+                  }
+
                   setMessages((prev) => {
                     const updated = [...prev]
                     const lastIdx = updated.length - 1
@@ -965,7 +1066,8 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                         thinking: false,
                         artifacts: data.artifacts,
                         messageId: data.messageId,
-                        mode: responseMode,
+                        // Use effectiveMode from routing (auto-routed by OSQR)
+                        mode: metadata.routing?.effectiveMode || 'quick',
                       }
                     }
                     return updated
@@ -1022,15 +1124,43 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       setIsLoading(false)
       setChatStage('complete')
       setStreamingState('idle') // Reset bubble to idle state
+      abortControllerRef.current = null
       // Reset for next question
       setInput('')
       setRefineResult(null)
       setRefinedQuestion('')
       setClarifyingAnswers([])
+      // Reset one-shot panel toggle (user must re-enable for next question)
+      setForcePanel(false)
       // PERSISTENCE: Clear pending request since we got a response
       if (typeof window !== 'undefined') {
         localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
       }
+    }
+  }
+
+  // Stop streaming response
+  const handleStopStreaming = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+      setIsLoading(false)
+      setStreamingState('idle')
+      setChatStage('complete')
+
+      // Mark the last message as stopped
+      setMessages((prev) => {
+        const updated = [...prev]
+        const lastIdx = updated.length - 1
+        if (lastIdx >= 0 && updated[lastIdx].role === 'osqr') {
+          updated[lastIdx] = {
+            ...updated[lastIdx],
+            thinking: false,
+            content: updated[lastIdx].content + (updated[lastIdx].content ? '\n\n[Stopped]' : '[Stopped by user]'),
+          }
+        }
+        return updated
+      })
     }
   }
 
@@ -1051,8 +1181,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           message: finalQuestion,
           workspaceId,
           useKnowledge,
-          includeDebate: showDebug,
-          mode: responseMode,
+          includeDebate: forcePanel, // Show council when panel is forced
+          // Only send mode if user explicitly requested panel mode
+          ...(forcePanel && { mode: 'thoughtful' }),
           conversationHistory,
         }),
       })
@@ -1088,11 +1219,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           content: data.answer,
           thinking: false,
           artifacts: data.artifacts,
-          mode: responseMode,
+          // Use effectiveMode from routing (auto-routed by OSQR)
+          mode: data.routing?.effectiveMode || 'quick',
           routing: data.routing,
-          councilResponses: showDebug && councilResponses.length > 0 ? councilResponses : undefined,
-          councilRoundtable: showDebug && councilRoundtable.length > 0 ? councilRoundtable : undefined,
-          debug: showDebug
+          councilResponses: forcePanel && councilResponses.length > 0 ? councilResponses : undefined,
+          councilRoundtable: forcePanel && councilRoundtable.length > 0 ? councilRoundtable : undefined,
+          debug: forcePanel
             ? {
                 panelDiscussion: data.panelDiscussion,
                 roundtableDiscussion: data.roundtableDiscussion,
@@ -1166,9 +1298,10 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   }
 
   // Handle "go deeper" on auto-downgraded questions
+  // Note: Since mode is now auto-routed, we just re-submit the question
+  // The "go deeper" prompt implies user wants more thorough answer
   const handleGoDeeper = (question: string) => {
     setInput(question)
-    setResponseMode('thoughtful')
     setAutoDowngradedQuestion(null)
     // Don't auto-submit - let user review and hit Ask
     setChatStage('input')
@@ -1309,8 +1442,8 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                       <span className="text-sm font-semibold text-slate-200">
                         OSQR
                       </span>
-                      {/* Mode badge */}
-                      {message.mode && !message.thinking && (
+                      {/* Mode badge - shows how OSQR responded */}
+                      {message.routing && !message.thinking && (
                         <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ring-1 ${
                           message.mode === 'quick'
                             ? 'bg-amber-500/10 text-amber-400 ring-amber-500/20'
@@ -1318,28 +1451,25 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                             ? 'bg-blue-500/10 text-blue-400 ring-blue-500/20'
                             : 'bg-purple-500/10 text-purple-400 ring-purple-500/20'
                         }`}>
-                          {message.mode === 'quick' && 'Quick'}
-                          {message.mode === 'thoughtful' && 'Thoughtful'}
-                          {message.mode === 'contemplate' && 'Contemplate'}
+                          {message.routing.autoRoutedReason || (message.mode === 'quick' ? 'Quick response' : 'Consulted the panel')}
                         </span>
                       )}
                     </div>
                     <Card className="bg-slate-700/50 border-slate-600/50 p-4">
                       {message.thinking ? (
                         <div className="flex items-center space-x-3 text-sm text-slate-400">
-                          {/* Tri-color thinking dots - matches OSQR's 3 agents */}
-                          <div className="flex items-center space-x-1">
-                            <div className="h-2 w-2 rounded-full bg-blue-500 animate-bounce shadow-sm shadow-blue-500/50" style={{ animationDelay: '0ms', animationDuration: '0.8s' }} />
-                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-bounce shadow-sm shadow-emerald-500/50" style={{ animationDelay: '150ms', animationDuration: '0.8s' }} />
-                            <div className="h-2 w-2 rounded-full bg-purple-500 animate-bounce shadow-sm shadow-purple-500/50" style={{ animationDelay: '300ms', animationDuration: '0.8s' }} />
+                          {/* Expanding and spinning dots animation - 5 dots */}
+                          <div className="relative flex items-center justify-center w-8 h-8">
+                            <div className="absolute inset-0 flex items-center justify-center animate-spin" style={{ animationDuration: '3s' }}>
+                              <div className="h-2 w-2 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50 absolute" style={{ transform: 'translateY(-10px)' }} />
+                              <div className="h-2 w-2 rounded-full bg-cyan-500 shadow-sm shadow-cyan-500/50 absolute" style={{ transform: 'rotate(72deg) translateY(-10px)' }} />
+                              <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50 absolute" style={{ transform: 'rotate(144deg) translateY(-10px)' }} />
+                              <div className="h-2 w-2 rounded-full bg-purple-500 shadow-sm shadow-purple-500/50 absolute" style={{ transform: 'rotate(216deg) translateY(-10px)' }} />
+                              <div className="h-2 w-2 rounded-full bg-pink-500 shadow-sm shadow-pink-500/50 absolute" style={{ transform: 'rotate(288deg) translateY(-10px)' }} />
+                            </div>
+                            <div className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-pulse" />
                           </div>
-                          <span>
-                            {responseMode === 'quick' && 'Quick response incoming...'}
-                            {responseMode === 'thoughtful' && 'Panel is deliberating...'}
-                            {responseMode === 'contemplate' && 'Deep analysis in progress...'}
-                            {responseMode === 'supreme' && 'Supreme Council convening...'}
-                            {!responseMode && 'Thinking...'}
-                          </span>
+                          <span>Thinking...</span>
                         </div>
                       ) : (
                         <div className="prose prose-sm prose-invert max-w-none prose-p:text-slate-300 prose-headings:text-slate-100">
@@ -1358,6 +1488,50 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                         workspaceId={workspaceId}
                         tokensUsed={message.tokensUsed}
                       />
+                    )}
+
+                    {/* Render Complete Actions - Preview + "Would you like to see it?" buttons */}
+                    {!message.thinking && message.renderComplete && (
+                      <div className="mt-3 space-y-3">
+                        {/* Artifact Preview */}
+                        <ArtifactPreview
+                          artifactId={message.renderComplete.artifactId}
+                          type={message.renderComplete.type}
+                        />
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2">
+                          <Button
+                            onClick={() => handleViewRender(message.renderComplete!.artifactId)}
+                            className="bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 text-sm"
+                            size="sm"
+                          >
+                            View full render
+                            <ArrowRight className="ml-1.5 h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="border-slate-600 text-slate-300 hover:bg-slate-700 text-sm"
+                            onClick={() => {
+                              setMessages((prev) => {
+                                const updated = [...prev]
+                                const lastIdx = updated.length - 1
+                                if (lastIdx >= 0 && updated[lastIdx].renderComplete) {
+                                  updated[lastIdx] = {
+                                    ...updated[lastIdx],
+                                    content: "Okay, I've saved it for later. Just let me know when you'd like to see it.",
+                                    renderComplete: undefined,
+                                  }
+                                }
+                                return updated
+                              })
+                            }}
+                          >
+                            Not now
+                          </Button>
+                        </div>
+                      </div>
                     )}
 
                     {/* I-9: Cross-project context indicator */}
@@ -1775,62 +1949,26 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
         {/* Input area */}
         <div className="mt-4 space-y-3">
-          {/* Response Mode Buttons with visual state indicators */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-            <span className="hidden sm:block text-sm font-medium text-slate-400">Mode:</span>
-            <TooltipProvider delayDuration={200}>
-              <div data-highlight-id="response-modes" className="flex items-center gap-2">
-                {/* Group 1: Quick / Thoughtful / Contemplate */}
+          {/* One-shot panel toggle and Feedback button - OSQR auto-routes by default */}
+          <div className="flex items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <TooltipProvider delayDuration={200}>
+                {/* One-shot "Ask the panel" toggle - forces Thoughtful mode for this question only */}
                 <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
-                  {/* Quick Mode */}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => {
-                          setResponseMode('quick')
-                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'quick' }))
-                        }}
+                        onClick={() => setForcePanel(!forcePanel)}
                         disabled={isLoading}
                         className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
-                          responseMode === 'quick'
-                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                      >
-                        <Zap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'quick' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                        <span className="hidden sm:inline">Quick</span>
-                        {responseMode === 'quick' && (
-                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-300"></span>
-                          </span>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
-                      <p className="font-medium text-amber-400">Quick Mode</p>
-                      <p className="text-xs text-slate-400">~5-10s • Direct answer without refinement</p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  {/* Thoughtful Mode */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => {
-                          setResponseMode('thoughtful')
-                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'thoughtful' }))
-                        }}
-                        disabled={isLoading}
-                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
-                          responseMode === 'thoughtful'
+                          forcePanel
                             ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
                             : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
                         } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
-                        <Lightbulb className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'thoughtful' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                        <span className="hidden sm:inline">Thoughtful</span>
-                        {responseMode === 'thoughtful' && (
+                        <Users className={`h-4 w-4 transition-transform duration-300 ${forcePanel ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                        <span className="hidden sm:inline">Ask the panel</span>
+                        {forcePanel && (
                           <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-300"></span>
@@ -1838,188 +1976,33 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                         )}
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
-                      <p className="font-medium text-blue-400">Thoughtful Mode</p>
-                      <p className="text-xs text-slate-400">~30-60s • Refine → Fire for better answers</p>
-                    </TooltipContent>
-                  </Tooltip>
-
-                  {/* Contemplate Mode - Master tier only */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => {
-                          if (!canUseContemplate) {
-                            setShowUpgradeModal(true)
-                            return
-                          }
-                          setResponseMode('contemplate')
-                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'contemplate' }))
-                        }}
-                        disabled={isLoading}
-                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial cursor-pointer ${
-                          !canUseContemplate
-                            ? 'text-slate-500 opacity-60'
-                            : responseMode === 'contemplate'
-                              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
-                              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {canUseContemplate ? (
-                          <GraduationCap className={`h-4 w-4 transition-transform duration-300 ${responseMode === 'contemplate' ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                        ) : (
-                          <Lock className="h-4 w-4" />
-                        )}
-                        <span className="hidden sm:inline">Contemplate</span>
-                        {!canUseContemplate && (
-                          <Crown className="h-3 w-3 text-amber-400 ml-1" />
-                        )}
-                        {responseMode === 'contemplate' && canUseContemplate && (
-                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-300"></span>
-                          </span>
-                        )}
-                      </button>
-                    </TooltipTrigger>
                     <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[220px]">
-                      <p className="font-medium text-purple-400">Contemplate Mode</p>
-                      <p className="text-xs text-slate-400">~60-90s • Deep analysis with multiple perspectives</p>
-                      {!canUseContemplate && (
-                        <p className="text-xs text-amber-400 mt-1 flex items-center gap-1">
-                          <Crown className="h-3 w-3" /> Master tier only
-                        </p>
-                      )}
+                      <p className="font-medium text-blue-400">Ask the panel</p>
+                      <p className="text-xs text-slate-400">Get multiple AI perspectives for this question. Resets after each response.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
+              </TooltipProvider>
+            </div>
 
-                {/* Group 2: Council (standalone) */}
-                <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => {
-                          const newShowDebug = !showDebug
-                          setShowDebug(newShowDebug)
-                          // When enabling Council, upgrade Quick mode to Thoughtful
-                          // (Quick has no panel debate to show)
-                          if (newShowDebug && responseMode === 'quick') {
-                            setResponseMode('thoughtful')
-                          }
-                        }}
-                        disabled={isLoading}
-                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
-                          showDebug
-                            ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-lg shadow-emerald-500/30 scale-[1.02]'
-                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                      >
-                        <Users className={`h-4 w-4 transition-transform duration-300 ${showDebug ? 'animate-pulse' : 'group-hover:scale-110'}`} />
-                        <span className="hidden sm:inline">Council</span>
-                        {showDebug && (
-                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-300"></span>
-                          </span>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
-                      <p className="font-medium text-emerald-400">Council Mode</p>
-                      <p className="text-xs text-slate-400">Watch multiple AI perspectives debate and refine the answer</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-
-                {/* Group 3: Supreme Court (standalone) - Earned through usage, not purchased */}
-                <div className={`flex p-1 rounded-xl ring-1 transition-all duration-300 ${
-                  hasEarnedSupreme && responseMode === 'supreme'
-                    ? 'bg-slate-800 ring-slate-700/50'
-                    : hasEarnedSupreme
-                      ? 'bg-gradient-to-r from-rose-950/50 to-red-950/50 ring-rose-500/30 shadow-sm shadow-rose-500/10'
-                      : 'bg-slate-800/50 ring-slate-700/30'
-                }`}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => {
-                          // Supreme Court is earned through usage patterns, not purchased
-                          if (!hasEarnedSupreme) {
-                            setShowSupremeLockedModal(true)
-                            return
-                          }
-                          setResponseMode('supreme')
-                          setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: 'supreme' }))
-                        }}
-                        disabled={isLoading}
-                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial cursor-pointer ${
-                          !hasEarnedSupreme
-                            ? 'text-slate-500/70 hover:text-slate-400'
-                            : responseMode === 'supreme'
-                              ? 'bg-gradient-to-r from-rose-500 to-red-600 text-white shadow-lg shadow-rose-500/30 scale-[1.02]'
-                              : 'text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10'
-                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      >
-                        {hasEarnedSupreme ? (
-                          <Scale className={`h-4 w-4 transition-all duration-300 ${responseMode === 'supreme' ? 'animate-pulse' : 'group-hover:scale-110 group-hover:rotate-3'}`} />
-                        ) : (
-                          <Scale className="h-4 w-4 opacity-50" />
-                        )}
-                        <span className="hidden sm:inline">Supreme</span>
-                        {!hasEarnedSupreme && (
-                          <Lock className="h-3 w-3 text-slate-500 ml-1" />
-                        )}
-                        {responseMode === 'supreme' && hasEarnedSupreme && (
-                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-300"></span>
-                          </span>
-                        )}
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[240px]">
-                      <p className="font-medium text-rose-400">Supreme Court Mode</p>
-                      {hasEarnedSupreme ? (
-                        <p className="text-xs text-slate-400">~2-3 min • AI justices deliberate with majority, concurring & dissenting opinions</p>
-                      ) : (
-                        <p className="text-xs text-slate-400">This mode is earned through mastery. Keep asking great questions.</p>
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
+            {/* Feedback Button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setShowFeedbackModal(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 hover:text-cyan-400 bg-slate-800 hover:bg-slate-700 rounded-lg ring-1 ring-slate-700/50 transition-all"
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                    <span className="hidden sm:inline">Feedback</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="bg-slate-800 border-slate-700">
+                  <p className="text-xs">Share feedback about OSQR</p>
+                </TooltipContent>
+              </Tooltip>
             </TooltipProvider>
           </div>
-
-          {/* Mode Suggestion Banner */}
-          {showModeSuggestion && modeSuggestion && (
-            <div className="flex items-center gap-3 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
-              <Sparkles className="h-4 w-4 text-blue-400 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="text-sm text-blue-300">
-                  {modeSuggestion.reason}.{' '}
-                </span>
-                <button
-                  onClick={() => {
-                    setResponseMode(modeSuggestion.suggestedMode)
-                    setShowModeSuggestion(false)
-                    // Trigger onboarding discovery for mode change
-                    setOnboardingState(prev => progressOnboarding(prev, { type: 'mode_changed', mode: modeSuggestion.suggestedMode }))
-                  }}
-                  className="text-sm font-medium text-blue-400 hover:text-blue-300 hover:underline"
-                >
-                  Try {modeSuggestion.suggestedMode} mode?
-                </button>
-              </div>
-              <button
-                onClick={() => setShowModeSuggestion(false)}
-                className="text-slate-500 hover:text-slate-300"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          )}
 
           {/* Refinement Suggestion - Real-time question improvement hints */}
           {showRefinementHints && refinementSuggestion && refinementSuggestion.type !== 'good' && input.trim().length > 0 && (
@@ -2102,93 +2085,62 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
               )}
             </div>
             <div className="flex sm:flex-col gap-2">
-              {/* Context-aware button: Fire (orange) for refined/good questions, Send (default) otherwise */}
-              {(() => {
+              {/* Stop button - shows when loading */}
+              {isLoading && (
+                <Button
+                  onClick={handleStopStreaming}
+                  size="lg"
+                  variant="destructive"
+                  className="flex-1 sm:flex-initial px-4 sm:px-6"
+                  title="Stop generating"
+                >
+                  <Square className="mr-2 h-4 w-4 fill-current" />
+                  Stop
+                </Button>
+              )}
+              {/* Context-aware button: Fire (orange) for refined/good questions, Ask otherwise */}
+              {!isLoading && (() => {
                 // Fire button is the "reward" - only shown when question is ready
                 const showFireButton = refinementSuggestion?.type === 'good' || chatStage === 'refined'
 
-                if (responseMode === 'quick') {
-                  // Quick mode
-                  if (showFireButton) {
-                    // Good question - show Fire button
-                    return (
-                      <Button
-                        onClick={() => handleSend()}
-                        disabled={isLoading || !input.trim()}
-                        size="lg"
-                        className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <>
-                            <Zap className="mr-2 h-4 w-4" />
-                            Fire
-                          </>
-                        )}
-                      </Button>
-                    )
-                  } else {
-                    // Simple/unrefined question - show Send button
-                    return (
-                      <Button
-                        onClick={() => handleSend()}
-                        disabled={isLoading || !input.trim()}
-                        size="lg"
-                        className="flex-1 sm:flex-initial px-4 sm:px-6"
-                      >
-                        {isLoading ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <>
-                            <Send className="mr-2 h-4 w-4" />
-                            Send
-                          </>
-                        )}
-                      </Button>
-                    )
-                  }
+                if (showFireButton) {
+                  // Good question - show Fire button
+                  return (
+                    <Button
+                      onClick={() => handleSend()}
+                      disabled={isLoading || !input.trim()}
+                      size="lg"
+                      className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Zap className="mr-2 h-4 w-4" />
+                          Fire
+                        </>
+                      )}
+                    </Button>
+                  )
                 } else {
-                  // Thoughtful/Contemplate mode
-                  if (showFireButton) {
-                    return (
-                      <Button
-                        onClick={handleSend}
-                        disabled={isLoading || !input.trim()}
-                        size="lg"
-                        className="flex-1 sm:flex-initial px-4 sm:px-6 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-                      >
-                        {isLoading && (chatStage === 'refining') ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <>
-                            <Zap className="mr-2 h-4 w-4" />
-                            Fire
-                          </>
-                        )}
-                      </Button>
-                    )
-                  } else {
-                    // Send/Ask button for unrefined questions
-                    // Note: chatStage can't be 'refined' here since that's handled by showFireButton
-                    return (
-                      <Button
-                        onClick={handleSend}
-                        disabled={isLoading || !input.trim()}
-                        size="lg"
-                        className="flex-1 sm:flex-initial px-4 sm:px-6"
-                      >
-                        {isLoading && (chatStage === 'refining') ? (
-                          <Loader2 className="h-5 w-5 animate-spin" />
-                        ) : (
-                          <>
-                            <Send className="mr-2 h-4 w-4" />
-                            Ask
-                          </>
-                        )}
-                      </Button>
-                    )
-                  }
+                  // Unrefined question - show Ask button
+                  return (
+                    <Button
+                      onClick={() => handleSend()}
+                      disabled={isLoading || !input.trim()}
+                      size="lg"
+                      className="flex-1 sm:flex-initial px-4 sm:px-6"
+                    >
+                      {isLoading ? (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="mr-2 h-4 w-4" />
+                          Ask
+                        </>
+                      )}
+                    </Button>
+                  )
                 }
               })()}
             </div>
@@ -2309,6 +2261,156 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         routing={routingNotification}
         onDismiss={() => setRoutingNotification(null)}
       />
+
+      {/* Feedback Modal */}
+      {showFeedbackModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              setShowFeedbackModal(false)
+              setFeedbackMessage('')
+              setFeedbackSentiment(null)
+              setFeedbackSubmitted(false)
+            }}
+          />
+          <div className="relative w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-xl animate-in zoom-in-95 fade-in duration-200">
+            {feedbackSubmitted ? (
+              // Success state
+              <div className="flex flex-col items-center py-6">
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mb-4">
+                  <Check className="h-8 w-8 text-green-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Thank you!</h3>
+                <p className="text-slate-400 text-center mb-6">
+                  Your feedback helps make OSQR better for everyone.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowFeedbackModal(false)
+                    setFeedbackMessage('')
+                    setFeedbackSentiment(null)
+                    setFeedbackSubmitted(false)
+                  }}
+                  className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
+              // Form state
+              <>
+                {/* Header */}
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-cyan-500/20 rounded-lg">
+                      <MessageSquare className="h-5 w-5 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">Share Feedback</h3>
+                      <p className="text-sm text-slate-400">Help us improve OSQR</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowFeedbackModal(false)
+                      setFeedbackMessage('')
+                      setFeedbackSentiment(null)
+                    }}
+                    className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+
+                {/* Sentiment Selection */}
+                <div className="mb-4">
+                  <p className="text-sm font-medium text-slate-300 mb-2">How's your experience?</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFeedbackSentiment(feedbackSentiment === 'positive' ? null : 'positive')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
+                        feedbackSentiment === 'positive'
+                          ? 'bg-green-500/20 text-green-400 ring-2 ring-green-500/50'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      <ThumbsUp className="h-5 w-5" />
+                      <span>Good</span>
+                    </button>
+                    <button
+                      onClick={() => setFeedbackSentiment(feedbackSentiment === 'negative' ? null : 'negative')}
+                      className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-all ${
+                        feedbackSentiment === 'negative'
+                          ? 'bg-red-500/20 text-red-400 ring-2 ring-red-500/50'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
+                      }`}
+                    >
+                      <ThumbsDown className="h-5 w-5" />
+                      <span>Needs work</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Message Input */}
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-slate-300 mb-2 block">
+                    What's on your mind? <span className="text-slate-500">(optional)</span>
+                  </label>
+                  <textarea
+                    value={feedbackMessage}
+                    onChange={(e) => setFeedbackMessage(e.target.value)}
+                    placeholder="Tell us about bugs, feature requests, or anything else..."
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 resize-none"
+                    rows={4}
+                  />
+                </div>
+
+                {/* Tip */}
+                <p className="text-xs text-slate-500 mb-4">
+                  You can also leave feedback on any response using the 👍 👎 buttons below each answer.
+                </p>
+
+                {/* Submit Button */}
+                <button
+                  onClick={async () => {
+                    if (!feedbackSentiment && !feedbackMessage.trim()) return
+                    setIsSubmittingFeedback(true)
+                    try {
+                      await fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          source: 'MODAL',
+                          sentiment: feedbackSentiment || undefined,
+                          message: feedbackMessage.trim() || undefined,
+                          workspaceId,
+                        }),
+                      })
+                      setFeedbackSubmitted(true)
+                    } catch (error) {
+                      console.error('Failed to submit feedback:', error)
+                    } finally {
+                      setIsSubmittingFeedback(false)
+                    }
+                  }}
+                  disabled={isSubmittingFeedback || (!feedbackSentiment && !feedbackMessage.trim())}
+                  className="w-full py-3 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  {isSubmittingFeedback ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    'Submit Feedback'
+                  )}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* OSQR Onboarding Bubble removed - earlier version, no longer needed */}
     </div>

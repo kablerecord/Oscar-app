@@ -14,7 +14,20 @@ import { queueInsight, calculatePriority } from './insight-queue'
 // Types
 // ============================================
 
-export type SecretaryCategory = 'commitment' | 'deadline' | 'follow_up' | 'dependency'
+export type SecretaryCategory =
+  | 'commitment'
+  | 'deadline'
+  | 'follow_up'
+  | 'dependency'
+  // New categories (Phase 2)
+  | 'contradiction'
+  | 'open_question'
+  | 'people_waiting'
+  | 'recurring_pattern'
+  | 'stale_decision'
+  | 'context_decay'
+  | 'unfinished_work'
+  | 'pattern_break'
 
 export interface SecretaryInsight {
   id: string
@@ -117,10 +130,155 @@ const DEPENDENCY_PATTERNS = [
   /\bwaiting\s+(?:on|for)\s+(\w[\w\s]{5,40}?)\b/gi,
   // "Depends on..."
   /\bdepends\s+on\s+(\w[\w\s]{5,40}?)\b/gi,
-  // "Can't do X until Y"
-  /\bcan['']t\s+(?:do|start|begin)\s+(?:\w+\s+)?until\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Can't do X until Y" - supports straight apostrophes, curly apostrophes, and no apostrophe
+  /\bcan(?:'|'|)t\s+(?:do|start|begin)\s+(?:the\s+)?(?:\w+\s+)?until\s+(\w[\w\s]{5,40}?)\b/gi,
   // "First we need to..."
   /\bfirst\s+(?:we\s+)?need\s+to\s+(\w[\w\s]{5,40}?)\b/gi,
+]
+
+// ============================================
+// Phase 2: Additional Detection Patterns
+// ============================================
+
+// Contradiction patterns - conflicting statements
+const CONTRADICTION_PATTERNS = [
+  // "Actually, I meant..."
+  /\bactually,?\s+(?:i|we)\s+(?:meant|mean)\s+(\w[\w\s]{5,60}?)\b/gi,
+  // "Wait, I thought..."
+  /\bwait,?\s+(?:i|we)\s+thought\s+(\w[\w\s]{5,60}?)\b/gi,
+  // "That's not what I said..."
+  /\bthat['']s\s+not\s+what\s+(?:i|we)\s+(?:said|meant)\b/gi,
+  // "I changed my mind..."
+  /\bi\s+changed\s+my\s+mind\s+(?:about|on)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Let's go with X instead" (reversal)
+  /\blet['']s\s+(?:go\s+with|do|use)\s+(\w[\w\s]{5,40}?)\s+instead\b/gi,
+  // "Scratch that..."
+  /\bscratch\s+that\b/gi,
+  // "Never mind..."
+  /\bnever\s*mind\s+(?:about\s+)?(\w[\w\s]{5,40}?)\b/gi,
+  // Direct contradiction markers
+  /\b(?:but|however)\s+(?:earlier|before|previously)\s+(?:i|we|you)\s+said\s+(\w[\w\s]{5,60}?)\b/gi,
+]
+
+// Open question patterns - questions asked but not answered
+const OPEN_QUESTION_PATTERNS = [
+  // Explicit questions
+  /\bshould\s+(?:we|i)\s+(\w[\w\s]{5,60}?)\?/gi,
+  /\bwhat\s+(?:should|would|could)\s+(?:we|i)\s+(\w[\w\s]{5,60}?)\?/gi,
+  /\bhow\s+(?:should|would|could)\s+(?:we|i)\s+(\w[\w\s]{5,60}?)\?/gi,
+  /\bwhich\s+(?:option|approach|way|one)\s+(\w[\w\s]{5,40}?)\?/gi,
+  // Deferred decisions
+  /\blet['']s\s+(?:think\s+about|decide\s+on)\s+(?:that|this)\s+later\b/gi,
+  /\bwe['']ll\s+(?:figure|work)\s+(?:that|this|it)\s+out\s+later\b/gi,
+  /\bneed\s+to\s+(?:decide|figure\s+out|determine)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // Research requests
+  /\bi\s+(?:need|should|want)\s+to\s+(?:research|look\s+into|investigate)\s+(\w[\w\s]{5,40}?)\b/gi,
+  /\blet['']s\s+(?:research|look\s+into|investigate)\s+(\w[\w\s]{5,40}?)\b/gi,
+]
+
+// People waiting patterns - others waiting for responses/deliverables
+const PEOPLE_WAITING_PATTERNS = [
+  // "I'll get back to [person]"
+  /\bi['']ll\s+get\s+back\s+to\s+(\w+)/gi,
+  // "I need to respond to [person]"
+  /\bi\s+need\s+to\s+(?:respond|reply|get\s+back)\s+to\s+(\w+)/gi,
+  // "I promised [person]..."
+  /\bi\s+promised\s+(\w+)\s+(?:i['']d|to|that)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "[Person] is waiting..."
+  /\b(\w+)\s+is\s+waiting\s+(?:for|on)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "I owe [person]..."
+  /\bi\s+owe\s+(\w+)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "I'll send [person]..."
+  /\bi['']ll\s+send\s+(\w+)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "I told [person] I would..."
+  /\bi\s+told\s+(\w+)\s+(?:i['']d|i\s+would)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "I should connect [person] with..."
+  /\bi\s+should\s+connect\s+(\w+)\s+with\s+(\w+)/gi,
+]
+
+// Recurring pattern markers - signals of repetition
+const RECURRING_PATTERN_PATTERNS = [
+  // "Every [time period]..."
+  /\bevery\s+(week|month|day|monday|friday|morning|evening)\b/gi,
+  // "Usually on [day]..." or "I usually [do X] on [day]"
+  /\busually\s+(?:on\s+)?(\w+day|mornings?|evenings?|weekly|monthly)\b/gi,
+  /\busually\s+[\w\s]+(?:on\s+)(\w+days?)\b/gi,
+  // "I always..."
+  /\bi\s+always\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Regularly..."
+  /\bregularly\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Weekly/Monthly [thing]"
+  /\b(weekly|monthly|daily)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Every time I..."
+  /\bevery\s+time\s+(?:i|we)\s+(\w[\w\s]{5,40}?)\b/gi,
+]
+
+// Stale decision markers - hints that a decision might need revisiting
+const STALE_DECISION_PATTERNS = [
+  // "We decided [time ago]..."
+  /\bwe\s+decided\s+(?:a\s+while\s+ago|months?\s+ago|last\s+(?:year|quarter))\b/gi,
+  // "That was based on..."
+  /\bthat\s+was\s+based\s+on\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "When we were..."
+  /\bwhen\s+we\s+were\s+(?:just\s+)?(?:starting|smaller|at\s+\d+)\b/gi,
+  // "Back when..."
+  /\bback\s+when\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Originally we..."
+  /\boriginally\s+we\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Things have changed since..."
+  /\bthings\s+have\s+changed\s+since\s+(\w[\w\s]{5,40}?)\b/gi,
+]
+
+// Context decay patterns - information getting stale
+const CONTEXT_DECAY_PATTERNS = [
+  // "Last time I checked..." - captures the phrase itself as signal
+  /\b(last\s+time\s+(?:i|we)\s+checked)/gi,
+  // "As of [old date]..."
+  /\bas\s+of\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/gi,
+  // "According to the [old] analysis..."
+  /\baccording\s+to\s+(?:the|my|our)\s+(\w+)\s+(?:analysis|research|data|report)\b/gi,
+  // "The [thing] is from..."
+  /\bthe\s+(\w+)\s+is\s+from\s+(?:last|a\s+few)\s+(?:year|month|quarter)/gi,
+  // "We haven't updated..."
+  /\bwe\s+haven['']?t\s+updated\s+(\w[\w\s]{5,40}?)\b/gi,
+]
+
+// Unfinished work patterns - incomplete artifacts
+const UNFINISHED_WORK_PATTERNS = [
+  // "TODO" markers
+  /\bTODO:?\s*(\w[\w\s]{5,60}?)\b/g,
+  // "WIP" markers
+  /\bWIP:?\s*(\w[\w\s]{5,40}?)\b/g,
+  // "Draft" mentions
+  /\b(?:the|my|our)\s+(\w+)\s+draft\b/gi,
+  // "[thing] is not finished yet" - captures subject before "is not finished"
+  /\b(\w[\w\s]{2,30}?)\s+is\s+not\s+(?:finished|done|complete)(?:\s+yet)?\b/gi,
+  // "Not finished/done with [thing]..."
+  /\bnot\s+(?:finished|done|complete)\s+with\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Still working on..."
+  /\bstill\s+working\s+on\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Need to finish..."
+  /\bneed\s+to\s+finish\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Incomplete" mentions
+  /\bthe\s+(\w[\w\s]{5,40}?)\s+is\s+incomplete\b/gi,
+  // "Partially done..."
+  /\bpartially\s+(?:done|complete|finished)\s+(?:with\s+)?(\w[\w\s]{5,40}?)\b/gi,
+]
+
+// Pattern break markers - anomalies from usual behavior
+const PATTERN_BREAK_PATTERNS = [
+  // "I haven't [done regular thing]..."
+  /\bi\s+haven['']t\s+(\w[\w\s]{5,40}?)\s+(?:in\s+a\s+while|lately|recently)\b/gi,
+  // "I forgot to..."
+  /\bi\s+forgot\s+to\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "I missed..."
+  /\bi\s+missed\s+(?:the|my)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "I skipped..."
+  /\bi\s+skipped\s+(?:the|my)\s+(\w[\w\s]{5,40}?)\b/gi,
+  // "Unlike usual..."
+  /\bunlike\s+usual\b/gi,
+  // "Normally I would..."
+  /\bnormally\s+(?:i|we)\s+would\s+(\w[\w\s]{5,40}?)\b/gi,
 ]
 
 // ============================================
@@ -149,6 +307,37 @@ function calculateSurfaceTime(category: SecretaryCategory, detectedAt: Date): Da
     case 'dependency':
       // Surface when blocking item resolves, or after 7 days
       surface.setDate(surface.getDate() + 7)
+      break
+    // Phase 2 categories
+    case 'contradiction':
+      // Surface immediately - contradictions need immediate attention
+      break
+    case 'open_question':
+      // Surface after 7 days if still unresolved
+      surface.setDate(surface.getDate() + 7)
+      break
+    case 'people_waiting':
+      // Surface after 3 days - people are waiting
+      surface.setDate(surface.getDate() + 3)
+      break
+    case 'recurring_pattern':
+      // Surface after 1 day to reinforce pattern
+      surface.setDate(surface.getDate() + 1)
+      break
+    case 'stale_decision':
+      // Surface after 14 days - give time for decisions to age
+      surface.setDate(surface.getDate() + 14)
+      break
+    case 'context_decay':
+      // Surface after 7 days - information may be stale
+      surface.setDate(surface.getDate() + 7)
+      break
+    case 'unfinished_work':
+      // Surface after 7 days if work remains incomplete
+      surface.setDate(surface.getDate() + 7)
+      break
+    case 'pattern_break':
+      // Surface immediately - anomalies need attention
       break
   }
 
@@ -423,6 +612,381 @@ export function detectDependencies(
 }
 
 // ============================================
+// Phase 2 Detection Functions
+// ============================================
+
+/**
+ * Detect contradictions from message
+ */
+export function detectContradictions(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of CONTRADICTION_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      const content = match[1]?.trim() || match[0]?.trim()
+
+      // Skip very short matches
+      if (content.length < 3) continue
+
+      const confidence = calculateConfidence(content, 'contradiction')
+
+      if (confidence >= 0.65) {
+        items.push({
+          id: generateId(),
+          category: 'contradiction',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('contradiction', now),
+          priority: 8, // High priority - contradictions need attention
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+/**
+ * Detect open questions from message
+ */
+export function detectOpenQuestions(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of OPEN_QUESTION_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      const content = match[1]?.trim() || match[0]?.trim()
+
+      // Skip very short matches
+      if (content.length < 5) continue
+
+      const confidence = calculateConfidence(content, 'open_question')
+
+      if (confidence >= 0.65) {
+        items.push({
+          id: generateId(),
+          category: 'open_question',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('open_question', now),
+          priority: 5, // Medium priority
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+/**
+ * Detect people waiting from message
+ */
+export function detectPeopleWaiting(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of PEOPLE_WAITING_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      // Get person name from first capture group
+      const person = match[1]?.trim() || ''
+      const action = match[2]?.trim() || match[0]?.trim()
+      const content = person ? `${person}: ${action}` : action
+
+      // Skip very short matches
+      if (content.length < 3) continue
+
+      const confidence = calculateConfidence(content, 'people_waiting')
+
+      if (confidence >= 0.65) {
+        items.push({
+          id: generateId(),
+          category: 'people_waiting',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('people_waiting', now),
+          priority: 7, // High priority - people are waiting
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+/**
+ * Detect recurring patterns from message
+ */
+export function detectRecurringPatterns(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of RECURRING_PATTERN_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      const content = match[1]?.trim() || match[0]?.trim()
+
+      // Skip very short matches
+      if (content.length < 3) continue
+
+      const confidence = calculateConfidence(content, 'recurring_pattern')
+
+      if (confidence >= 0.6) {
+        items.push({
+          id: generateId(),
+          category: 'recurring_pattern',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('recurring_pattern', now),
+          priority: 4, // Lower priority - informational
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+/**
+ * Detect stale decisions from message
+ */
+export function detectStaleDecisions(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of STALE_DECISION_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      const content = match[1]?.trim() || match[0]?.trim()
+
+      // Skip very short matches
+      if (content.length < 5) continue
+
+      const confidence = calculateConfidence(content, 'stale_decision')
+
+      if (confidence >= 0.6) {
+        items.push({
+          id: generateId(),
+          category: 'stale_decision',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('stale_decision', now),
+          priority: 5, // Medium priority
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+/**
+ * Detect context decay from message
+ */
+export function detectContextDecay(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of CONTEXT_DECAY_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      const content = match[1]?.trim() || match[0]?.trim()
+
+      // Skip very short matches
+      if (content.length < 3) continue
+
+      const confidence = calculateConfidence(content, 'context_decay')
+
+      if (confidence >= 0.6) {
+        items.push({
+          id: generateId(),
+          category: 'context_decay',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('context_decay', now),
+          priority: 4, // Lower priority - informational
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+/**
+ * Detect unfinished work from message
+ */
+export function detectUnfinishedWork(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of UNFINISHED_WORK_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      const content = match[1]?.trim() || match[0]?.trim()
+
+      // Skip very short matches
+      if (content.length < 3) continue
+
+      const confidence = calculateConfidence(content, 'unfinished_work')
+
+      if (confidence >= 0.65) {
+        items.push({
+          id: generateId(),
+          category: 'unfinished_work',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('unfinished_work', now),
+          priority: 6, // Medium-high priority
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+/**
+ * Detect pattern breaks from message
+ */
+export function detectPatternBreaks(
+  workspaceId: string,
+  message: string,
+  threadId: string
+): DetectionResult {
+  const items: SecretaryInsight[] = []
+  const now = new Date()
+
+  for (const pattern of PATTERN_BREAK_PATTERNS) {
+    pattern.lastIndex = 0
+    let match
+
+    while ((match = pattern.exec(message)) !== null) {
+      const content = match[1]?.trim() || match[0]?.trim()
+
+      // Skip very short matches
+      if (content.length < 3) continue
+
+      const confidence = calculateConfidence(content, 'pattern_break')
+
+      if (confidence >= 0.65) {
+        items.push({
+          id: generateId(),
+          category: 'pattern_break',
+          content,
+          context: extractContext(message, match.index, 100),
+          sourceThreadId: threadId,
+          detectedAt: now,
+          surfaceAfter: calculateSurfaceTime('pattern_break', now),
+          priority: 7, // High priority - anomalies
+          confidence,
+          resolved: false,
+        })
+      }
+    }
+  }
+
+  return {
+    found: items.length > 0,
+    items: deduplicateInsights(items),
+  }
+}
+
+// ============================================
 // Main Entry Point
 // ============================================
 
@@ -439,19 +1003,53 @@ export async function runSecretaryCheck(
 
   const allInsights: SecretaryInsight[] = []
 
-  // Run all detectors
-  const [commitments, deadlines, followUps, dependencies] = await Promise.all([
+  // Run all detectors (Phase 1 + Phase 2)
+  const [
+    commitments,
+    deadlines,
+    followUps,
+    dependencies,
+    // Phase 2 detectors
+    contradictions,
+    openQuestions,
+    peopleWaiting,
+    recurringPatterns,
+    staleDecisions,
+    contextDecay,
+    unfinishedWork,
+    patternBreaks,
+  ] = await Promise.all([
+    // Phase 1
     Promise.resolve(detectCommitments(workspaceId, message, threadId)),
     Promise.resolve(detectDeadlines(workspaceId, message, threadId)),
     Promise.resolve(detectFollowUps(workspaceId, message, threadId)),
     Promise.resolve(detectDependencies(workspaceId, message, threadId)),
+    // Phase 2
+    Promise.resolve(detectContradictions(workspaceId, message, threadId)),
+    Promise.resolve(detectOpenQuestions(workspaceId, message, threadId)),
+    Promise.resolve(detectPeopleWaiting(workspaceId, message, threadId)),
+    Promise.resolve(detectRecurringPatterns(workspaceId, message, threadId)),
+    Promise.resolve(detectStaleDecisions(workspaceId, message, threadId)),
+    Promise.resolve(detectContextDecay(workspaceId, message, threadId)),
+    Promise.resolve(detectUnfinishedWork(workspaceId, message, threadId)),
+    Promise.resolve(detectPatternBreaks(workspaceId, message, threadId)),
   ])
 
   // Collect all insights
+  // Phase 1
   if (commitments.found) allInsights.push(...commitments.items)
   if (deadlines.found) allInsights.push(...deadlines.items)
   if (followUps.found) allInsights.push(...followUps.items)
   if (dependencies.found) allInsights.push(...dependencies.items)
+  // Phase 2
+  if (contradictions.found) allInsights.push(...contradictions.items)
+  if (openQuestions.found) allInsights.push(...openQuestions.items)
+  if (peopleWaiting.found) allInsights.push(...peopleWaiting.items)
+  if (recurringPatterns.found) allInsights.push(...recurringPatterns.items)
+  if (staleDecisions.found) allInsights.push(...staleDecisions.items)
+  if (contextDecay.found) allInsights.push(...contextDecay.items)
+  if (unfinishedWork.found) allInsights.push(...unfinishedWork.items)
+  if (patternBreaks.found) allInsights.push(...patternBreaks.items)
 
   // Queue insights for delivery
   for (const insight of allInsights) {
@@ -479,10 +1077,20 @@ export async function runSecretaryCheck(
   }
 
   console.log(`[Secretary] Detected ${allInsights.length} items:`, {
+    // Phase 1
     commitments: commitments.items.length,
     deadlines: deadlines.items.length,
     followUps: followUps.items.length,
     dependencies: dependencies.items.length,
+    // Phase 2
+    contradictions: contradictions.items.length,
+    openQuestions: openQuestions.items.length,
+    peopleWaiting: peopleWaiting.items.length,
+    recurringPatterns: recurringPatterns.items.length,
+    staleDecisions: staleDecisions.items.length,
+    contextDecay: contextDecay.items.length,
+    unfinishedWork: unfinishedWork.items.length,
+    patternBreaks: patternBreaks.items.length,
   })
 
   return allInsights
@@ -665,6 +1273,7 @@ function calculateDeadlineReminder(deadline: Date | null, now: Date): Date {
  */
 function mapCategoryToInsightType(category: SecretaryCategory): 'next_step' | 'recall' | 'clarify' | 'contradiction' {
   switch (category) {
+    // Phase 1
     case 'commitment':
       return 'next_step'
     case 'deadline':
@@ -673,6 +1282,23 @@ function mapCategoryToInsightType(category: SecretaryCategory): 'next_step' | 'r
       return 'clarify'
     case 'dependency':
       return 'next_step'
+    // Phase 2
+    case 'contradiction':
+      return 'contradiction'
+    case 'open_question':
+      return 'clarify'
+    case 'people_waiting':
+      return 'next_step'
+    case 'recurring_pattern':
+      return 'recall'
+    case 'stale_decision':
+      return 'clarify'
+    case 'context_decay':
+      return 'recall'
+    case 'unfinished_work':
+      return 'next_step'
+    case 'pattern_break':
+      return 'recall'
     default:
       return 'recall'
   }
@@ -683,6 +1309,7 @@ function mapCategoryToInsightType(category: SecretaryCategory): 'next_step' | 'r
  */
 function formatInsightTitle(category: SecretaryCategory): string {
   switch (category) {
+    // Phase 1
     case 'commitment':
       return 'Commitment reminder'
     case 'deadline':
@@ -691,6 +1318,23 @@ function formatInsightTitle(category: SecretaryCategory): string {
       return 'Unresolved discussion'
     case 'dependency':
       return 'Dependency check'
+    // Phase 2
+    case 'contradiction':
+      return 'Contradiction detected'
+    case 'open_question':
+      return 'Open question'
+    case 'people_waiting':
+      return 'Someone is waiting'
+    case 'recurring_pattern':
+      return 'Pattern noticed'
+    case 'stale_decision':
+      return 'Decision may be stale'
+    case 'context_decay':
+      return 'Information may be outdated'
+    case 'unfinished_work':
+      return 'Unfinished work'
+    case 'pattern_break':
+      return 'Break from routine'
     default:
       return 'Quick note'
   }
@@ -701,6 +1345,7 @@ function formatInsightTitle(category: SecretaryCategory): string {
  */
 function formatInsightMessage(insight: SecretaryInsight): string {
   switch (insight.category) {
+    // Phase 1
     case 'commitment':
       return `You mentioned "${insight.content}". Did that happen?`
     case 'deadline':
@@ -709,6 +1354,23 @@ function formatInsightMessage(insight: SecretaryInsight): string {
       return `You were discussing "${insight.content}". Want to revisit?`
     case 'dependency':
       return `"${insight.content}" - is this still blocking?`
+    // Phase 2
+    case 'contradiction':
+      return `I noticed a potential contradiction: "${insight.content}". Want to clarify?`
+    case 'open_question':
+      return `You had an open question about "${insight.content}". Still need to decide?`
+    case 'people_waiting':
+      return `Reminder: ${insight.content}. Have you followed up?`
+    case 'recurring_pattern':
+      return `I noticed a pattern: "${insight.content}". Want me to track this?`
+    case 'stale_decision':
+      return `You mentioned "${insight.content}". Still the right approach?`
+    case 'context_decay':
+      return `"${insight.content}" might be outdated. Worth checking?`
+    case 'unfinished_work':
+      return `"${insight.content}" appears incomplete. Need to finish this?`
+    case 'pattern_break':
+      return `You mentioned "${insight.content}". Everything okay?`
     default:
       return insight.content
   }

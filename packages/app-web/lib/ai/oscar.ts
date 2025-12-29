@@ -44,6 +44,7 @@ export interface OSQRRequest {
   mode?: ResponseMode // Control response complexity and processing time
   userId?: string // Optional: user ID for personalized settings (synthesizer model, etc.)
   userLevel?: number // Optional: user's capability level (0-12) for GKVI context
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }> // Previous messages in this conversation
 }
 
 export interface OSQRResponse {
@@ -420,21 +421,21 @@ ${context}
    * Runs panel discussions first (not streamed), then streams synthesis
    */
   static async *askStream(request: OSQRRequest): AsyncIterable<string> {
-    const { userMessage, panelAgents, context, mode = 'thoughtful', userId, userLevel } = request
+    const { userMessage, panelAgents, context, mode = 'thoughtful', userId, userLevel, conversationHistory } = request
 
     switch (mode) {
       case 'quick':
         // Quick mode: stream directly from the provider
-        yield* this.quickResponseStream({ userMessage, panelAgents, context, userId })
+        yield* this.quickResponseStream({ userMessage, panelAgents, context, userId, conversationHistory })
         break
 
       case 'contemplate':
-        yield* this.contemplativeResponseStream({ userMessage, panelAgents, context, userId, userLevel })
+        yield* this.contemplativeResponseStream({ userMessage, panelAgents, context, userId, userLevel, conversationHistory })
         break
 
       case 'thoughtful':
       default:
-        yield* this.thoughtfulResponseStream({ userMessage, panelAgents, context, userId, userLevel })
+        yield* this.thoughtfulResponseStream({ userMessage, panelAgents, context, userId, userLevel, conversationHistory })
         break
     }
   }
@@ -443,7 +444,7 @@ ${context}
    * Quick mode streaming: Direct streaming from Claude
    */
   private static async *quickResponseStream(request: Omit<OSQRRequest, 'mode' | 'includeDebate'>): AsyncIterable<string> {
-    const { userMessage, context } = request
+    const { userMessage, context, conversationHistory } = request
     const routingDecision = routeQuestion(userMessage)
 
     console.log(`OSQR: Quick mode streaming - using Claude Sonnet 4`)
@@ -467,6 +468,14 @@ ${context}
       })
     }
 
+    // Add conversation history for multi-turn context
+    if (conversationHistory && conversationHistory.length > 0) {
+      for (const msg of conversationHistory) {
+        messages.push({ role: msg.role, content: msg.content })
+      }
+    }
+
+    // Add current user message
     messages.push({ role: 'user', content: userMessage })
 
     // Use generateStream if available
@@ -483,7 +492,7 @@ ${context}
    * Thoughtful mode streaming: Panel discussion first, then stream synthesis
    */
   private static async *thoughtfulResponseStream(request: Omit<OSQRRequest, 'mode' | 'includeDebate'>): AsyncIterable<string> {
-    const { userMessage, panelAgents, context, userId, userLevel } = request
+    const { userMessage, panelAgents, context, userId, userLevel, conversationHistory } = request
 
     // Step 1: Get panel responses (not streamed - happens behind the scenes)
     console.log('OSQR: Thoughtful mode - consulting panel...')
@@ -491,6 +500,7 @@ ${context}
       userMessage,
       agents: panelAgents,
       context,
+      conversationHistory,
     })
 
     // Step 2: Roundtable (not streamed)
@@ -498,7 +508,7 @@ ${context}
     if (panelAgents.length > 1) {
       console.log('OSQR: Facilitating roundtable...')
       roundtableResponses = await PanelOrchestrator.roundtable(
-        { userMessage, agents: panelAgents, context },
+        { userMessage, agents: panelAgents, context, conversationHistory },
         panelResponses
       )
     }
@@ -512,6 +522,7 @@ ${context}
       context,
       userId,
       userLevel,
+      conversationHistory,
     })
   }
 
@@ -519,7 +530,7 @@ ${context}
    * Contemplate mode streaming: Extended panel discussion, then stream synthesis
    */
   private static async *contemplativeResponseStream(request: Omit<OSQRRequest, 'mode' | 'includeDebate'>): AsyncIterable<string> {
-    const { userMessage, panelAgents, context, userId, userLevel } = request
+    const { userMessage, panelAgents, context, userId, userLevel, conversationHistory } = request
 
     console.log('OSQR: Contemplate mode - deep analysis...')
 
@@ -528,19 +539,20 @@ ${context}
       userMessage,
       agents: panelAgents,
       context,
+      conversationHistory,
     })
 
     // Step 2: First roundtable
     console.log('OSQR: Extended roundtable...')
     const roundtableResponses = await PanelOrchestrator.roundtable(
-      { userMessage, agents: panelAgents, context },
+      { userMessage, agents: panelAgents, context, conversationHistory },
       panelResponses
     )
 
     // Step 3: Second roundtable for deeper insights
     console.log('OSQR: Second round of deliberation...')
     const secondRoundResponses = await PanelOrchestrator.roundtable(
-      { userMessage, agents: panelAgents, context },
+      { userMessage, agents: panelAgents, context, conversationHistory },
       roundtableResponses || panelResponses
     )
 
@@ -554,6 +566,7 @@ ${context}
       isDeepAnalysis: true,
       userId,
       userLevel,
+      conversationHistory,
     })
   }
 
@@ -569,14 +582,29 @@ ${context}
     userId?: string
     userLevel?: number
     questionType?: string
+    conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
   }): AsyncIterable<string> {
-    const { userMessage, panelResponses, roundtableResponses, context, isDeepAnalysis = false, userId, userLevel, questionType } = params
+    const { userMessage, panelResponses, roundtableResponses, context, isDeepAnalysis = false, userId, userLevel, questionType, conversationHistory } = params
 
     // Build synthesis prompt (same as non-streaming)
     const messages: AIMessage[] = []
 
     const systemPrompt = this.buildSystemPrompt({ userLevel, questionType })
     messages.push({ role: 'system', content: systemPrompt })
+
+    // Add conversation history for context
+    if (conversationHistory && conversationHistory.length > 0) {
+      // Add a condensed summary of the conversation for synthesis context
+      const historyContext = conversationHistory
+        .slice(-6) // Last 6 messages (3 exchanges)
+        .map(m => `${m.role === 'user' ? 'User' : 'OSQR'}: ${m.content}`)
+        .join('\n\n')
+      messages.push({
+        role: 'system',
+        content: `Previous conversation context:\n${historyContext}`,
+      })
+    }
+
     messages.push({ role: 'user', content: `User's question: ${userMessage}` })
 
     if (context) {

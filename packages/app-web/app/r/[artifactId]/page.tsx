@@ -2,28 +2,57 @@
 
 /**
  * Render Surface Page
- * Displays rendered artifacts (images, charts)
+ * Displays rendered artifacts (images, charts, templates)
  * @see docs/features/RENDER_SYSTEM_SPEC.md
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { ImageArtifactContent, ChartArtifactContent } from '@/lib/render/types'
+import {
+  ImageArtifactContent,
+  ChartArtifactContent,
+  TemplateArtifactContent,
+  ArtifactContent,
+} from '@/lib/render/types'
 import { ImageRenderer } from '@/components/render/ImageRenderer'
 import { ChartRenderer } from '@/components/render/ChartRenderer'
-import { ArrowLeft, Download, RefreshCw, AlertCircle } from 'lucide-react'
+import { TemplateRenderer } from '@/components/render/TemplateRenderer'
+import { ArrowLeft, Download, RefreshCw, AlertCircle, Gamepad2, Table2, LayoutGrid } from 'lucide-react'
 
 interface ArtifactWithRelations {
   id: string
-  type: 'IMAGE' | 'CHART'
+  type: 'IMAGE' | 'CHART' | 'TEMPLATE'
   title: string | null
-  content: ImageArtifactContent | ChartArtifactContent
+  content: ArtifactContent
   state: string
   version: number
   createdAt: string
   viewedAt: string | null
   parent?: { id: string; version: number } | null
   children?: { id: string; version: number }[]
+}
+
+function getDefaultTitle(content: ArtifactContent): string {
+  switch (content.type) {
+    case 'image':
+      return 'Generated Image'
+    case 'chart':
+      return 'Chart'
+    case 'template':
+      const templateContent = content as TemplateArtifactContent
+      switch (templateContent.template) {
+        case 'listings':
+          return 'Listings'
+        case 'table':
+          return 'Data Table'
+        case 'game-simple':
+          return templateContent.config?.name || 'Game'
+        default:
+          return 'Template'
+      }
+    default:
+      return 'Artifact'
+  }
 }
 
 export default function RenderSurfacePage() {
@@ -34,6 +63,57 @@ export default function RenderSurfacePage() {
   const [artifact, setArtifact] = useState<ArtifactWithRelations | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Debounce timer for state persistence
+  const stateUpdateTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Handle template state changes with debounced persistence
+  const handleStateChange = useCallback((newState: unknown) => {
+    if (!artifact || artifact.content.type !== 'template') return
+
+    // Update local state immediately for responsive UI
+    setArtifact(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        content: {
+          ...prev.content,
+          state: newState,
+        } as TemplateArtifactContent,
+      }
+    })
+
+    // Debounce API updates (300ms delay to batch rapid changes)
+    if (stateUpdateTimerRef.current) {
+      clearTimeout(stateUpdateTimerRef.current)
+    }
+
+    stateUpdateTimerRef.current = setTimeout(async () => {
+      try {
+        await fetch(`/api/artifacts/${artifactId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            content: {
+              ...artifact.content,
+              state: newState,
+            },
+          }),
+        })
+      } catch (err) {
+        console.error('Failed to persist template state:', err)
+      }
+    }, 300)
+  }, [artifact, artifactId])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (stateUpdateTimerRef.current) {
+        clearTimeout(stateUpdateTimerRef.current)
+      }
+    }
+  }, [])
 
   // Fetch artifact on mount
   useEffect(() => {
@@ -122,8 +202,15 @@ export default function RenderSurfacePage() {
               </button>
 
               <div>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {artifact.title || (content.type === 'image' ? 'Generated Image' : 'Chart')}
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                  {content.type === 'template' && (
+                    <>
+                      {(content as TemplateArtifactContent).template === 'game-simple' && <Gamepad2 className="w-5 h-5" />}
+                      {(content as TemplateArtifactContent).template === 'table' && <Table2 className="w-5 h-5" />}
+                      {(content as TemplateArtifactContent).template === 'listings' && <LayoutGrid className="w-5 h-5" />}
+                    </>
+                  )}
+                  {artifact.title || getDefaultTitle(content)}
                 </h1>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Version {artifact.version}
@@ -191,6 +278,12 @@ export default function RenderSurfacePage() {
             )}
             {content.type === 'chart' && (
               <ChartRenderer content={content as ChartArtifactContent} />
+            )}
+            {content.type === 'template' && (
+              <TemplateRenderer
+                content={content as TemplateArtifactContent}
+                onStateChange={handleStateChange}
+              />
             )}
           </div>
         )}

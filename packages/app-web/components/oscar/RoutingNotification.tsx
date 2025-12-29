@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils'
 interface RoutingInfo {
   autoRouted: boolean
   autoRoutedReason: string
-  requestedMode: 'quick' | 'thoughtful' | 'contemplate'
+  requestedMode?: 'quick' | 'thoughtful' | 'contemplate'
   effectiveMode: 'quick' | 'thoughtful' | 'contemplate'
   questionType: string
   complexity: number
@@ -70,7 +70,9 @@ export function RoutingNotification({
     }, 200)
   }
 
-  if (!routing?.autoRouted || !isVisible) {
+  // Only show when user explicitly requested a mode AND it was changed
+  // With auto-routing (no requestedMode), there's no "routing change" to show
+  if (!routing?.autoRouted || !isVisible || !routing.requestedMode) {
     return null
   }
 

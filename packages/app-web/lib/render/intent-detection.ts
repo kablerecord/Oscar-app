@@ -4,7 +4,8 @@
  * @see docs/features/RENDER_SYSTEM_SPEC.md
  */
 
-import { RenderIntent, RENDER_TRIGGERS } from './types'
+import { RenderIntent, RENDER_TRIGGERS, TemplateType } from './types'
+import { detectTemplateIntent, detectGameVariant } from './templates/selector'
 
 /**
  * Detect render intent from a user message
@@ -184,4 +185,98 @@ export function inferChartType(message: string): 'line' | 'bar' | 'area' {
 
   // Default to line (founder preference from spec)
   return 'line'
+}
+
+// ============================================
+// Template Intent Detection (v1.5.1)
+// ============================================
+
+export interface TemplateIntent {
+  detected: boolean
+  template: TemplateType | null
+  confidence: 'explicit' | 'inferred' | null
+  trigger?: string
+  variant?: string  // For games: 'tic-tac-toe', 'memory', etc.
+}
+
+/**
+ * Detect template intent from a user message
+ */
+export function detectTemplateRenderIntent(message: string): TemplateIntent {
+  // First check for game requests (higher priority)
+  const gameVariant = detectGameVariant(message)
+  if (gameVariant) {
+    return {
+      detected: true,
+      template: 'game-simple',
+      confidence: 'explicit',
+      trigger: gameVariant,
+      variant: gameVariant,
+    }
+  }
+
+  // Then check for other template types
+  const templateIntent = detectTemplateIntent(message)
+  if (templateIntent.detected) {
+    return {
+      detected: true,
+      template: templateIntent.template,
+      confidence: templateIntent.confidence,
+      trigger: templateIntent.trigger,
+    }
+  }
+
+  return {
+    detected: false,
+    template: null,
+    confidence: null,
+  }
+}
+
+/**
+ * Combined render intent that includes templates
+ */
+export interface CombinedRenderIntent {
+  detected: boolean
+  type: 'image' | 'chart' | 'template' | null
+  confidence: 'explicit' | 'inferred' | null
+  trigger?: string
+  // For templates
+  template?: TemplateType
+  variant?: string
+}
+
+/**
+ * Detect any render intent (image, chart, or template)
+ */
+export function detectAnyRenderIntent(message: string): CombinedRenderIntent {
+  // Check for image/chart first
+  const renderIntent = detectRenderIntent(message)
+  if (renderIntent.detected) {
+    return {
+      detected: true,
+      type: renderIntent.type,
+      confidence: renderIntent.confidence,
+      trigger: renderIntent.trigger,
+    }
+  }
+
+  // Then check for templates
+  const templateIntent = detectTemplateRenderIntent(message)
+  if (templateIntent.detected) {
+    return {
+      detected: true,
+      type: 'template',
+      confidence: templateIntent.confidence,
+      trigger: templateIntent.trigger,
+      template: templateIntent.template || undefined,
+      variant: templateIntent.variant,
+    }
+  }
+
+  return {
+    detected: false,
+    type: null,
+    confidence: null,
+  }
 }

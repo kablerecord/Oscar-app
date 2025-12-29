@@ -24,10 +24,17 @@ import {
 import {
   detectRenderIntent,
   detectIterationIntent,
+  detectAnyRenderIntent,
   extractRenderPrompt,
   inferImageSize,
   inferChartType,
 } from '@/lib/render/intent-detection'
+import {
+  createGameContent,
+  createListingsContent,
+  createTableContent,
+  detectGameVariant,
+} from '@/lib/render/templates'
 import { ArtifactType } from '@prisma/client'
 
 // ============================================
@@ -44,6 +51,11 @@ const RenderRequestSchema = z.object({
     data: z.array(z.record(z.string(), z.unknown())),
     xKey: z.string().optional(),
     yKey: z.union([z.string(), z.array(z.string())]).optional(),
+  }).optional(),
+  // For templates, data can be provided directly
+  templateData: z.object({
+    items: z.array(z.record(z.string(), z.unknown())).optional(),
+    rows: z.array(z.record(z.string(), z.unknown())).optional(),
   }).optional(),
 })
 
@@ -67,9 +79,10 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { message, workspaceId, conversationId, messageId, chartData } = RenderRequestSchema.parse(body)
+    const { message, workspaceId, conversationId, messageId, chartData, templateData } = RenderRequestSchema.parse(body)
 
-    // Detect render intent
+    // Detect render intent (including templates)
+    const combinedIntent = detectAnyRenderIntent(message)
     const intent = detectRenderIntent(message)
 
     if (!intent.detected) {
@@ -287,6 +300,108 @@ export async function POST(req: NextRequest) {
         renderComplete: true,
         message: 'Render complete. Would you like to see it?',
       })
+    }
+
+    // Handle template generation (listings, table, game)
+    if (combinedIntent.detected && combinedIntent.type === 'template') {
+      // Detect game variant for game-simple templates
+      const gameVariant = detectGameVariant(message)
+
+      if (gameVariant) {
+        // Create game artifact
+        const gameContent = createGameContent(gameVariant)
+
+        const artifact = await createArtifact({
+          userId: user.id,
+          workspaceId,
+          type: 'TEMPLATE' as ArtifactType,
+          title: gameContent.config.name,
+          content: gameContent,
+          conversationId,
+          messageId,
+        })
+
+        // Templates are rendered client-side, mark as complete immediately
+        const updatedArtifact = await prisma.artifact.update({
+          where: { id: artifact.id },
+          data: {
+            state: 'COMPLETE_AWAITING_VIEW',
+          },
+        })
+
+        return NextResponse.json({
+          artifact: updatedArtifact,
+          renderComplete: true,
+          message: `Game ready! Would you like to play ${gameContent.config.name}?`,
+        })
+      }
+
+      // Handle listings template
+      if (templateData?.items && templateData.items.length > 0) {
+        // Ensure each item has an id
+        const itemsWithIds = templateData.items.map((item, index) => ({
+          id: (item.id as string) || `item-${index}`,
+          ...item,
+        }))
+        const listingsContent = createListingsContent(itemsWithIds)
+
+        const artifact = await createArtifact({
+          userId: user.id,
+          workspaceId,
+          type: 'TEMPLATE' as ArtifactType,
+          title: 'Listings',
+          content: listingsContent,
+          conversationId,
+          messageId,
+        })
+
+        const updatedArtifact = await prisma.artifact.update({
+          where: { id: artifact.id },
+          data: {
+            state: 'COMPLETE_AWAITING_VIEW',
+          },
+        })
+
+        return NextResponse.json({
+          artifact: updatedArtifact,
+          renderComplete: true,
+          message: 'Render complete. Would you like to see it?',
+        })
+      }
+
+      // Handle table template
+      if (templateData?.rows && templateData.rows.length > 0) {
+        const tableContent = createTableContent(templateData.rows)
+
+        const artifact = await createArtifact({
+          userId: user.id,
+          workspaceId,
+          type: 'TEMPLATE' as ArtifactType,
+          title: 'Data Table',
+          content: tableContent,
+          conversationId,
+          messageId,
+        })
+
+        const updatedArtifact = await prisma.artifact.update({
+          where: { id: artifact.id },
+          data: {
+            state: 'COMPLETE_AWAITING_VIEW',
+          },
+        })
+
+        return NextResponse.json({
+          artifact: updatedArtifact,
+          renderComplete: true,
+          message: 'Render complete. Would you like to see it?',
+        })
+      }
+
+      // Template detected but no data provided
+      return NextResponse.json({
+        error: 'Template data required',
+        message: "I detected a template request but need data to display. Can you provide items or rows?",
+      }, { status: 400 })
     }
 
     return NextResponse.json({

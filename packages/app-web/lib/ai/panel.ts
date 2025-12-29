@@ -14,6 +14,7 @@ export interface PanelRequest {
   agents: PanelAgent[]
   context?: string // RAG context or additional context
   previousMessages?: AIMessage[] // For roundtable mode
+  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }> // Previous conversation for context
 }
 
 export interface PanelResponse {
@@ -30,7 +31,7 @@ export class PanelOrchestrator {
    * Get responses from multiple agents in parallel
    */
   static async askPanel(request: PanelRequest): Promise<PanelResponse[]> {
-    const { userMessage, agents, context } = request
+    const { userMessage, agents, context, conversationHistory } = request
 
     // Call all agents in parallel
     const promises = agents.map(async (agent) => {
@@ -61,6 +62,13 @@ Base your response primarily on the knowledge base context above. If the context
           role: 'system',
           content: systemContent,
         })
+
+        // Add conversation history for multi-turn context
+        if (conversationHistory && conversationHistory.length > 0) {
+          for (const msg of conversationHistory) {
+            messages.push({ role: msg.role, content: msg.content })
+          }
+        }
 
         // Add user message
         messages.push({
@@ -95,7 +103,7 @@ Base your response primarily on the knowledge base context above. If the context
     request: PanelRequest,
     initialResponses: PanelResponse[]
   ): Promise<PanelResponse[]> {
-    const { userMessage, agents, context } = request
+    const { userMessage, agents, context, conversationHistory } = request
 
     // Build a summary of other agents' responses for each agent
     const responseSummary = initialResponses
@@ -132,6 +140,13 @@ ${context}
           role: 'system',
           content: systemContent,
         })
+
+        // Add conversation history for multi-turn context
+        if (conversationHistory && conversationHistory.length > 0) {
+          for (const msg of conversationHistory) {
+            messages.push({ role: msg.role, content: msg.content })
+          }
+        }
 
         // Original user message
         messages.push({

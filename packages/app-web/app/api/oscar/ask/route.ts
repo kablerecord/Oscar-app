@@ -68,7 +68,8 @@ const RequestSchema = z.object({
   conversationId: z.string().optional(), // Conversation ID for memory tracking
   useKnowledge: z.boolean().default(true),
   includeDebate: z.boolean().default(false), // Debug mode to see panel discussion
-  mode: z.enum(['quick', 'thoughtful', 'contemplate', 'council']).default('thoughtful'), // Response complexity mode
+  // Mode is now optional - when not provided, OSQR auto-routes based on question complexity
+  mode: z.enum(['quick', 'thoughtful', 'contemplate', 'council']).optional(),
   systemMode: z.boolean().optional(), // Explicit system mode (restrict to OSQR docs only)
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
@@ -617,41 +618,75 @@ Guidelines:
     // STANDARD PATH: Full processing for complex questions
     // ==========================================================================
 
-    // Track if we auto-routed to a different mode
+    // ==========================================================================
+    // AUTO-ROUTING: OSQR decides the best mode based on question complexity
+    // When mode is not provided, OSQR auto-selects based on question analysis
+    // ==========================================================================
     let autoRouted = false
     let autoRoutedReason = ''
-    let effectiveMode: ResponseMode = mode
+    let effectiveMode: ResponseMode
 
-    // Auto-downgrade conditions:
-    // 1. User selected thoughtful/contemplate but complexity is low (1-2)
-    // 2. Question is factual/conversational type
-    // 3. System mode is active (OSQR docs can be answered from indexed files)
-    const shouldDowngrade = (
-      (mode === 'thoughtful' || mode === 'contemplate') &&
-      (
-        (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) ||
-        (systemMode && complexity <= 3) // OSQR questions can usually be answered from docs
+    if (mode) {
+      // User explicitly requested a mode - start with it, may downgrade below
+      effectiveMode = mode
+
+      // Downgrade to Quick mode for simple questions that don't need multi-model synthesis
+      // Self-referential questions (about OSQR) ALWAYS use Quick mode - constitution is in the prompt
+      const shouldDowngrade = (
+        (mode === 'thoughtful' || mode === 'contemplate') &&
+        (
+          questionType === 'self_referential' || // Always quick for identity questions
+          (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) ||
+          (systemMode && complexity <= 3)
+        )
       )
-    )
 
-    if (shouldDowngrade) {
-      effectiveMode = 'quick'
+      if (shouldDowngrade) {
+        effectiveMode = 'quick'
+        autoRouted = true
+
+        if (questionType === 'self_referential') {
+          autoRoutedReason = "Identity question - I know who I am!"
+        } else if (systemMode) {
+          autoRoutedReason = "Found the answer in indexed documentation."
+        } else {
+          autoRoutedReason = "Simple question - used Quick mode for faster response."
+        }
+
+        console.log(`[OSQR] Auto-routed: ${mode} → ${effectiveMode} (${questionType}, complexity: ${complexity})`)
+      }
+    } else {
+      // No mode specified - OSQR auto-routes based on question analysis
       autoRouted = true
 
-      if (systemMode) {
-        autoRoutedReason = "I found the answer in my indexed documentation, so I used Quick mode instead of consulting the full panel."
-      } else if (questionType === 'factual') {
-        autoRoutedReason = "This looked like a straightforward factual question, so I used Quick mode to get you a faster answer."
-      } else {
-        autoRoutedReason = "This seemed like a simple question, so I used Quick mode instead of the full panel discussion."
+      // Self-referential questions always use Quick
+      if (questionType === 'self_referential') {
+        effectiveMode = 'quick'
+        autoRoutedReason = "Quick response"
+      }
+      // System mode with indexed docs uses Quick
+      else if (systemMode && complexity <= 3) {
+        effectiveMode = 'quick'
+        autoRoutedReason = "Quick response"
+      }
+      // Simple factual or conversational questions use Quick
+      else if (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) {
+        effectiveMode = 'quick'
+        autoRoutedReason = "Quick response"
+      }
+      // High stakes or complex analytical questions use Thoughtful (panel)
+      else if (complexity >= 4 || questionType === 'high_stakes' || questionType === 'analytical') {
+        effectiveMode = 'thoughtful'
+        autoRoutedReason = "Consulted the panel"
+      }
+      // Everything else gets Quick for speed
+      else {
+        effectiveMode = 'quick'
+        autoRoutedReason = "Quick response"
       }
 
-      console.log(`[OSQR] Auto-routed: ${mode} → ${effectiveMode} (${questionType}, complexity: ${complexity})`)
+      console.log(`[OSQR] Auto-routed to: ${effectiveMode} (${questionType}, complexity: ${complexity})`)
     }
-
-    // NOTE: Auto-upgrade for quick mode is now handled in the FAST PATH above.
-    // Quick mode requests always go through the fast path, so this code path
-    // only handles 'thoughtful' and 'contemplate' modes.
 
     // ==========================================================================
     // SAFETY CHECK: Detect crisis signals BEFORE any processing

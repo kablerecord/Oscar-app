@@ -2,14 +2,23 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle } from 'lucide-react'
+import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle, Award, Gift, Copy, Users } from 'lucide-react'
+import { getAllEarnedBadges, BADGES } from '@/lib/badges/config'
 import { MainLayout } from '@/components/layout/MainLayout'
+import { UserProfileSection } from '@/components/settings/UserProfileSection'
 
 interface UserData {
   name: string
   email: string
   tier: string
   createdAt: string
+}
+
+interface UserStats {
+  totalQuestions: number
+  streak: number
+  profileComplete: boolean
+  documentsIndexed: number
 }
 
 interface InsightPreferences {
@@ -35,8 +44,28 @@ interface PrivacySettings {
   }
 }
 
+interface ReferralStats {
+  referralCode: string | null
+  totalReferrals: number
+  pendingReferrals: number
+  convertedReferrals: number
+  expiredReferrals: number
+  currentBonusPercent: number
+  maxBonusPercent: number
+  effectiveTokenBonus: number
+  baseTokenLimit: number
+  effectiveTokenLimit: number
+  referrals: Array<{
+    id: string
+    status: 'PENDING' | 'CONVERTED' | 'EXPIRED'
+    createdAt: string
+    convertedAt: string | null
+  }>
+}
+
 export default function SettingsPage() {
   const [userData, setUserData] = useState<UserData | null>(null)
+  const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Insight preferences state
@@ -57,12 +86,21 @@ export default function SettingsPage() {
   // Use Knowledge Base state (persisted in localStorage)
   const [useKnowledgeBase, setUseKnowledgeBase] = useState(true)
 
+  // Refinement hints state (persisted in localStorage)
+  const [showRefinementHints, setShowRefinementHints] = useState(false)
+
   // Privacy settings state
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null)
   const [savingPrivacy, setSavingPrivacy] = useState(false)
   const [showDeleteDataModal, setShowDeleteDataModal] = useState(false)
   const [deletingData, setDeletingData] = useState(false)
   const [deleteDataSuccess, setDeleteDataSuccess] = useState(false)
+
+  // Referral system state
+  const [referralStats, setReferralStats] = useState<ReferralStats | null>(null)
+  const [referralLoading, setReferralLoading] = useState(true)
+  const [generatingCode, setGeneratingCode] = useState(false)
+  const [codeCopied, setCodeCopied] = useState(false)
 
   useEffect(() => {
     async function fetchUserData() {
@@ -79,6 +117,22 @@ export default function SettingsPage() {
       }
     }
     fetchUserData()
+  }, [])
+
+  // Fetch user stats for badges
+  useEffect(() => {
+    async function fetchUserStats() {
+      try {
+        const res = await fetch('/api/settings/stats')
+        if (res.ok) {
+          const data = await res.json()
+          setUserStats(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch user stats:', error)
+      }
+    }
+    fetchUserStats()
   }, [])
 
   // Fetch insight preferences
@@ -105,6 +159,13 @@ export default function SettingsPage() {
     }
   }, [])
 
+  // Load Refinement Hints setting from localStorage
+  useEffect(() => {
+    const stored = localStorage.getItem('osqr-show-refinement-hints')
+    // Default to false if not set
+    setShowRefinementHints(stored === 'true')
+  }, [])
+
   // Fetch privacy settings
   useEffect(() => {
     async function fetchPrivacySettings() {
@@ -121,11 +182,41 @@ export default function SettingsPage() {
     fetchPrivacySettings()
   }, [])
 
+  // Fetch referral stats
+  useEffect(() => {
+    async function fetchReferralStats() {
+      try {
+        const res = await fetch('/api/referrals/stats')
+        if (res.ok) {
+          const data = await res.json()
+          setReferralStats(data)
+        }
+      } catch (error) {
+        console.error('Failed to fetch referral stats:', error)
+      } finally {
+        setReferralLoading(false)
+      }
+    }
+    fetchReferralStats()
+  }, [])
+
   // Toggle Use Knowledge Base setting
   const toggleUseKnowledgeBase = () => {
     const newValue = !useKnowledgeBase
     setUseKnowledgeBase(newValue)
     localStorage.setItem('osqr-use-knowledge-base', String(newValue))
+  }
+
+  // Toggle Refinement Hints setting
+  const toggleRefinementHints = () => {
+    const newValue = !showRefinementHints
+    setShowRefinementHints(newValue)
+    localStorage.setItem('osqr-show-refinement-hints', String(newValue))
+    // Trigger storage event for other tabs/components
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'osqr-show-refinement-hints',
+      newValue: String(newValue),
+    }))
   }
 
   // Update privacy tier
@@ -174,6 +265,45 @@ export default function SettingsPage() {
     } finally {
       setDeletingData(false)
     }
+  }
+
+  // Generate referral code
+  const handleGenerateReferralCode = async () => {
+    setGeneratingCode(true)
+    try {
+      const res = await fetch('/api/referrals/generate', { method: 'POST' })
+      if (res.ok) {
+        const data = await res.json()
+        setReferralStats(prev => prev ? { ...prev, referralCode: data.referralCode } : null)
+      }
+    } catch (error) {
+      console.error('Failed to generate referral code:', error)
+    } finally {
+      setGeneratingCode(false)
+    }
+  }
+
+  // Copy referral code to clipboard
+  const handleCopyReferralCode = async () => {
+    if (!referralStats?.referralCode) return
+    try {
+      await navigator.clipboard.writeText(referralStats.referralCode)
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy referral code:', error)
+    }
+  }
+
+  // Format token count for display
+  const formatTokens = (tokens: number): string => {
+    if (tokens >= 1_000_000) {
+      return `${(tokens / 1_000_000).toFixed(1)}M`.replace('.0M', 'M')
+    }
+    if (tokens >= 1_000) {
+      return `${(tokens / 1_000).toFixed(0)}K`
+    }
+    return tokens.toString()
   }
 
   // Update insight preferences
@@ -346,6 +476,105 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        {/* How OSQR Sees You - User Profile Section */}
+        <UserProfileSection />
+
+        {/* Badges Section */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-amber-500/20 rounded-lg">
+              <Award className="h-5 w-5 text-amber-400" />
+            </div>
+            <h2 className="text-xl font-semibold text-white">Achievements</h2>
+          </div>
+
+          {userStats ? (
+            <div className="space-y-4">
+              {/* Earned Badges */}
+              {(() => {
+                const earnedBadges = getAllEarnedBadges(userStats)
+                const allBadgeIds = Object.keys(BADGES)
+                const unearnedBadgeIds = allBadgeIds.filter(id => !earnedBadges.find(b => b.id === id))
+
+                return (
+                  <>
+                    {earnedBadges.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-400 mb-3">Earned</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {earnedBadges.map((badge) => (
+                            <div
+                              key={badge.id}
+                              className={`flex items-center gap-3 p-3 rounded-lg ${badge.color}`}
+                            >
+                              <span className="text-2xl">{badge.icon}</span>
+                              <div>
+                                <p className="text-white text-sm font-medium">{badge.name}</p>
+                                <p className="text-neutral-400 text-xs">{badge.description}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {unearnedBadgeIds.length > 0 && (
+                      <div>
+                        <label className="block text-sm font-medium text-neutral-400 mb-3">
+                          {earnedBadges.length > 0 ? 'Locked' : 'Available Badges'}
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {unearnedBadgeIds.map((id) => {
+                            const badge = BADGES[id]
+                            return (
+                              <div
+                                key={id}
+                                className="flex items-center gap-3 p-3 rounded-lg bg-neutral-800/50 opacity-50"
+                              >
+                                <span className="text-2xl grayscale">{badge.icon}</span>
+                                <div>
+                                  <p className="text-neutral-400 text-sm font-medium">{badge.name}</p>
+                                  <p className="text-neutral-500 text-xs">{badge.description}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stats Summary */}
+                    <div className="border-t border-neutral-800 pt-4 mt-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                        <div>
+                          <p className="text-2xl font-bold text-white">{userStats.totalQuestions}</p>
+                          <p className="text-xs text-neutral-400">Questions</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-white">{userStats.streak}</p>
+                          <p className="text-xs text-neutral-400">Day Streak</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-white">{userStats.documentsIndexed}</p>
+                          <p className="text-xs text-neutral-400">Docs Indexed</p>
+                        </div>
+                        <div>
+                          <p className="text-2xl font-bold text-white">{earnedBadges.length}/{allBadgeIds.length}</p>
+                          <p className="text-xs text-neutral-400">Badges</p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )
+              })()}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+            </div>
+          )}
+        </section>
+
         {/* Subscription Section */}
         <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-6">
@@ -378,6 +607,211 @@ export default function SettingsPage() {
                 : 'Upgrade to unlock the full power of OSQR.'}
             </p>
           </div>
+        </section>
+
+        {/* Refer Friends Section */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-pink-500/20 rounded-lg">
+              <Gift className="h-5 w-5 text-pink-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Refer Friends, Get More</h2>
+              <p className="text-sm text-neutral-400">You BOTH get +5% permanent usage boost. Stack up to 50%!</p>
+            </div>
+          </div>
+
+          {referralStats ? (
+            <div className="space-y-6">
+              {/* Referral Code */}
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-2">Your Referral Code</label>
+                {referralStats.referralCode ? (
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 font-mono text-lg text-white tracking-wider">
+                      {referralStats.referralCode}
+                    </div>
+                    <button
+                      onClick={handleCopyReferralCode}
+                      className="px-4 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                      {codeCopied ? (
+                        <>
+                          <Check className="h-4 w-4" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-4 w-4" />
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleGenerateReferralCode}
+                    disabled={generatingCode}
+                    className="px-4 py-3 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    {generatingCode ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Gift className="h-4 w-4" />
+                        Generate Referral Code
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="bg-neutral-800 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-white">{referralStats.totalReferrals}</p>
+                  <p className="text-xs text-neutral-400">Total Referred</p>
+                </div>
+                <div className="bg-neutral-800 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-green-400">{referralStats.convertedReferrals}</p>
+                  <p className="text-xs text-neutral-400">Converted</p>
+                </div>
+                <div className="bg-neutral-800 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-amber-400">{referralStats.pendingReferrals}</p>
+                  <p className="text-xs text-neutral-400">Pending</p>
+                </div>
+                <div className="bg-neutral-800 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-pink-400">+{referralStats.currentBonusPercent}%</p>
+                  <p className="text-xs text-neutral-400">Usage Boost</p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-neutral-400">Progress to max usage boost</span>
+                  <span className="text-white font-medium">+{referralStats.currentBonusPercent}% / +{referralStats.maxBonusPercent}%</span>
+                </div>
+                <div className="h-2 bg-neutral-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-500"
+                    style={{ width: `${(referralStats.currentBonusPercent / referralStats.maxBonusPercent) * 100}%` }}
+                  />
+                </div>
+                <p className="text-xs text-neutral-500 mt-2">
+                  {referralStats.currentBonusPercent < referralStats.maxBonusPercent
+                    ? `${Math.ceil((referralStats.maxBonusPercent - referralStats.currentBonusPercent) / 5)} more successful referrals to reach max`
+                    : 'Maximum usage boost achieved!'}
+                </p>
+              </div>
+
+              {/* Effective Usage Limit */}
+              {referralStats.currentBonusPercent > 0 && (
+                <div className="bg-pink-500/10 border border-pink-500/30 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Users className="h-4 w-4 text-pink-400" />
+                    <span className="text-sm font-medium text-pink-300">Your Usage Boost</span>
+                  </div>
+                  <p className="text-sm text-neutral-300">
+                    Base: <span className="text-white font-medium">{formatTokens(referralStats.baseTokenLimit)}</span> →
+                    With boost: <span className="text-pink-300 font-medium">{formatTokens(referralStats.effectiveTokenLimit)}</span>
+                    <span className="text-pink-400 ml-2">(+{referralStats.currentBonusPercent}%)</span>
+                  </p>
+                </div>
+              )}
+
+              {/* Referral History */}
+              {referralStats.referrals.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-3">Referral History</label>
+                  <div className="space-y-2">
+                    {referralStats.referrals.slice(0, 5).map((referral) => (
+                      <div
+                        key={referral.id}
+                        className="flex items-center justify-between bg-neutral-800 rounded-lg px-4 py-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${
+                            referral.status === 'CONVERTED' ? 'bg-green-500' :
+                            referral.status === 'PENDING' ? 'bg-amber-500' :
+                            'bg-neutral-500'
+                          }`} />
+                          <span className="text-sm text-neutral-400">
+                            {new Date(referral.createdAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                        <span className={`text-xs font-medium px-2 py-1 rounded ${
+                          referral.status === 'CONVERTED' ? 'bg-green-500/20 text-green-300' :
+                          referral.status === 'PENDING' ? 'bg-amber-500/20 text-amber-300' :
+                          'bg-neutral-700 text-neutral-400'
+                        }`}>
+                          {referral.status === 'CONVERTED' ? 'Converted' :
+                           referral.status === 'PENDING' ? 'Pending' :
+                           'Expired'}
+                        </span>
+                      </div>
+                    ))}
+                    {referralStats.referrals.length > 5 && (
+                      <p className="text-xs text-neutral-500 text-center mt-2">
+                        And {referralStats.referrals.length - 5} more...
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* How It Works */}
+              <div className="border-t border-neutral-800 pt-4">
+                <p className="text-sm text-neutral-400 mb-2">How it works:</p>
+                <ul className="text-sm text-neutral-500 space-y-1">
+                  <li>1. Share your referral code with friends</li>
+                  <li>2. They sign up and <span className="text-pink-400">instantly get +5%</span></li>
+                  <li>3. When they become a paying customer, <span className="text-pink-400">you get +5% too</span></li>
+                  <li>4. Stack up to 10 referrals for a max 50% boost each</li>
+                </ul>
+              </div>
+            </div>
+          ) : referralLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
+            </div>
+          ) : (
+            /* Empty/Error state with marketing copy */
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Gift className="h-8 w-8 text-pink-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Share the Love, Get Rewarded</h3>
+              <p className="text-neutral-400 mb-4 max-w-sm mx-auto">
+                When you refer a friend, you <span className="text-pink-400 font-medium">both</span> get +5% extra usage forever.
+                Stack up to 10 referrals for a massive 50% boost!
+              </p>
+              <button
+                onClick={handleGenerateReferralCode}
+                disabled={generatingCode}
+                className="px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all flex items-center gap-2 mx-auto"
+              >
+                {generatingCode ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Gift className="h-4 w-4" />
+                    Get Your Referral Code
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </section>
 
         {/* Preferences Section */}
@@ -429,6 +863,22 @@ export default function SettingsPage() {
               >
                 <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${
                   useKnowledgeBase ? 'left-6' : 'left-1'
+                }`} />
+              </button>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white font-medium">Question Refinement Hints</p>
+                <p className="text-sm text-neutral-400">Show suggestions to improve your questions</p>
+              </div>
+              <button
+                onClick={toggleRefinementHints}
+                className={`w-12 h-7 rounded-full transition-colors relative cursor-pointer ${
+                  showRefinementHints ? 'bg-blue-500' : 'bg-neutral-700'
+                }`}
+              >
+                <div className={`absolute top-1 w-5 h-5 rounded-full bg-white transition-transform ${
+                  showRefinementHints ? 'left-6' : 'left-1'
                 }`} />
               </button>
             </div>

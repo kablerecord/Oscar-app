@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import { Shield, Check, Trash2, Lock, Eye, ArrowLeft, Building2, FileText, Scale, Bot, Heart } from 'lucide-react'
 import Link from 'next/link'
+import { EasterEggConsole } from './easter-egg'
 
 export const metadata: Metadata = {
   title: 'Trust & Privacy Manifesto - OSQR',
@@ -10,6 +11,20 @@ export const metadata: Metadata = {
 export default function ManifestoPage() {
   return (
     <div className="min-h-screen bg-slate-900">
+      {/* Layer 4: Console easter egg */}
+      <EasterEggConsole />
+
+      {/* Layer 2: HTML comment easter egg - only visible in DevTools */}
+      {/*
+        ═══════════════════════════════════════════════════════════
+
+        If you're reading this, you're the kind of person we built
+        OSQR for. The curious ones. The ones who look deeper.
+
+        There's more to discover: /vision
+
+        ═══════════════════════════════════════════════════════════
+      */}
       {/* Header */}
       <div className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto max-w-4xl px-4 py-4 sm:px-6 lg:px-8">
@@ -511,8 +526,24 @@ export default function ManifestoPage() {
             View Privacy Policy →
           </Link>
           <p className="text-slate-500 text-sm mt-8">
-            This document is version 1.0 · Last updated: December 2025
+            This document is version 1.0 · Last updated: December 2025 ·{' '}
+            {/* Layer 1: Subtle infinity symbol - clickable but looks decorative */}
+            <Link
+              href="/vision"
+              className="text-slate-600 hover:text-purple-400 transition-colors duration-500"
+              title=""
+              aria-label="Hidden page"
+            >
+              ∞
+            </Link>
           </p>
+          {/* Layer 3: Invisible text - only visible via select-all or inspect */}
+          <span
+            className="select-all text-transparent text-[1px] leading-none block h-0 overflow-hidden"
+            aria-hidden="true"
+          >
+            The curious find /vision
+          </span>
         </div>
       </div>
     </div>

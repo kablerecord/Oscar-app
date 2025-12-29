@@ -24,23 +24,28 @@ datasource db {
 // =============================================================================
 
 model User {
-  id                 String                  @id @default(cuid())
-  email              String                  @unique
-  name               String?
-  password           String?
-  image              String?
-  encryptionKey      Json? // Wrapped DEK for per-user encryption (v1.1)
-  ceremonySeen       Json? // Tracks which tier ceremonies have been shown: { pro?: boolean, master?: boolean }
-  createdAt          DateTime                @default(now())
-  updatedAt          DateTime                @updatedAt
-  accounts           Account[]
-  sessions           Session[]
-  settings           UserSetting[]
-  workspaces         Workspace[]
-  insightPreferences UserInsightPreferences?
-  artifacts          Artifact[]
+  id                   String                  @id @default(cuid())
+  email                String                  @unique
+  name                 String?
+  password             String?
+  image                String?
+  encryptionKey        Json? // Wrapped DEK for per-user encryption (v1.1)
+  ceremonySeen         Json? // Tracks which tier ceremonies have been shown: { pro?: boolean, master?: boolean }
+  referralCode         String?                 @unique // User's personal referral code
+  referralBonusPercent Int                     @default(0) // Accumulated token bonus (5% per successful referral, max 50%)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  accounts             Account[]
+  sessions             Session[]
+  settings             UserSetting[]
+  workspaces           Workspace[]
+  insightPreferences   UserInsightPreferences?
+  artifacts            Artifact[]
+  referralsMade        Referral[]              @relation("ReferralsMade")
+  referralsReceived    Referral[]              @relation("ReferralsReceived")
 
   @@index([email])
+  @@index([referralCode])
 }
 
 model Workspace {
@@ -1001,6 +1006,38 @@ enum FeedbackSource {
   BUTTON          // Clicked feedback button
   NATURAL_LANGUAGE // Said "leave feedback" or similar in chat
   RESPONSE_RATING // Thumbs up/down on response
+}
+
+// ============================================
+// Referral System (V1.5)
+// ============================================
+// Permanent 5% token bonus per successful referral (capped at 50%)
+// A user is "referred" when they sign up with someone's referral code
+// A referral "converts" when the referred user becomes a paying customer
+
+model Referral {
+  id            String    @id @default(cuid())
+  referrerId    String    // User who made the referral
+  referredId    String    @unique // User who was referred (each user can only be referred once)
+  referralCode  String    // The code that was used
+  status        ReferralStatus @default(PENDING)
+  convertedAt   DateTime? // When referred user became paying
+  bonusApplied  Boolean   @default(false) // Whether bonus was applied to referrer
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  referrer      User      @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred      User      @relation("ReferralsReceived", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referralCode])
+  @@index([status])
+}
+
+enum ReferralStatus {
+  PENDING    // User signed up but hasn't paid
+  CONVERTED  // User became a paying customer
+  EXPIRED    // User never converted (e.g., after 90 days)
 }
 
 // ============================================

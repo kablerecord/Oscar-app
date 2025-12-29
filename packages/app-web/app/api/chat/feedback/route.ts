@@ -10,9 +10,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { messageId, workspaceId, feedback } = await req.json()
+    const { messageId, workspaceId, feedback, comment } = await req.json()
 
-    if (!messageId || !workspaceId || !feedback) {
+    // Must have at least messageId and workspaceId, plus either feedback or comment
+    if (!messageId || !workspaceId || (!feedback && !comment)) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -28,13 +29,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
     }
 
-    // Update message metadata with feedback
+    // Get existing metadata to merge with new feedback
+    const existingMessage = await prisma.chatMessage.findUnique({
+      where: { id: messageId },
+      select: { metadata: true },
+    })
+
+    const existingMetadata = (existingMessage?.metadata as Record<string, unknown>) || {}
+
+    // Update message metadata with feedback and/or comment
     const message = await prisma.chatMessage.update({
       where: { id: messageId },
       data: {
         metadata: {
-          feedback,
-          feedbackAt: new Date().toISOString(),
+          ...existingMetadata,
+          ...(feedback && { feedback, feedbackAt: new Date().toISOString() }),
+          ...(comment && {
+            comment,
+            commentAt: new Date().toISOString(),
+            // Keep history of comments if multiple are submitted
+            commentHistory: [
+              ...((existingMetadata.commentHistory as string[]) || []),
+              { text: comment, at: new Date().toISOString() }
+            ]
+          }),
         },
       },
     })
