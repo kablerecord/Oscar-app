@@ -43,9 +43,11 @@ COPY --from=builder --chown=nextjs:nodejs /app/websites/marketing/.next/static .
 
 USER nextjs
 
-# Railway automatically injects PORT - no EXPOSE needed
-# The HOSTNAME must be 0.0.0.0 to listen on all interfaces
+# Railway uses port 8080 by default
+ENV PORT=8080
 ENV HOSTNAME="0.0.0.0"
+
+EXPOSE 8080
 
 # Use dumb-init as PID 1 to properly handle signals
 ENTRYPOINT ["dumb-init", "--"]
