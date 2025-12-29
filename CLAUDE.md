@@ -158,9 +158,11 @@ pnpm --filter @osqr/marketing dev
 
 ## Deployment
 
-- **app-web:** Railway (app.osqr.ai)
-- **marketing:** Vercel (osqr.ai)
+- **app-web:** Railway (app.osqr.app) - deployed from `packages/app-web/Dockerfile`
+- **marketing:** Railway (osqr.app, www.osqr.app) - deployed from `websites/marketing/Dockerfile`
 - **Database:** Supabase PostgreSQL with pgvector
+
+**Note:** The legacy `osqr-website` repo should be archived. All marketing site code lives in `websites/marketing/`.
 
 ---
 
@@ -196,7 +198,7 @@ pnpm --filter @osqr/marketing dev
 - **oscar-app** - This repository (the monorepo)
 - **@osqr/*** - Package names within the monorepo
 - **osqr/** - Legacy brain repo (reference only)
-- **osqr-website/** - Legacy marketing site (archived)
+- **osqr-website/** - Legacy marketing site (ARCHIVED - do not use, deploy from `websites/marketing/` instead)
 
 ---
 
@@ -249,8 +251,9 @@ pnpm --filter @osqr/marketing dev
 
 ---
 
-## Railway Deployment (app-web)
+## Railway Deployment
 
+### app-web (Main Application)
 **Config:** `railway.json` at repo root points to `packages/app-web/Dockerfile`
 
 **Important:** The Dockerfile uses paths like `COPY packages/app-web/...` because Railway builds from repo root with `dockerfilePath` pointing to the subdirectory.
@@ -258,6 +261,15 @@ pnpm --filter @osqr/marketing dev
 **Domains:**
 - `app.osqr.app` (custom domain)
 - `oscar-app-production.up.railway.app`
+
+### marketing (Marketing Site)
+**Config:** `websites/marketing/Dockerfile`
+
+**Important:** Create a separate Railway service in the same project. Set the root directory to `/` and dockerfile path to `websites/marketing/Dockerfile`.
+
+**Domains:**
+- `osqr.app` (custom domain)
+- `www.osqr.app` (custom domain)
 
 ---
 
