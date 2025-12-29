@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle, Award, Gift, Copy, Users, Link2, RefreshCw } from 'lucide-react'
-import { getAllEarnedBadges, BADGES } from '@/lib/badges/config'
+import { getAllEarnedBadges, BADGES, BADGE_CATEGORIES, UserStats } from '@/lib/badges/config'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { UserProfileSection } from '@/components/settings/UserProfileSection'
 
@@ -14,12 +14,7 @@ interface UserData {
   createdAt: string
 }
 
-interface UserStats {
-  totalQuestions: number
-  streak: number
-  profileComplete: boolean
-  documentsIndexed: number
-}
+// UserStats is now imported from @/lib/badges/config
 
 interface InsightPreferences {
   enabled: boolean
@@ -538,84 +533,125 @@ export default function SettingsPage() {
           </div>
 
           {userStats ? (
-            <div className="space-y-4">
-              {/* Earned Badges */}
+            <div className="space-y-6">
+              {/* Stats Summary at top */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                <div className="bg-neutral-800/50 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-white">{userStats.totalQuestions}</p>
+                  <p className="text-xs text-neutral-400">Questions</p>
+                </div>
+                <div className="bg-neutral-800/50 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-white">{userStats.totalActiveDays || 0}</p>
+                  <p className="text-xs text-neutral-400">Active Days</p>
+                </div>
+                <div className="bg-neutral-800/50 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-white">{userStats.documentsIndexed}</p>
+                  <p className="text-xs text-neutral-400">Docs Indexed</p>
+                </div>
+                <div className="bg-neutral-800/50 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-amber-400">{getAllEarnedBadges(userStats).length}/{Object.keys(BADGES).length}</p>
+                  <p className="text-xs text-neutral-400">Badges Earned</p>
+                </div>
+              </div>
+
+              {/* Badges by Category */}
               {(() => {
                 const earnedBadges = getAllEarnedBadges(userStats)
-                const allBadgeIds = Object.keys(BADGES)
-                const unearnedBadgeIds = allBadgeIds.filter(id => !earnedBadges.find(b => b.id === id))
+                const earnedBadgeIds = new Set(earnedBadges.map(b => b.id))
 
                 return (
-                  <>
-                    {earnedBadges.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-400 mb-3">Earned</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {earnedBadges.map((badge) => (
-                            <div
-                              key={badge.id}
-                              className={`flex items-center gap-3 p-3 rounded-lg ${badge.color}`}
-                            >
-                              <span className="text-2xl">{badge.icon}</span>
-                              <div>
-                                <p className="text-white text-sm font-medium">{badge.name}</p>
-                                <p className="text-neutral-400 text-xs">{badge.description}</p>
-                              </div>
+                  <div className="space-y-6">
+                    {Object.entries(BADGE_CATEGORIES).map(([categoryId, category]) => {
+                      const categoryBadges = category.badges
+                      const earnedInCategory = categoryBadges.filter(id => earnedBadgeIds.has(id))
+
+                      return (
+                        <div key={categoryId} className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="text-sm font-medium text-white">{category.name}</h3>
+                              <p className="text-xs text-neutral-500">{category.description}</p>
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                            <span className="text-xs text-neutral-400">
+                              {earnedInCategory.length}/{categoryBadges.length}
+                            </span>
+                          </div>
 
-                    {unearnedBadgeIds.length > 0 && (
-                      <div>
-                        <label className="block text-sm font-medium text-neutral-400 mb-3">
-                          {earnedBadges.length > 0 ? 'Locked' : 'Available Badges'}
-                        </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {unearnedBadgeIds.map((id) => {
-                            const badge = BADGES[id]
-                            return (
-                              <div
-                                key={id}
-                                className="flex items-center gap-3 p-3 rounded-lg bg-neutral-800/50 opacity-50"
-                              >
-                                <span className="text-2xl grayscale">{badge.icon}</span>
-                                <div>
-                                  <p className="text-neutral-400 text-sm font-medium">{badge.name}</p>
-                                  <p className="text-neutral-500 text-xs">{badge.description}</p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            {categoryBadges.map((badgeId) => {
+                              const badge = BADGES[badgeId]
+                              if (!badge) return null
+                              const isEarned = earnedBadgeIds.has(badgeId)
+
+                              return (
+                                <div
+                                  key={badgeId}
+                                  className={`flex items-center gap-2 p-2.5 rounded-lg transition-all ${
+                                    isEarned
+                                      ? badge.color
+                                      : 'bg-neutral-800/30 opacity-40'
+                                  }`}
+                                  title={badge.description}
+                                >
+                                  <span className={`text-xl ${isEarned ? '' : 'grayscale'}`}>
+                                    {badge.icon}
+                                  </span>
+                                  <div className="min-w-0 flex-1">
+                                    <p className={`text-xs font-medium truncate ${
+                                      isEarned ? 'text-white' : 'text-neutral-500'
+                                    }`}>
+                                      {badge.name}
+                                    </p>
+                                  </div>
                                 </div>
-                              </div>
-                            )
-                          })}
+                              )
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Stats Summary */}
-                    <div className="border-t border-neutral-800 pt-4 mt-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                        <div>
-                          <p className="text-2xl font-bold text-white">{userStats.totalQuestions}</p>
-                          <p className="text-xs text-neutral-400">Questions</p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-white">{userStats.streak}</p>
-                          <p className="text-xs text-neutral-400">Day Streak</p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-white">{userStats.documentsIndexed}</p>
-                          <p className="text-xs text-neutral-400">Docs Indexed</p>
-                        </div>
-                        <div>
-                          <p className="text-2xl font-bold text-white">{earnedBadges.length}/{allBadgeIds.length}</p>
-                          <p className="text-xs text-neutral-400">Badges</p>
-                        </div>
-                      </div>
-                    </div>
-                  </>
+                      )
+                    })}
+                  </div>
                 )
               })()}
+
+              {/* Progress indicators for long-term badges */}
+              {userStats.consecutiveMonthsActive !== undefined && userStats.consecutiveMonthsActive > 0 && userStats.consecutiveMonthsActive < 12 && (
+                <div className="border-t border-neutral-800 pt-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-neutral-400">Journey Progress</span>
+                    <span className="text-xs text-neutral-500">
+                      {userStats.consecutiveMonthsActive} month{userStats.consecutiveMonthsActive !== 1 ? 's' : ''} active
+                    </span>
+                  </div>
+                  <div className="flex gap-1">
+                    {Array.from({ length: 12 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-2 flex-1 rounded-full ${
+                          i < userStats.consecutiveMonthsActive!
+                            ? i < 3
+                              ? 'bg-emerald-500'
+                              : i < 6
+                              ? 'bg-blue-500'
+                              : 'bg-amber-500'
+                            : 'bg-neutral-800'
+                        }`}
+                        title={
+                          i === 2 ? 'Quarterly Quest (3 months)' :
+                          i === 5 ? 'Semester Scholar (6 months)' :
+                          i === 11 ? 'Year One (12 months)' :
+                          `Month ${i + 1}`
+                        }
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-neutral-600">3mo</span>
+                    <span className="text-[10px] text-neutral-600">6mo</span>
+                    <span className="text-[10px] text-neutral-600">12mo</span>
+                  </div>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-center py-8">

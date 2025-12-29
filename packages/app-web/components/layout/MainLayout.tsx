@@ -67,12 +67,8 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
         const response = await fetch('/api/settings/stats')
         if (response.ok) {
           const stats = await response.json()
-          const badge = getActiveBadge({
-            totalQuestions: stats.totalQuestions,
-            streak: stats.streak,
-            profileComplete: stats.profileComplete,
-            documentsIndexed: stats.documentsIndexed,
-          })
+          // Pass full stats object - API now returns complete UserStats
+          const badge = getActiveBadge(stats)
           setActiveBadge(badge)
         }
       } catch (error) {
