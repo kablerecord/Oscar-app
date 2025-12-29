@@ -73,7 +73,8 @@ const RequestSchema = z.object({
   conversationId: z.string().optional(),
   useKnowledge: z.boolean().default(true),
   includeDebate: z.boolean().default(false),
-  mode: z.enum(['quick', 'thoughtful', 'contemplate', 'council']).default('thoughtful'),
+  // Mode is now optional - when not provided, OSQR auto-routes based on question complexity
+  mode: z.enum(['quick', 'thoughtful', 'contemplate', 'council']).optional(),
   systemMode: z.boolean().optional(),
   conversationHistory: z.array(z.object({
     role: z.enum(['user', 'assistant']),
@@ -453,31 +454,68 @@ export async function POST(req: NextRequest) {
       const questionType = questionAnalysis.questionType
       const complexity = questionAnalysis.complexity
 
-      // Determine effective mode (auto-routing)
+      // ==========================================================================
+      // AUTO-ROUTING: OSQR decides the best mode based on question complexity
+      // When mode is not provided, OSQR auto-selects based on question analysis
+      // ==========================================================================
       let autoRouted = false
       let autoRoutedReason = ''
-      let effectiveMode: ResponseMode = mode
+      let effectiveMode: ResponseMode
 
-      // Downgrade to Quick mode for simple questions that don't need multi-model synthesis
-      // Self-referential questions (about OSQR) ALWAYS use Quick mode - constitution is in the prompt
-      const shouldDowngrade = (
-        (mode === 'thoughtful' || mode === 'contemplate') &&
-        (
-          questionType === 'self_referential' || // Always quick for identity questions
-          (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) ||
-          (systemMode && complexity <= 3)
+      if (mode) {
+        // User explicitly requested a mode - start with it, may downgrade below
+        effectiveMode = mode
+
+        // Downgrade to Quick mode for simple questions that don't need multi-model synthesis
+        // Self-referential questions (about OSQR) ALWAYS use Quick mode - constitution is in the prompt
+        const shouldDowngrade = (
+          (mode === 'thoughtful' || mode === 'contemplate') &&
+          (
+            questionType === 'self_referential' || // Always quick for identity questions
+            (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) ||
+            (systemMode && complexity <= 3)
+          )
         )
-      )
 
-      if (shouldDowngrade) {
-        effectiveMode = 'quick'
+        if (shouldDowngrade) {
+          effectiveMode = 'quick'
+          autoRouted = true
+          if (questionType === 'self_referential') {
+            autoRoutedReason = "Identity question - I know who I am!"
+          } else if (systemMode) {
+            autoRoutedReason = "Found the answer in indexed documentation."
+          } else {
+            autoRoutedReason = "Simple question - used Quick mode for faster response."
+          }
+        }
+      } else {
+        // No mode specified - OSQR auto-routes based on question analysis
         autoRouted = true
+
+        // Self-referential questions always use Quick
         if (questionType === 'self_referential') {
-          autoRoutedReason = "Identity question - I know who I am!"
-        } else if (systemMode) {
-          autoRoutedReason = "Found the answer in indexed documentation."
-        } else {
-          autoRoutedReason = "Simple question - used Quick mode for faster response."
+          effectiveMode = 'quick'
+          autoRoutedReason = "Quick response"
+        }
+        // System mode with indexed docs uses Quick
+        else if (systemMode && complexity <= 3) {
+          effectiveMode = 'quick'
+          autoRoutedReason = "Quick response"
+        }
+        // Simple factual or conversational questions use Quick
+        else if (complexity <= 2 && (questionType === 'factual' || questionType === 'conversational')) {
+          effectiveMode = 'quick'
+          autoRoutedReason = "Quick response"
+        }
+        // High stakes or complex analytical questions use Thoughtful (panel)
+        else if (complexity >= 4 || questionType === 'high_stakes' || questionType === 'analytical') {
+          effectiveMode = 'thoughtful'
+          autoRoutedReason = "Consulted the panel"
+        }
+        // Everything else gets Quick for speed
+        else {
+          effectiveMode = 'quick'
+          autoRoutedReason = "Quick response"
         }
       }
 
