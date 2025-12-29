@@ -96,7 +96,8 @@ describe('Dependency Inference', () => {
     });
 
     it('should calculate suggested deadlines', () => {
-      const commitment = createCommitment('Wedding ceremony', 30);
+      // Use 60 days to ensure "Book travel" (30 day lead time) deadline is in the future
+      const commitment = createCommitment('Wedding ceremony', 60);
       const chain = inferDependencies(commitment);
 
       const bookTravel = chain.inferredDependencies.find(
