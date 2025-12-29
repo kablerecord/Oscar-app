@@ -1982,6 +1982,33 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                     </TooltipContent>
                   </Tooltip>
                 </div>
+
+                {/* Supreme Court Button - Greyed out until earned, creates mythology */}
+                <div className="flex p-1 bg-slate-800/50 rounded-xl ring-1 ring-slate-700/30">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => !hasEarnedSupreme && setShowSupremeLockedModal(true)}
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                          hasEarnedSupreme
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 cursor-pointer'
+                            : 'text-slate-600 cursor-pointer hover:text-slate-500'
+                        }`}
+                      >
+                        <Scale className={`h-4 w-4 transition-transform duration-300 ${hasEarnedSupreme ? '' : 'opacity-50'}`} />
+                        <span className="hidden sm:inline opacity-60">Supreme Court</span>
+                        {!hasEarnedSupreme && (
+                          <Lock className="h-3 w-3 ml-1 opacity-40" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[200px]">
+                      <p className="text-xs text-slate-400 italic">
+                        {hasEarnedSupreme ? 'Adversarial multi-model deliberation' : 'Earned, not purchased'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               </TooltipProvider>
             </div>
 
