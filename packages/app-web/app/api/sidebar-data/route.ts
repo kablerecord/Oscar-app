@@ -199,14 +199,22 @@ export async function GET(req: NextRequest) {
     // Get longest streak (simplified: just use current for now, would need historical tracking)
     const longestStreak = currentStreak
 
-    // Get member since date
+    // Get member since date and referral bonus
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { createdAt: true },
+      select: { createdAt: true, referralBonusPercent: true, referralCode: true },
     })
     const memberSince = user?.createdAt
       ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
       : 'Unknown'
+
+    // Get referral stats
+    const referralCount = await prisma.referral.count({
+      where: { referrerId: session.user.id },
+    })
+    const convertedReferralCount = await prisma.referral.count({
+      where: { referrerId: session.user.id, status: 'CONVERTED' },
+    })
 
     return NextResponse.json({
       quickStats: {
@@ -215,6 +223,10 @@ export async function GET(req: NextRequest) {
         documentsCount: documentCount,
         documentsMax: tierConfig.limits.maxDocuments,
         capabilityLevel: workspace?.capabilityLevel || 1,
+        referralBonusPercent: user?.referralBonusPercent || 0,
+        referralCount,
+        convertedReferralCount,
+        referralCode: user?.referralCode || null,
       },
       recentThreads: recentThreads.map(t => ({
         id: t.id,

@@ -18,7 +18,7 @@ import { runBatchReflection } from '@/lib/uip/reflection'
  * Security: Protected by CRON_SECRET bearer token
  *
  * Usage:
- * curl -X POST https://app.osqr.ai/api/cron/uip-reflection \
+ * curl -X POST https://app.osqr.app/api/cron/uip-reflection \
  *   -H "Authorization: Bearer YOUR_CRON_SECRET"
  */
 

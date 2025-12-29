@@ -13,7 +13,7 @@ import { processPendingTasks } from '@/lib/tasks/executor'
  * Security: Protected by CRON_SECRET bearer token
  *
  * Usage:
- * curl -X POST https://app.osqr.ai/api/cron/index-osqr \
+ * curl -X POST https://app.osqr.app/api/cron/index-osqr \
  *   -H "Authorization: Bearer YOUR_CRON_SECRET"
  */
 

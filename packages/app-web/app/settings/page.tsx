@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle, Award, Gift, Copy, Users } from 'lucide-react'
+import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle, Award, Gift, Copy, Users, Link2, RefreshCw } from 'lucide-react'
 import { getAllEarnedBadges, BADGES } from '@/lib/badges/config'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { UserProfileSection } from '@/components/settings/UserProfileSection'
@@ -99,8 +99,10 @@ export default function SettingsPage() {
   // Referral system state
   const [referralStats, setReferralStats] = useState<ReferralStats | null>(null)
   const [referralLoading, setReferralLoading] = useState(true)
+  const [referralError, setReferralError] = useState<string | null>(null)
   const [generatingCode, setGeneratingCode] = useState(false)
   const [codeCopied, setCodeCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
 
   useEffect(() => {
     async function fetchUserData() {
@@ -186,13 +188,22 @@ export default function SettingsPage() {
   useEffect(() => {
     async function fetchReferralStats() {
       try {
+        setReferralError(null)
         const res = await fetch('/api/referrals/stats')
         if (res.ok) {
           const data = await res.json()
           setReferralStats(data)
+        } else {
+          const errorData = await res.json().catch(() => ({}))
+          const errorMsg = errorData.details
+            ? `${errorData.error}: ${errorData.details}`
+            : (errorData.error || 'Failed to load referral data')
+          console.error('Referral stats error:', errorData)
+          setReferralError(errorMsg)
         }
       } catch (error) {
         console.error('Failed to fetch referral stats:', error)
+        setReferralError('Network error - please try again')
       } finally {
         setReferralLoading(false)
       }
@@ -270,14 +281,39 @@ export default function SettingsPage() {
   // Generate referral code
   const handleGenerateReferralCode = async () => {
     setGeneratingCode(true)
+    setReferralError(null)
     try {
       const res = await fetch('/api/referrals/generate', { method: 'POST' })
       if (res.ok) {
         const data = await res.json()
-        setReferralStats(prev => prev ? { ...prev, referralCode: data.referralCode } : null)
+        // Refetch full stats to get the complete data
+        const statsRes = await fetch('/api/referrals/stats')
+        if (statsRes.ok) {
+          const statsData = await statsRes.json()
+          setReferralStats(statsData)
+        } else {
+          // At minimum, show the code we just generated
+          setReferralStats(prev => prev ? { ...prev, referralCode: data.referralCode } : {
+            referralCode: data.referralCode,
+            totalReferrals: 0,
+            pendingReferrals: 0,
+            convertedReferrals: 0,
+            expiredReferrals: 0,
+            currentBonusPercent: 0,
+            maxBonusPercent: 50,
+            effectiveTokenBonus: 1,
+            baseTokenLimit: 0,
+            effectiveTokenLimit: 0,
+            referrals: [],
+          })
+        }
+      } else {
+        const errorData = await res.json().catch(() => ({}))
+        setReferralError(errorData.error || 'Failed to generate code')
       }
     } catch (error) {
       console.error('Failed to generate referral code:', error)
+      setReferralError('Network error - please try again')
     } finally {
       setGeneratingCode(false)
     }
@@ -292,6 +328,19 @@ export default function SettingsPage() {
       setTimeout(() => setCodeCopied(false), 2000)
     } catch (error) {
       console.error('Failed to copy referral code:', error)
+    }
+  }
+
+  // Copy share link to clipboard
+  const handleCopyShareLink = async () => {
+    if (!referralStats?.referralCode) return
+    try {
+      const shareLink = `https://app.osqr.app/signup?ref=${referralStats.referralCode}`
+      await navigator.clipboard.writeText(shareLink)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch (error) {
+      console.error('Failed to copy share link:', error)
     }
   }
 
@@ -617,7 +666,7 @@ export default function SettingsPage() {
             </div>
             <div>
               <h2 className="text-xl font-semibold text-white">Refer Friends, Get More</h2>
-              <p className="text-sm text-neutral-400">You BOTH get +5% permanent usage boost. Stack up to 50%!</p>
+              <p className="text-sm text-neutral-400">You BOTH get +5% permanent usage boost — about 60 extra questions/month. Stack up to 50%!</p>
             </div>
           </div>
 
@@ -627,32 +676,70 @@ export default function SettingsPage() {
               <div>
                 <label className="block text-sm font-medium text-neutral-400 mb-2">Your Referral Code</label>
                 {referralStats.referralCode ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 font-mono text-lg text-white tracking-wider">
-                      {referralStats.referralCode}
+                  <div className="space-y-4">
+                    {/* Code for manual entry */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Copy className="h-3.5 w-3.5 text-neutral-500" />
+                        <span className="text-xs text-neutral-500">For manual entry during signup</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 font-mono text-lg text-white tracking-wider">
+                          {referralStats.referralCode}
+                        </div>
+                        <button
+                          onClick={handleCopyReferralCode}
+                          className="px-4 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 cursor-pointer"
+                        >
+                          {codeCopied ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-4 w-4" />
+                              Copy Code
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
-                    <button
-                      onClick={handleCopyReferralCode}
-                      className="px-4 py-3 bg-pink-600 hover:bg-pink-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                    >
-                      {codeCopied ? (
-                        <>
-                          <Check className="h-4 w-4" />
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-4 w-4" />
-                          Copy
-                        </>
-                      )}
-                    </button>
+
+                    {/* Share Link for easy sharing */}
+                    <div>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Link2 className="h-3.5 w-3.5 text-neutral-500" />
+                        <span className="text-xs text-neutral-500">Share this link — code auto-fills on signup</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-neutral-800/50 border border-neutral-700/50 rounded-lg px-4 py-2.5 text-sm text-neutral-400 truncate">
+                          app.osqr.app/signup?ref={referralStats.referralCode}
+                        </div>
+                        <button
+                          onClick={handleCopyShareLink}
+                          className="px-4 py-2.5 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 cursor-pointer"
+                        >
+                          {linkCopied ? (
+                            <>
+                              <Check className="h-4 w-4" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Link2 className="h-4 w-4" />
+                              Copy Link
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 ) : (
                   <button
                     onClick={handleGenerateReferralCode}
                     disabled={generatingCode}
-                    className="px-4 py-3 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                    className="px-4 py-3 bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors flex items-center gap-2 cursor-pointer disabled:cursor-wait"
                   >
                     {generatingCode ? (
                       <>
@@ -770,11 +857,11 @@ export default function SettingsPage() {
               {/* How It Works */}
               <div className="border-t border-neutral-800 pt-4">
                 <p className="text-sm text-neutral-400 mb-2">How it works:</p>
-                <ul className="text-sm text-neutral-500 space-y-1">
+                <ul className="text-sm text-neutral-500 space-y-1.5">
                   <li>1. Share your referral code with friends</li>
-                  <li>2. They sign up and <span className="text-pink-400">instantly get +5%</span></li>
+                  <li>2. They sign up and <span className="text-pink-400">instantly get +5%</span> <span className="text-neutral-600">(~60 extra questions/month)</span></li>
                   <li>3. When they become a paying customer, <span className="text-pink-400">you get +5% too</span></li>
-                  <li>4. Stack up to 10 referrals for a max 50% boost each</li>
+                  <li>4. Stack up to 10 referrals for <span className="text-pink-400">+50% max</span> <span className="text-neutral-600">(~600 extra questions/month)</span></li>
                 </ul>
               </div>
             </div>
@@ -782,8 +869,46 @@ export default function SettingsPage() {
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
             </div>
+          ) : referralError ? (
+            /* Error state */
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle className="h-8 w-8 text-red-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">Something went wrong</h3>
+              <p className="text-neutral-400 mb-4 max-w-sm mx-auto">
+                {referralError}
+              </p>
+              <button
+                onClick={async () => {
+                  setReferralLoading(true)
+                  setReferralError(null)
+                  try {
+                    const res = await fetch('/api/referrals/stats')
+                    if (res.ok) {
+                      const data = await res.json()
+                      setReferralStats(data)
+                    } else {
+                      const errorData = await res.json().catch(() => ({}))
+                      const errorMsg = errorData.details
+                        ? `${errorData.error}: ${errorData.details}`
+                        : (errorData.error || 'Failed to load - please try again')
+                      setReferralError(errorMsg)
+                    }
+                  } catch {
+                    setReferralError('Network error - please check your connection')
+                  } finally {
+                    setReferralLoading(false)
+                  }
+                }}
+                className="px-6 py-3 bg-neutral-700 hover:bg-neutral-600 text-white rounded-lg font-medium transition-all flex items-center gap-2 mx-auto cursor-pointer"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Try Again
+              </button>
+            </div>
           ) : (
-            /* Empty/Error state with marketing copy */
+            /* Empty state with marketing copy */
             <div className="text-center py-8">
               <div className="w-16 h-16 bg-pink-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Gift className="h-8 w-8 text-pink-400" />
@@ -796,7 +921,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleGenerateReferralCode}
                 disabled={generatingCode}
-                className="px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all flex items-center gap-2 mx-auto"
+                className="px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 disabled:opacity-50 text-white rounded-lg font-medium transition-all flex items-center gap-2 mx-auto cursor-pointer disabled:cursor-wait"
               >
                 {generatingCode ? (
                   <>
@@ -839,15 +964,6 @@ export default function SettingsPage() {
                 >
                   Light
                 </button>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-white font-medium">Default Mode</p>
-                <p className="text-sm text-neutral-400">Your preferred thinking depth</p>
-              </div>
-              <div className="px-3 py-1.5 bg-neutral-800 text-neutral-300 rounded-lg text-sm">
-                Thoughtful
               </div>
             </div>
             <div className="flex items-center justify-between">

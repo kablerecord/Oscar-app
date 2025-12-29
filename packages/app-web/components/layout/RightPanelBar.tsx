@@ -19,6 +19,7 @@ import {
   MessageCircle,
   Send,
   Sparkles,
+  Gift,
 } from 'lucide-react'
 import { MSCPanel } from '@/components/msc/MSCPanel'
 import { useTipsHighlight, type HighlightId } from '@/components/tips/TipsHighlightProvider'
@@ -51,6 +52,10 @@ interface SidebarData {
     documentsCount: number
     documentsMax: number
     capabilityLevel: number
+    referralBonusPercent: number
+    referralCount: number
+    convertedReferralCount: number
+    referralCode: string | null
   } | null
   pinnedItems: Array<{ id: string; content: string; category: string }>
   profileInfo: {
@@ -561,6 +566,44 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
                     <p className="text-xs text-slate-500 mt-1">{capabilityInfo.description}</p>
                   </div>
                 )}
+
+                {/* Referral Bonus */}
+                <div className="rounded-xl bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/20 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Gift className="h-4 w-4 text-pink-400" />
+                      <span className="text-sm text-slate-300">Referral Bonus</span>
+                    </div>
+                    <span className="text-sm font-bold text-pink-400">
+                      +{data.quickStats.referralBonusPercent}%
+                    </span>
+                  </div>
+                  {data.quickStats.referralCount > 0 ? (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Friends referred</span>
+                        <span className="text-slate-300">{data.quickStats.referralCount}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-slate-400">Converted</span>
+                        <span className="text-emerald-400">{data.quickStats.convertedReferralCount}</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-700 rounded-full overflow-hidden mt-2">
+                        <div
+                          className="h-full bg-gradient-to-r from-pink-500 to-purple-500 rounded-full transition-all"
+                          style={{ width: `${Math.min(data.quickStats.referralBonusPercent * 2, 100)}%` }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 text-right">
+                        {data.quickStats.referralBonusPercent}/50% max bonus
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400">
+                      Refer friends to earn up to 50% more usage!
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           )}

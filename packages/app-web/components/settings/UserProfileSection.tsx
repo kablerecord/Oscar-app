@@ -299,7 +299,10 @@ export function UserProfileSection() {
 
       {/* Preview when collapsed - show profile summary */}
       {!isExpanded && profile && (
-        <div className="mt-4 pt-4 border-t border-neutral-800">
+        <div
+          className="mt-4 pt-4 border-t border-neutral-800 cursor-pointer"
+          onClick={() => setIsExpanded(true)}
+        >
           <div className="flex flex-wrap gap-4 text-sm">
             {/* Confidence indicator */}
             {profile.overallConfidence > 0 && (
