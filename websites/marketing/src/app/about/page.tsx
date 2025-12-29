@@ -192,13 +192,13 @@ export default function AboutPage() {
                 Ready to Think Better?
               </h3>
               <p className="text-blue-100 mb-6">
-                Start your free trial and experience OSQR for yourself.
+                Experience OSQR for yourself. 90-day money-back guarantee.
               </p>
               <a
                 href="https://app.osqr.app/signup"
                 className="inline-flex items-center justify-center rounded-lg bg-white px-6 py-3 text-base font-semibold text-blue-600 hover:bg-blue-50 transition-colors"
               >
-                Get Started Free
+                Get Started
               </a>
             </div>
           </section>

@@ -23,7 +23,7 @@ export function CTA() {
               Ready to Think Better?
             </h2>
             <p className="text-lg text-blue-100 max-w-2xl mx-auto mb-8">
-              Start your 7-day free trial today. No credit card required. Experience the power of OSQR and transform how you work with AI.
+              Experience the power of OSQR and transform how you work with AI. 90-day money-back guarantee.
             </p>
 
             {/* CTA Button */}
@@ -31,7 +31,7 @@ export function CTA() {
               href={`${APP_URL}/signup`}
               className="inline-flex items-center justify-center font-semibold rounded-lg px-6 py-3 text-base bg-white text-blue-600 hover:bg-blue-50 transition-all duration-200 shadow-lg"
             >
-              Get Started Free
+              Get Started
             </a>
 
             <p className="mt-4 text-sm text-blue-200">

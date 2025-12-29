@@ -38,6 +38,36 @@
 > **Build Spec:** `docs/builds/DEPTH_AWARE_INTELLIGENCE_BUILD.md`
 > **Admin API:** `POST /api/admin/seed-cache` to seed global cache
 
+### Pre-Launch Checklist
+
+> **Status:** Must complete before public launch
+
+#### AI Provider Billing (CRITICAL)
+
+| Provider | Billing Console | Status | Alert Thresholds |
+|----------|-----------------|--------|------------------|
+| **OpenAI** | [platform.openai.com/account/billing](https://platform.openai.com/account/billing) | ⬜ Setup | $100, $500, $1000 |
+| **Anthropic** | [console.anthropic.com/settings/billing](https://console.anthropic.com/settings/billing) | ⬜ Setup | $100, $500, $1000 |
+| **Google AI** | [makersuite.google.com/app/billing](https://makersuite.google.com/app/billing) | ⬜ Setup | $100, $500, $1000 |
+| **xAI (Grok)** | [console.x.ai/team/billing](https://console.x.ai/team/billing) | ⬜ Setup | $100, $500, $1000 |
+| **Groq** | [console.groq.com/settings/billing](https://console.groq.com/settings/billing) | ⬜ Setup | $100, $500, $1000 |
+
+**Per-user cost estimates:** See [docs/business/OSQR_COST_ANALYSIS.md](docs/business/OSQR_COST_ANALYSIS.md)
+- Average user (180 queries/mo): ~$4.18/user
+- Power user (600 queries/mo): ~$11.50/user
+- Pro tier margin: ~70%
+
+**Recommended:** Set up Anthropic and OpenAI first (primary models), then Google/xAI/Groq.
+
+#### Other Pre-Launch Items
+
+- [x] Claude data folder indexed
+- [x] Referral system (5% permanent bonus per referral, 50% cap)
+- [ ] Stripe payment links tested
+- [ ] Production testing (see BLOCKED.md)
+
+---
+
 ### Next Steps (Pick One)
 
 1. **V1.1 AI Feature Parity** - Voice, images, web search, code execution

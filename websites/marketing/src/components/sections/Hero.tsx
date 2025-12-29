@@ -92,7 +92,7 @@ export function Hero() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <a href={`${APP_URL}/signup`}>
                 <Button size="lg" className="w-full sm:w-auto px-8">
-                  Get Started Free
+                  Get Started
                 </Button>
               </a>
               <button
@@ -103,7 +103,7 @@ export function Hero() {
               </button>
             </div>
             <p className="mt-4 text-xs text-slate-500">
-              7-day free trial. No credit card required.
+              90-day money-back guarantee. If OSQR doesn&apos;t help you think better, full refund.
             </p>
           </div>
 
@@ -178,7 +178,7 @@ export function Hero() {
                 </form>
 
                 <p className="mt-4 text-xs text-slate-500 text-center">
-                  Don&apos;t have a code? <a href={`${APP_URL}/signup`} className="text-blue-400 hover:text-blue-300">Sign up for free</a>
+                  Don&apos;t have a code? <a href={`${APP_URL}/signup`} className="text-blue-400 hover:text-blue-300">Sign up here</a>
                 </p>
               </div>
             </div>

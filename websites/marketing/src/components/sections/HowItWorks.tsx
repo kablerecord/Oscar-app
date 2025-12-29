@@ -126,7 +126,7 @@ export function HowItWorks() {
             href="https://app.osqr.app/signup"
             className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-6 py-3 text-base font-semibold text-white shadow-lg shadow-blue-500/25 transition-all hover:bg-blue-600 hover:shadow-blue-500/40"
           >
-            Get Started Free
+            Get Started
           </a>
         </div>
       </div>

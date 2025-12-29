@@ -1,64 +1,138 @@
-# Blocked Items
+# Pre-Launch Checklist & Session Progress
 
-This file tracks items that are blocked during autonomous development and need user input or external factors to resolve.
-
-## Currently Blocked
-
-### 1. Claude Data Folder Indexing Verification
-**Date:** 2025-12-08
-**What:** Cannot verify if folder is indexed: `/Users/kablerecord/Desktop/Personal Brand/AI GPT/Export data/Claude/Claude Data Dec 1 2025`
-**Status:** Database is now online, can verify indexing
-**Resolution:** Run:
-```bash
-# Check if Claude exports are indexed
-cd /Users/kablerecord/Desktop/oscar-app
-node -e "
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
-prisma.document.findMany({
-  where: { OR: [
-    { originalFilename: { contains: 'Claude' } },
-    { title: { contains: 'Claude' } },
-    { sourceType: 'chat_export' }
-  ]},
-  take: 20
-}).then(docs => {
-  console.log('Claude exports found:', docs.length);
-  docs.forEach(d => console.log('-', d.title));
-}).finally(() => prisma.\$disconnect());
-"
-```
-
-If not indexed, run:
-```bash
-npm run index-knowledge "/Users/kablerecord/Desktop/Personal Brand/AI GPT/Export data/Claude/Claude Data Dec 1 2025"
-```
+This file tracks pre-launch items and session progress.
 
 ---
 
-### 2. Production Testing (Requires User Action)
-**Date:** 2025-12-22
-**What:** The following features need to be tested in production by a user:
-**Status:** NEEDS USER TESTING
+## Pre-Launch Status (Updated Dec 29, 2025)
 
-**Document Upload Test:**
-1. Go to https://app.osqr.app/vault
-2. Upload a test PDF/DOCX/TXT file
-3. Verify it shows up in the vault with summary
-4. Ask OSQR a question about the document content
+### ✅ RESOLVED Items
 
-**Complex Question with Context Test:**
-1. Upload at least one document to the vault
-2. Ask a question that requires context from the vault
-3. Verify the answer references the document content
+| Item | Status | Notes |
+|------|--------|-------|
+| Claude Data Indexing | ✅ Done | 20+ Claude files indexed including conversations.json, memories.json, projects.json |
+| Referral System | ✅ Done | 5% permanent bonus per referral, 50% cap. See `lib/referrals/service.ts` |
+| Markdown in Responses | ✅ Done | Conversational style enforced in GKVI coaching section |
+| Refine Fire Suggestions | ✅ Done | Disabled by default (opt-in only) |
+| Mobile Response Time | ✅ Done | Depth-Aware Intelligence provides caching |
 
-**Stripe Payment Links Test:**
-1. Go to https://app.osqr.app/pricing
-2. Click "Get Pro" or "Get Master" button
-3. Verify it redirects to a valid Stripe checkout page
-4. (Optional) Toggle to yearly and test yearly links
+### 📋 AI Provider Billing (see ROADMAP.md for checklist)
 
-**Note:** These tests require authentication and cannot be automated without login credentials.
+Go to ROADMAP.md > Pre-Launch Checklist for billing console links and alert thresholds.
+
+### 🔮 Future Features (Not Blocking Launch)
+
+**Intelligent Routing Classifier (V2.0)**
+- **Current state:** Pattern-based routing in `lib/ai/model-router.ts` - 9 question types, complexity estimation, auto-routing
+- **Future enhancement:** ML-trained classifier based on user feedback and chat history
+- **Blocked on:** Chat history analysis infrastructure, user feedback collection at scale
+- **Reference:** The model router is already highly functional; ML version is optimization, not requirement
+
+---
+
+## Session Summary: Dec 29, 2025 - Secretary Checklist Completion
+
+### COMPLETED THIS SESSION
+
+1. **Secretary Checklist - All 12 Categories** ✅
+   - Extended from MVP (4 categories) to full implementation (12 categories)
+   - Added 8 new detection categories:
+     - Contradiction, Open question, People waiting, Recurring pattern
+     - Stale decision, Context decay, Unfinished work, Pattern break
+   - Fixed regex patterns for edge cases (apostrophes, flexible matching)
+   - Created comprehensive test suite: **65 tests, all passing**
+   - Updated documentation in ROADMAP.md and build doc
+
+2. **Type Error Fix in OSCARBubble.tsx** ✅
+   - Fixed `getInsightFollowUp()` to use insight types (next_step, clarify, recall, contradiction) instead of secretary categories
+
+3. **Test Suite Created** ✅
+   - Location: `lib/til/__tests__/secretary-checklist.test.ts`
+   - 65 unit tests covering all 12 detection categories
+   - Tests for false positive filtering, priority assignments, confidence scores
+
+### Files Modified This Session
+- `packages/app-web/lib/til/secretary-checklist.ts` - All 12 detectors + pattern fixes
+- `packages/app-web/lib/til/__tests__/secretary-checklist.test.ts` - NEW: 65 tests
+- `packages/app-web/components/oscar/OSCARBubble.tsx` - Type fix
+- `docs/builds/INSIGHTS_SECRETARY_BUILD.md` - Updated to "FULLY COMPLETE"
+- `ROADMAP.md` - Updated Secretary Checklist section
+
+---
+
+## Session Summary: Autonomous Dev Session (Dec 28, 2025)
+
+### COMPLETED (Implemented & Ready to Test)
+
+1. **Access Code Expiration** - Added `expiresAt` field to AccessCode model and validation
+2. **Password Visibility Toggle** - Added eye icon to login page
+3. **Stop Button for Chat** - Added AbortController support + Stop button in UI
+4. **5-Dot Spinning Animation** - Changed 3-dot bounce to 5-dot expanding/spinning ring
+5. **Feedback Button Fixed** - Added TooltipProvider wrapper to fix tooltip error
+
+### ANALYSIS COMPLETED
+
+1. **Response Time Bottlenecks:**
+   - Main bottleneck is context assembly for complex questions
+   - Fast path exists for simple questions (complexity <= 2)
+   - Cross-session memory, TIL, UIP all add to context time
+comment:what about having some things pre loaded? we actually built this at one time but maybe we aren't using it. Look to see if there is a pre loaded set of questions that looks at the user's vault.
+2. **Chat History Access:**
+   - Cross-session memory IS implemented (`lib/oscar/cross-session-memory.ts`)
+   - Saves conversation summaries after 3+ messages
+   - Loads key facts (name, projects, goals, challenges) into context
+   - If user feels OSQR doesn't remember, might need more explicit recall
+comment: I asked it a question about my vault, then asked a follow up question and it had no idea what the previous question was
+3. **Document Understanding:**
+   - Vault documents ARE included in context via `assembleContext()`
+   - Uses `smartSearch()` with vector similarity
+   - Default: 5 knowledge chunks per query
+   - If not working, check if documents are properly indexed
+comment: how can I test it?
+4. **Badge System:**
+   - Located: `lib/badges/config.ts`
+   - Only "First Steps" badge is active
+   - 5 more badges defined but commented out (streaks, questions-100, vault-indexed)
+comment: let's enable the so I can see what it looks like
+5. **n8n Usage:**
+   - Not currently integrated into the app
+   - 23 files in `/docs/research/` contain n8n educational content
+   - Researched for future workflow automation
+COmment: ok, then we don't need n8n?
+6. **GPKV Contents:**
+   - Spec in `docs/architecture/GPKV_SPECIFICATION.md`
+   - V2.0 feature for collective learning
+   - Will contain: error→solution mappings, framework conventions, Oscar self-improvement
+Comment: from my understanding gpkv is essentially osqr's files correct? some, like the constitution, are "findable" and others are not
+7. **TIL (Temporal Intelligence Layer):**
+   - Session tracking, pattern detection, insights generation
+   - Secretary checklist with 12 detection categories
+   - Cognitive profiler tracks 50+ behavioral dimensions
+comment: is there anything we could do but are not? is there anything in the build docuents that uses til but we did not set up yet?
+8. **Pricing/Tiers:**
+   - 3 tiers: Lite ($19), Pro ($99), Master ($249)
+   - Token-based billing (500K, 2.5M, 12.5M tokens/month)
+   - Lite hidden until 500 paid users
+This needs an overhaul. I want to really analyze the features that we have and how they are divided between pro and max. 
+9. **"See Another AI" Feature:**
+   - Shows button on Quick mode responses
+   - Calls `/api/oscar/alt-opinion` endpoint
+   - Gets second opinion from Claude, GPT-4, or GPT-4o
+   - Shows comparison (agreements/disagreements)
+Needs testing then so I can see how I like it and what benefit it has
+10. **Vault Privacy Button:**
+    - Already exists at lines 92-98 in VaultPageClient.tsx
+    - Links to `/settings#privacy`
+
+---
+
+## Production Testing
+
+| Test | Status | Notes |
+|------|--------|-------|
+| Document Upload | ✅ Done | 1200+ documents uploaded |
+| Vault Context in Responses | ⬜ Verify | Ask OSQR about vault content, confirm it references docs |
+| Stripe Payment Links | ⬜ Verify | Click pricing buttons, confirm Stripe checkout works |
 
 ---
 

@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react'
 import { Sidebar } from './Sidebar'
-import { TopBar } from './TopBar'
+import { TopBar, type UserBadge } from './TopBar'
 import { RightPanelBar, type HighlightTarget } from './RightPanelBar'
 import { useFocusMode } from '@/components/focus/FocusModeContext'
 import { PanelLeftOpen, PanelRightOpen } from 'lucide-react'
+import { getActiveBadge } from '@/lib/badges/config'
 
 const SIDEBAR_COLLAPSED_KEY = 'osqr_sidebar_collapsed'
 
@@ -36,6 +37,7 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
   const [rightPanelOpen, setRightPanelOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+  const [activeBadge, setActiveBadge] = useState<UserBadge | null>(null)
   const { focusMode } = useFocusMode()
 
   // Track window size for responsive grid
@@ -56,6 +58,28 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
         setSidebarCollapsed(true)
       }
     }
+  }, [])
+
+  // Fetch user stats and calculate active badge
+  useEffect(() => {
+    async function fetchBadge() {
+      try {
+        const response = await fetch('/api/settings/stats')
+        if (response.ok) {
+          const stats = await response.json()
+          const badge = getActiveBadge({
+            totalQuestions: stats.totalQuestions,
+            streak: stats.streak,
+            profileComplete: stats.profileComplete,
+            documentsIndexed: stats.documentsIndexed,
+          })
+          setActiveBadge(badge)
+        }
+      } catch (error) {
+        console.error('Failed to fetch badge stats:', error)
+      }
+    }
+    fetchBadge()
   }, [])
 
   const toggleSidebarCollapsed = () => {
@@ -104,6 +128,7 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
         <TopBar
           user={user}
           onMenuClick={() => setSidebarOpen(true)}
+          activeBadge={activeBadge}
           pageTitle={pageTitle}
           pageDescription={pageDescription}
           sidebarCollapsed={sidebarCollapsed}

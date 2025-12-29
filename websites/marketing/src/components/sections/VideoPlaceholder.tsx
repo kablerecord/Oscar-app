@@ -77,14 +77,14 @@ export function VideoPlaceholder() {
 
             {/* CTA */}
             <p className="text-slate-400 text-sm max-w-md text-center mb-4">
-              Experience OSQR for yourself. Start your free trial today.
+              Experience OSQR for yourself. 90-day money-back guarantee.
             </p>
 
             <a
               href="https://app.osqr.app/signup"
               className="inline-flex items-center justify-center rounded-lg bg-blue-500 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/25 hover:bg-blue-600 transition-all"
             >
-              Get Started Free
+              Get Started
             </a>
           </div>
         </div>
