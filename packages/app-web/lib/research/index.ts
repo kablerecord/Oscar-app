@@ -1,16 +1,25 @@
 /**
  * Deep Research System
  *
+ * ⚠️ FUTURE SCAFFOLDING - NOT YET IMPLEMENTED ⚠️
+ *
+ * This is the backend for the SUPREME COURT BUTTON feature (v2.0+).
+ * The greyed-out button in the panel UI will trigger this system when
+ * a user "earns" access through sophisticated usage patterns.
+ *
+ * See: docs/features/SUPREME-COURT-BUTTON.md for the full vision.
+ *
  * Transforms OSQR from conversational assistant into compounding intelligence layer.
  * Research becomes permanent assets in PKV, indexed and cross-referenced.
  *
  * @see docs/features/OSQR_DEEP_RESEARCH_SPEC.md
+ * @see docs/features/SUPREME-COURT-BUTTON.md
  *
  * Module Structure:
  * - types.ts           - TypeScript interfaces
  * - templates/         - Research template definitions
- * - tribunal/          - Tribunal mode orchestration
- * - background/        - Background execution system
+ * - tribunal/          - Tribunal mode orchestration (adversarial AI deliberation)
+ * - background/        - Background execution system (overnight research)
  * - storage/           - PKV integration for research outputs
  */
 
