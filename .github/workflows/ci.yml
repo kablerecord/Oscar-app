@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build @osqr/shared
+        run: pnpm --filter @osqr/shared build
+
       - name: Build @osqr/core
         run: pnpm build:core
 
@@ -78,6 +81,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Build @osqr/shared
+        run: pnpm --filter @osqr/shared build
 
       - name: Build @osqr/core
         run: pnpm build:core
