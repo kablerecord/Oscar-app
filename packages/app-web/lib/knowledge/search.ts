@@ -31,7 +31,6 @@ function isOSQRSystemQuery(query: string): boolean {
   const systemPatterns = [
     // OSQR core concepts
     /osqr/i,
-    /jarvis/i,
     /roadmap/i,
     /architecture/i,
     /how does.*work/i,

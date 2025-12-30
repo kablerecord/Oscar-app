@@ -1,8 +1,17 @@
 # OSQR Pricing Specification
 
-**Version:** 1.0  
-**Date:** December 2024  
-**Status:** Ready for Implementation
+> **⚠️ DEPRECATED (December 2024)**
+>
+> This document contains outdated pricing information. The source of truth for current pricing is:
+> - **Live pricing page**: https://www.osqr.app/pricing
+> - **Code**: `packages/shared/src/tiers/config.ts` (shared across app + marketing)
+>
+> **Current tiers**: Pro ($99), Master ($249), Enterprise (custom)
+> **Lite tier**: Planned for future, not currently active
+
+**Version:** 1.0
+**Date:** December 2024
+**Status:** DEPRECATED - See code for current pricing
 
 ---
 

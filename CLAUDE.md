@@ -41,7 +41,7 @@ oscar-app/                    # Root of the monorepo
 ├── packages/
 │   ├── app-web/             # @osqr/app-web - The main Next.js app
 │   ├── core/                # @osqr/core - The OSQR brain/engine
-│   └── shared/              # Shared utilities (future use)
+│   └── shared/              # @osqr/shared - Shared config (pricing, types)
 ├── websites/
 │   └── marketing/           # @osqr/marketing - Marketing site (osqr.ai)
 ├── docs/                    # Documentation
@@ -52,9 +52,20 @@ oscar-app/                    # Root of the monorepo
 
 ---
 
-## The Three Packages in oscar-app
+## The Four Packages in oscar-app
 
-### 1. `packages/app-web` (@osqr/app-web)
+### 1. `packages/shared` (@osqr/shared)
+**Single source of truth for pricing and shared config.**
+
+- **Tech:** TypeScript
+- **Contains:**
+  - `src/tiers/config.ts` - **Pricing tier definitions (THE SOURCE OF TRUTH)**
+  - Helper functions: `getTierConfig`, `hasFeature`, `getLimit`, etc.
+  - Type exports: `TierName`, `TierConfig`, `TierLimits`
+
+**Imported by:** Both `@osqr/app-web` and `@osqr/marketing` import pricing from here.
+
+### 2. `packages/app-web` (@osqr/app-web)
 **What users interact with.** The main OSQR application.
 
 - **Tech:** Next.js 16, React 19, Prisma, NextAuth
@@ -67,11 +78,11 @@ oscar-app/                    # Root of the monorepo
   - `/prisma` - Database schema
 
 **Key files:**
-- `lib/tiers/config.ts` - Pricing tier definitions (source of truth)
+- `lib/tiers/config.ts` - Re-exports from `@osqr/shared` + adds Stripe IDs
 - `lib/ai/` - AI provider integrations
 - `app/api/` - API endpoints
 
-### 2. `packages/core` (@osqr/core)
+### 3. `packages/core` (@osqr/core)
 **The OSQR brain.** Constitutional AI, governance, and core reasoning.
 
 - **Tech:** TypeScript, compiled to dist/
@@ -83,13 +94,14 @@ oscar-app/                    # Root of the monorepo
 
 **Imported by:** `@osqr/app-web` uses `@osqr/core` for AI governance
 
-### 3. `websites/marketing` (@osqr/marketing)
+### 4. `websites/marketing` (@osqr/marketing)
 **The marketing website.** Public-facing site at osqr.ai.
 
 - **Tech:** Next.js 16, React 19
 - **Port:** 3000 (dev)
 - **URL:** osqr.ai (production)
 - **Migrated from:** `osqr-website/` (legacy)
+- **Pricing:** Imports from `@osqr/shared` - no hardcoded prices
 
 ---
 
@@ -144,15 +156,23 @@ pnpm --filter @osqr/marketing dev
 
 ## Pricing (Current State)
 
-**Source of truth:** `packages/app-web/lib/tiers/config.ts`
+**Source of truth:** `packages/shared/src/tiers/config.ts` (@osqr/shared)
+**Live page:** https://www.osqr.app/pricing
 
 | Tier | Monthly | Yearly | Future Price | Status |
 |------|---------|--------|--------------|--------|
-| Lite | $19 | N/A | $29 | Hidden until 500 paid users |
+| Lite | $29 | N/A | $49 | Hidden until 500 paid users |
 | Pro | $99 | $948 ($79/mo) | $149 | Active |
 | Master | $249 | $2,388 ($199/mo) | $349 | Active |
+| Enterprise | Custom | Custom | Custom | Active |
 
 **Founder pricing:** First 500 paid users lock in current rates forever.
+
+**User-facing features (no confusing metrics):**
+- Pro: 500 docs, 10GB, Thoughtful/Contemplate modes, Voice, Image, VS Code, Cross-device
+- Master: Everything in Pro + Council Mode, 1,500 docs, 100GB, Priority, Weekly reviews
+
+**To update pricing:** Edit `packages/shared/src/tiers/config.ts` only. Both app-web and marketing import from there.
 
 ---
 
@@ -181,7 +201,7 @@ pnpm --filter @osqr/marketing dev
 | Question | Answer |
 |----------|--------|
 | Where's the active code? | `oscar-app/` (this repo) |
-| Where's the pricing logic? | `packages/app-web/lib/tiers/config.ts` |
+| Where's the pricing config? | `packages/shared/src/tiers/config.ts` (source of truth) |
 | Where's the pricing UI? | `packages/app-web/app/pricing/page.tsx` and `websites/marketing/src/app/pricing/page.tsx` |
 | Where's the AI code? | `packages/app-web/lib/ai/` |
 | Where's the database schema? | `packages/app-web/prisma/schema.prisma` |
@@ -206,7 +226,7 @@ pnpm --filter @osqr/marketing dev
 
 1. **Always work in `oscar-app/`** - This is the active codebase
 2. **Reference `osqr/` for specs** - But implement in `packages/core/`
-3. **Keep pricing in sync** - Both `app-web` and `marketing` have pricing pages
+3. **Update pricing in `@osqr/shared` only** - Never hardcode prices in app-web or marketing
 4. **Use pnpm** - Not npm or yarn (monorepo requirement)
 
 ---

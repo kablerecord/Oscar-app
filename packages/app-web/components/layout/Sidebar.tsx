@@ -24,6 +24,7 @@ import {
   History,
   PanelLeftClose,
   PanelLeftOpen,
+  FlaskConical,
 } from 'lucide-react'
 import {
   DropdownMenu,
@@ -66,6 +67,13 @@ const navigation = [
     href: '/vault',
     icon: Database,
     description: 'Browse your indexed documents',
+  },
+  {
+    name: 'Oscar Lab',
+    href: '/lab',
+    icon: FlaskConical,
+    description: 'Help improve Oscar with feedback',
+    isNew: true,
   },
   {
     name: 'Settings',
@@ -347,13 +355,14 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
             {navigation.map((item) => {
               const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
               const Icon = item.icon
-              const iconColor = item.name === 'Panel' ? 'text-cyan-400' : item.name === 'Memory Vault' ? 'text-purple-400' : 'text-slate-400'
+              const iconColor = item.name === 'Panel' ? 'text-cyan-400' : item.name === 'Memory Vault' ? 'text-purple-400' : item.name === 'Oscar Lab' ? 'text-emerald-400' : 'text-slate-400'
+              const isNew = 'isNew' in item && item.isNew
 
               return (
                 <div key={item.name} className="relative group">
                   <Link
                     href={item.href}
-                    data-highlight-id={item.name === 'Memory Vault' ? 'vault-link' : undefined}
+                    data-highlight-id={item.name === 'Memory Vault' ? 'vault-link' : item.name === 'Oscar Lab' ? 'lab-link' : undefined}
                     className={cn(
                       'flex h-10 w-10 items-center justify-center rounded-xl transition-all',
                       isActive
@@ -361,7 +370,10 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
                         : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                     )}
                   >
-                    <Icon className="h-5 w-5" />
+                    <Icon className={cn("h-5 w-5", item.name === 'Oscar Lab' && !isActive && "text-emerald-400")} />
+                    {isNew && (
+                      <span className="absolute -top-1 -right-1 h-2 w-2 bg-emerald-500 rounded-full ring-2 ring-slate-900" />
+                    )}
                   </Link>
                   {/* Tooltip */}
                   <div className="absolute left-full ml-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
@@ -369,6 +381,11 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
                       <div className="flex items-center gap-2 mb-1">
                         <Icon className={cn('h-3.5 w-3.5', iconColor)} />
                         <span className="text-sm font-semibold text-white">{item.name}</span>
+                        {isNew && (
+                          <span className="px-1 py-0.5 text-[9px] font-semibold bg-emerald-500/20 text-emerald-400 rounded-full">
+                            New
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-400">{item.description}</p>
                     </div>
@@ -481,12 +498,13 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
           {navigation.map((item) => {
             const isActive = pathname === item.href || pathname?.startsWith(item.href + '/')
             const Icon = item.icon
+            const isNew = 'isNew' in item && item.isNew
 
             return (
               <Link
                 key={item.name}
                 href={item.href}
-                data-highlight-id={item.name === 'Memory Vault' ? 'vault-link' : undefined}
+                data-highlight-id={item.name === 'Memory Vault' ? 'vault-link' : item.name === 'Oscar Lab' ? 'lab-link' : undefined}
                 className={cn(
                   'group flex items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                   isActive
@@ -497,9 +515,14 @@ export function Sidebar({ workspaceId, onClose, isCollapsed = false, onToggleCol
               >
                 <Icon className={cn(
                   "mr-3 h-5 w-5 flex-shrink-0 transition-colors",
-                  isActive ? "text-blue-400" : "text-slate-500 group-hover:text-slate-300"
+                  isActive ? "text-blue-400" : item.name === 'Oscar Lab' ? "text-emerald-400" : "text-slate-500 group-hover:text-slate-300"
                 )} />
                 {item.name}
+                {isNew && (
+                  <span className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 rounded-full ring-1 ring-emerald-500/30">
+                    New
+                  </span>
+                )}
               </Link>
             )
           })}

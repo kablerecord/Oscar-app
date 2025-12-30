@@ -4,23 +4,30 @@ import { useState } from 'react'
 import { Brain, ChevronDown, ChevronUp, Users, Check, AlertTriangle, Sparkles, Loader2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 
-// Model avatars/colors for visual distinction
+// Model avatars/colors for visual distinction - brand appropriate
 const MODEL_STYLES: Record<string, { color: string; bgColor: string; icon: string }> = {
-  // Anthropic
-  'claude-sonnet-4-20250514': { color: 'text-orange-400', bgColor: 'bg-orange-500/10', icon: '🧠' },
-  'claude-3-5-sonnet-20241022': { color: 'text-orange-400', bgColor: 'bg-orange-500/10', icon: '🧠' },
-  'claude-3-5-haiku-20241022': { color: 'text-orange-300', bgColor: 'bg-orange-500/10', icon: '⚡' },
-  // OpenAI
-  'gpt-4o': { color: 'text-green-400', bgColor: 'bg-green-500/10', icon: '🤖' },
-  'gpt-4o-mini': { color: 'text-green-300', bgColor: 'bg-green-500/10', icon: '🔹' },
-  'gpt-4.1': { color: 'text-green-400', bgColor: 'bg-green-500/10', icon: '🤖' },
-  // Google
-  'gemini-2.0-flash-exp': { color: 'text-blue-400', bgColor: 'bg-blue-500/10', icon: '💎' },
-  'gemini-1.5-pro': { color: 'text-blue-400', bgColor: 'bg-blue-500/10', icon: '💎' },
-  // xAI
-  'grok-2-latest': { color: 'text-purple-400', bgColor: 'bg-purple-500/10', icon: '🚀' },
+  // Anthropic Claude - Orange brand color, "A" for Anthropic
+  'claude-sonnet-4-20250514': { color: 'text-[#D97706]', bgColor: 'bg-[#D97706]/10', icon: 'A' },
+  'claude-3-5-sonnet-20241022': { color: 'text-[#D97706]', bgColor: 'bg-[#D97706]/10', icon: 'A' },
+  'claude-3-5-haiku-20241022': { color: 'text-[#D97706]', bgColor: 'bg-[#D97706]/10', icon: 'A' },
+  'claude': { color: 'text-[#D97706]', bgColor: 'bg-[#D97706]/10', icon: 'A' },
+  // OpenAI GPT - Green/Teal brand color
+  'gpt-4o': { color: 'text-[#10A37F]', bgColor: 'bg-[#10A37F]/10', icon: '◎' },
+  'gpt-4o-mini': { color: 'text-[#10A37F]', bgColor: 'bg-[#10A37F]/10', icon: '◎' },
+  'gpt-4.1': { color: 'text-[#10A37F]', bgColor: 'bg-[#10A37F]/10', icon: '◎' },
+  'gpt4': { color: 'text-[#10A37F]', bgColor: 'bg-[#10A37F]/10', icon: '◎' },
+  // Google Gemini - Blue brand color
+  'gemini-2.0-flash-exp': { color: 'text-[#4285F4]', bgColor: 'bg-[#4285F4]/10', icon: '✦' },
+  'gemini-1.5-pro': { color: 'text-[#4285F4]', bgColor: 'bg-[#4285F4]/10', icon: '✦' },
+  'gemini': { color: 'text-[#4285F4]', bgColor: 'bg-[#4285F4]/10', icon: '✦' },
+  // xAI Grok
+  'grok-2-latest': { color: 'text-slate-300', bgColor: 'bg-slate-500/10', icon: '𝕏' },
+  // Meta Llama - Purple brand color
+  'llama-3.3-70b-versatile': { color: 'text-[#7C3AED]', bgColor: 'bg-[#7C3AED]/10', icon: '🦙' },
+  'llama-3.1-8b-instant': { color: 'text-[#7C3AED]', bgColor: 'bg-[#7C3AED]/10', icon: '🦙' },
+  'groq': { color: 'text-[#7C3AED]', bgColor: 'bg-[#7C3AED]/10', icon: '🦙' },
   // Default
-  default: { color: 'text-slate-400', bgColor: 'bg-slate-500/10', icon: '🤖' },
+  default: { color: 'text-slate-400', bgColor: 'bg-slate-500/10', icon: '?' },
 }
 
 function getModelStyle(modelId: string) {
@@ -29,6 +36,7 @@ function getModelStyle(modelId: string) {
 
 function getModelDisplayName(modelId: string): string {
   const names: Record<string, string> = {
+    // Full model IDs
     'claude-sonnet-4-20250514': 'Claude Sonnet 4',
     'claude-3-5-sonnet-20241022': 'Claude 3.5 Sonnet',
     'claude-3-5-haiku-20241022': 'Claude Haiku',
@@ -38,6 +46,13 @@ function getModelDisplayName(modelId: string): string {
     'gemini-2.0-flash-exp': 'Gemini 2.0 Flash',
     'gemini-1.5-pro': 'Gemini 1.5 Pro',
     'grok-2-latest': 'Grok 2',
+    'llama-3.3-70b-versatile': 'Llama 3.3 70B',
+    'llama-3.1-8b-instant': 'Llama 3.1 8B',
+    // Short IDs from council mode
+    'claude': 'Claude',
+    'gpt4': 'GPT-4o',
+    'gemini': 'Gemini',
+    'groq': 'Llama 3.3',
   }
   return names[modelId] || modelId
 }
@@ -50,6 +65,8 @@ export interface PanelMemberResponse {
   content: string
   isLoading?: boolean
   error?: string
+  confidence?: number // 0-1 scale from council mode
+  reasoning?: string // Model's reasoning chain from council mode
 }
 
 export interface CouncilSynthesis {
@@ -109,7 +126,7 @@ export function CouncilPanel({
       </div>
 
       {/* Initial Responses Grid */}
-      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
         {responses.map((response, idx) => {
           const style = getModelStyle(response.modelId)
           const isExpanded = expandedAgent === response.agentId
@@ -277,13 +294,15 @@ export function CouncilBadge({
   modelCount: number
   onClick?: () => void
 }) {
+  // Use span instead of button to avoid nested button issues when used inside clickable containers
+  const Component = onClick ? 'button' : 'span'
   return (
-    <button
+    <Component
       onClick={onClick}
       className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-purple-500/10 ring-1 ring-purple-500/20 text-xs text-purple-400 hover:bg-purple-500/20 transition-colors"
     >
       <Users className="h-3 w-3" />
       <span>{modelCount} models</span>
-    </button>
+    </Component>
   )
 }

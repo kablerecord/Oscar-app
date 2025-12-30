@@ -69,22 +69,14 @@ export function Hero() {
 
       <div className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center">
-          {/* Badge */}
-          <div className="inline-flex items-center rounded-full bg-blue-500/10 px-4 py-1.5 text-sm font-medium text-blue-400 ring-1 ring-inset ring-blue-500/20 mb-8">
-            <span className="mr-2">🧠</span>
-            Your AI Operating System for Capability
-          </div>
-
           {/* Main headline */}
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-white mb-6">
-            Stop Asking AI Questions.
-            <br />
-            <span className="gradient-text">Start Asking Better Ones.</span>
+            <span className="gradient-text">I multiply what you can do</span>
           </h1>
 
           {/* Subheadline */}
           <p className="mx-auto max-w-2xl text-lg sm:text-xl text-slate-400 mb-10">
-            OSQR is the AI operating system that helps you <span className="text-white font-medium">think sharper</span>, <span className="text-white font-medium">decide faster</span>, and <span className="text-white font-medium">build capability</span> that compounds. Multiple AI models. One synthesized answer. Your personal knowledge vault.
+            I&apos;m Oscar. I synthesize insights across multiple AI models to amplify your thinking—not replace it. You bring direction, I multiply momentum.
           </p>
 
           {/* CTA Buttons */}
@@ -92,7 +84,7 @@ export function Hero() {
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
               <a href={`${APP_URL}/signup`}>
                 <Button size="lg" className="w-full sm:w-auto px-8">
-                  Get Started
+                  Meet Oscar
                 </Button>
               </a>
               <button

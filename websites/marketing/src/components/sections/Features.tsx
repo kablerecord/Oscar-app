@@ -3,9 +3,9 @@ import Link from 'next/link'
 const features = [
   {
     icon: '⚡',
-    title: 'Multi-Model Intelligence Engine',
-    description: "OSQR doesn't rely on one AI. It routes your question through a curated panel of models (Claude, GPT-4, Gemini, Grok, and more), compares their answers, and synthesizes the best response.",
-    highlight: 'Many brains. One clear answer.',
+    title: 'Multi-Model Synthesis',
+    description: "I don't ask one AI and hope it's right. For high-stakes decisions, I run your question through multiple models simultaneously—then synthesize where they agree, surface where they diverge, and arbitrate the conflicts. You get deliberation, not just a single guess.",
+    highlight: 'Deliberation, not guesswork.',
   },
   {
     icon: '🎛',

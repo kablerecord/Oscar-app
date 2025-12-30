@@ -21,6 +21,7 @@ export type ArtifactType =
   | 'JSON'           // Structured JSON data
   | 'CSV'            // Tabular data
   | 'REACT'          // React component (preview in sandbox)
+  | 'RESEARCH'       // Deep research report
 
 export interface Artifact {
   id: string

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Info, Check, RotateCcw, Zap, Brain, GraduationCap } from 'lucide-react'
+import { X, Info, Check, RotateCcw, Zap, Brain, GraduationCap, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -21,16 +21,18 @@ interface RoutingNotificationProps {
   className?: string
 }
 
-const MODE_ICONS = {
+const MODE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   quick: Zap,
   thoughtful: Brain,
   contemplate: GraduationCap,
+  council: Users,
 }
 
-const MODE_LABELS = {
+const MODE_LABELS: Record<string, string> = {
   quick: 'Quick',
   thoughtful: 'Thoughtful',
   contemplate: 'Contemplate',
+  council: 'Council',
 }
 
 export function RoutingNotification({
@@ -76,8 +78,8 @@ export function RoutingNotification({
     return null
   }
 
-  const RequestedIcon = MODE_ICONS[routing.requestedMode]
-  const EffectiveIcon = MODE_ICONS[routing.effectiveMode]
+  const RequestedIcon = MODE_ICONS[routing.requestedMode] || Zap
+  const EffectiveIcon = MODE_ICONS[routing.effectiveMode] || Zap
   const wasDowngraded = routing.requestedMode !== 'quick' && routing.effectiveMode === 'quick'
   const wasUpgraded = routing.requestedMode === 'quick' && routing.effectiveMode !== 'quick'
 

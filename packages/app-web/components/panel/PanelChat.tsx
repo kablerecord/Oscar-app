@@ -17,7 +17,7 @@ export function PanelChat({ agents, workspaceId }: PanelChatProps) {
   const [selectedAgents, setSelectedAgents] = useState<Set<string>>(
     new Set(agents.map((a) => a.id))
   )
-  const [useRag, setUseRag] = useState(false)
+  const [useRag, setUseRag] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [responses, setResponses] = useState<AgentResponse[]>([])
   const [showRoundtable, setShowRoundtable] = useState(false)

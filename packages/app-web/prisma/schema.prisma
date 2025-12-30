@@ -43,6 +43,7 @@ model User {
   artifacts            Artifact[]
   referralsMade        Referral[]              @relation("ReferralsMade")
   referralsReceived    Referral[]              @relation("ReferralsReceived")
+  labMember            LabMember?
 
   @@index([email])
   @@index([referralCode])
@@ -133,8 +134,11 @@ model ChatThread {
   projectId   String?
   title       String
   mode        String        @default("panel")
+  status      String        @default("active")  // "active" | "ended" | "archived"
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+  endedAt     DateTime?                         // When conversation ended (for Learning Layer)
+  metadata    Json?                             // Additional metadata (import info, etc.)
   messages    ChatMessage[]
   project     Project?      @relation(fields: [projectId], references: [id])
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
@@ -142,6 +146,7 @@ model ChatThread {
   @@index([workspaceId])
   @@index([projectId])
   @@index([updatedAt])
+  @@index([status])
 }
 
 model ChatMessage {
@@ -155,6 +160,7 @@ model ChatMessage {
   createdAt DateTime   @default(now())
   agent     Agent?     @relation(fields: [agentId], references: [id])
   thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  quickReactions QuickReaction[]
 
   @@index([threadId])
   @@index([agentId])
@@ -1009,6 +1015,32 @@ enum FeedbackSource {
 }
 
 // ============================================
+// Testimonial System
+// ============================================
+// User-submitted testimonials for marketing website
+
+model Testimonial {
+  id          String            @id @default(cuid())
+  userId      String
+  content     String            @db.Text  // The testimonial quote
+  displayName String?           // How user wants to be attributed (optional)
+  role        String?           // e.g., "Startup Founder" (optional)
+  status      TestimonialStatus @default(PENDING)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum TestimonialStatus {
+  PENDING   // Awaiting review
+  APPROVED  // Ready for website
+  REJECTED  // Not suitable
+}
+
+// ============================================
 // Referral System (V1.5)
 // ============================================
 // Permanent 5% token bonus per successful referral (capped at 50%)
@@ -1177,4 +1209,276 @@ enum InvalidationTrigger {
   SEMANTIC_CONFLICT   // New info contradicts cached answer
   LRU_EVICTION        // Evicted due to cache size limits
   MANUAL              // Admin invalidation
+}
+
+// ============================================
+// OSCAR LAB - STRUCTURED FEEDBACK SYSTEM
+// ============================================
+
+// Lab membership and engagement tracking
+model LabMember {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Engagement level
+  tier            LabTier  @default(EXPLORER)
+  joinedAt        DateTime @default(now())
+
+  // Progress tracking
+  challengesCompleted  Int @default(0)
+  feedbackScore        Int @default(0)
+  streakDays           Int @default(0)
+  lastActiveAt         DateTime?
+
+  // Preferences
+  weeklyDigest         Boolean @default(true)
+  challengeReminders   Boolean @default(true)
+
+  // Relations
+  challengeResponses   ChallengeResponse[]
+  deepDiveResponses    DeepDiveResponse[]
+  quickReactions       QuickReaction[]
+
+  @@index([tier])
+  @@index([feedbackScore])
+}
+
+enum LabTier {
+  EXPLORER
+  CONTRIBUTOR
+  INSIDER
+}
+
+// Quick inline reactions (Tier 1)
+model QuickReaction {
+  id              String   @id @default(cuid())
+
+  labMemberId     String
+  labMember       LabMember @relation(fields: [labMemberId], references: [id], onDelete: Cascade)
+
+  // What they're reacting to
+  messageId       String?
+  message         ChatMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  threadId        String?
+
+  // The reaction
+  reaction        ReactionType
+  category        FeedbackCategory?
+  comment         String?  @db.Text
+
+  // Context capture
+  responseMode    String?
+  modelUsed       String?
+  hadPanelDiscussion Boolean @default(false)
+  retrievalUsed   Boolean @default(false)
+
+  createdAt       DateTime @default(now())
+
+  @@index([labMemberId])
+  @@index([reaction])
+  @@index([category])
+  @@index([createdAt])
+}
+
+enum ReactionType {
+  THUMBS_UP
+  THUMBS_DOWN
+  MISSED_SOMETHING
+  UNEXPECTED_GOOD
+  WRONG_MODE
+}
+
+enum FeedbackCategory {
+  INTENT_UNDERSTANDING
+  RESPONSE_QUALITY
+  MODE_CALIBRATION
+  KNOWLEDGE_RETRIEVAL
+  PERSONALIZATION
+  CAPABILITY_GAP
+}
+
+// Guided challenges (Tier 2)
+model Challenge {
+  id              String   @id @default(cuid())
+
+  // Challenge definition
+  title           String
+  description     String   @db.Text
+  category        FeedbackCategory
+
+  // The task
+  promptToTry     String?  @db.Text
+  compareMode     Boolean  @default(false)
+  modesCompare    String[]
+
+  // Questions to answer after
+  questions       Json     // Array of ChallengeQuestion objects
+
+  // Targeting
+  targetTier      LabTier?
+  targetModes     String[]
+  prerequisiteId  String?
+
+  // Lifecycle
+  status          ChallengeStatus @default(DRAFT)
+  publishedAt     DateTime?
+  expiresAt       DateTime?
+
+  // Metadata
+  estimatedMinutes Int @default(5)
+  pointsReward     Int @default(10)
+
+  // Relations
+  responses       ChallengeResponse[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([status])
+  @@index([category])
+  @@index([publishedAt])
+}
+
+enum ChallengeStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+// User's response to a challenge
+model ChallengeResponse {
+  id              String   @id @default(cuid())
+
+  challengeId     String
+  challenge       Challenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  labMemberId     String
+  labMember       LabMember @relation(fields: [labMemberId], references: [id], onDelete: Cascade)
+
+  // Their answers
+  answers         Json
+
+  // If it was a comparison challenge
+  preferredMode   String?
+  comparisonNotes String?  @db.Text
+
+  // Context
+  threadId        String?
+  timeSpentSeconds Int?
+
+  // Quality signals
+  thoughtfulness  Int?
+  flagged         Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+
+  @@unique([challengeId, labMemberId])
+  @@index([challengeId])
+  @@index([labMemberId])
+  @@index([createdAt])
+}
+
+// Deep dive feedback forms (Tier 3)
+model DeepDiveForm {
+  id              String   @id @default(cuid())
+
+  // Form definition
+  title           String
+  description     String   @db.Text
+  category        FeedbackCategory
+
+  // Form structure
+  sections        Json     // Array of FormSection objects
+
+  // Targeting
+  targetTier      LabTier?
+  triggerAfter    String?
+
+  // Lifecycle
+  status          ChallengeStatus @default(DRAFT)
+
+  // Metadata
+  estimatedMinutes Int @default(15)
+  pointsReward     Int @default(50)
+
+  // Relations
+  responses       DeepDiveResponse[]
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+// User's response to a deep dive form
+model DeepDiveResponse {
+  id              String   @id @default(cuid())
+
+  formId          String
+  form            DeepDiveForm @relation(fields: [formId], references: [id], onDelete: Cascade)
+
+  labMemberId     String
+  labMember       LabMember @relation(fields: [labMemberId], references: [id], onDelete: Cascade)
+
+  // Their answers
+  answers         Json
+
+  // Quality
+  thoughtfulness  Int?
+  flagged         Boolean  @default(false)
+  adminNotes      String?  @db.Text
+
+  createdAt       DateTime @default(now())
+
+  @@index([formId])
+  @@index([labMemberId])
+}
+
+// Aggregated insights from feedback
+model LabInsight {
+  id              String   @id @default(cuid())
+
+  // What this insight is about
+  category        FeedbackCategory
+  subcategory     String?
+
+  // The insight
+  title           String
+  summary         String   @db.Text
+
+  // Evidence
+  sampleSize      Int
+  sentiment       Float
+  confidence      Float
+
+  // Source data
+  sourceReactions Int      @default(0)
+  sourceChallenges Int     @default(0)
+  sourceDeepDives Int      @default(0)
+
+  // Action tracking
+  status          LabInsightStatus @default(NEW)
+  actionTaken     String?  @db.Text
+  resolvedAt      DateTime?
+
+  // Time window
+  periodStart     DateTime
+  periodEnd       DateTime
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum LabInsightStatus {
+  NEW
+  REVIEWING
+  ACTIONABLE
+  IN_PROGRESS
+  RESOLVED
+  WONT_FIX
 }

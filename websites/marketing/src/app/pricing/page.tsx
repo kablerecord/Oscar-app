@@ -1,7 +1,15 @@
 'use client'
 
+/**
+ * PRICING PAGE - Marketing Website
+ *
+ * Pricing data is imported from @osqr/shared for consistency.
+ * Marketing-specific display config (tooltips, styles) stays here.
+ */
+
 import { useState } from 'react'
 import Link from 'next/link'
+import { TIERS, type TierName } from '@osqr/shared'
 
 // For local development, use localhost:3001. In production, use app.osqr.app
 const APP_URL = process.env.NODE_ENV === 'development'
@@ -16,7 +24,7 @@ interface Feature {
   tooltip?: string
 }
 
-interface Tier {
+interface MarketingTier {
   name: string
   tagline: string
   monthlyPrice: number
@@ -26,7 +34,7 @@ interface Tier {
   cta: string
   tierStyle: 'pro' | 'master'
   badge: string
-  tier: string
+  tier: TierName
   limits: {
     docs: number
     maxFile: number
@@ -35,61 +43,61 @@ interface Tier {
   }
 }
 
-const tiers: Tier[] = [
+// Marketing-specific feature display with tooltips
+// Base pricing pulled from @osqr/shared
+const tiers: MarketingTier[] = [
   {
     name: 'Pro',
-    tagline: 'Full OSQR experience with multi-model panel',
-    monthlyPrice: 99,
-    yearlyPrice: 948, // $79/month × 12 = $948 (2 months free)
-    futurePrice: 149,
+    tagline: TIERS.pro.description,
+    monthlyPrice: TIERS.pro.price,
+    yearlyPrice: TIERS.pro.yearlyPrice,
+    futurePrice: TIERS.pro.futurePrice,
     features: [
-      { text: '500 documents in vault', available: true, tooltip: 'Upload your documents, notes, and context. OSQR references your knowledge to give personalized, relevant answers.' },
-      { text: '100 queries per day', available: true, tooltip: 'More than enough for daily professional use.' },
-      { text: '30-day chat history analysis', available: true, tooltip: 'OSQR analyzes your conversation patterns to deliver increasingly personalized responses.' },
-      { text: 'Quick, Thoughtful, and Contemplate modes', available: true, tooltip: 'Quick for fast answers, Thoughtful for deeper analysis, Contemplate for complex reasoning.' },
-      { text: 'Full Personal Knowledge Vault', available: true, tooltip: 'Your complete knowledge base at OSQR\'s fingertips.' },
-      { text: 'Cross-interface continuity', available: true, tooltip: 'OSQR remembers context across sessions and interfaces.' },
-      { text: '10GB storage', available: true, tooltip: 'Plenty of room for your documents and knowledge base.' },
-      { text: '100 image analyses per month', available: true, tooltip: 'Upload and analyze images, diagrams, and screenshots.' },
+      { text: '500 documents in your Knowledge Vault', available: true, tooltip: 'Upload your documents, notes, and context. OSQR references your knowledge to give personalized, relevant answers.' },
+      { text: '10GB storage for your files', available: true, tooltip: 'Plenty of room for your documents and knowledge base.' },
+      { text: 'Full conversation history', available: true, tooltip: 'OSQR remembers everything — your context never disappears.' },
+      { text: 'Thoughtful Mode for deeper reasoning', available: true, tooltip: 'When you need more than a quick answer, Thoughtful Mode engages multi-step analysis.' },
+      { text: 'Contemplate Mode for complex problems', available: true, tooltip: 'Extended reasoning for your most challenging questions.' },
+      { text: 'Voice input', available: true, tooltip: 'Talk to OSQR naturally — no typing required.' },
+      { text: 'Image understanding', available: true, tooltip: 'Upload screenshots, diagrams, photos — OSQR sees and analyzes them.' },
+      { text: 'VS Code extension', available: true, tooltip: 'OSQR in your development environment.' },
+      { text: 'Cross-device continuity', available: true, tooltip: 'Start on phone, continue on desktop — OSQR keeps your context.' },
     ],
     cta: 'Get Pro',
     tierStyle: 'pro',
     badge: 'FOUNDER PRICING',
     tier: 'pro',
     limits: {
-      docs: 500,
-      maxFile: 25,
-      models: '2',
+      docs: TIERS.pro.limits.maxDocuments,
+      maxFile: TIERS.pro.limits.maxFileSizeMB,
+      models: String(TIERS.pro.modelCount),
       modes: '3',
     },
   },
   {
     name: 'Master',
-    tagline: 'All modes including Council for builders and power users',
-    monthlyPrice: 249,
-    yearlyPrice: 2388, // $199/mo effective
-    futurePrice: 349,
+    tagline: TIERS.master.description,
+    monthlyPrice: TIERS.master.price,
+    yearlyPrice: TIERS.master.yearlyPrice,
+    futurePrice: TIERS.master.futurePrice,
     features: [
-      { text: 'Everything in Pro', available: true, isHeader: true, tooltip: 'All Pro features included, plus the advanced capabilities below.' },
+      { text: 'Everything in Pro, plus:', available: true, isHeader: true, tooltip: 'All Pro features included, plus the advanced capabilities below.' },
+      { text: 'Council Mode', available: true, tooltip: 'Watch Claude, GPT, Gemini, and Grok debate your question live — OSQR synthesizes the best answer.' },
       { text: '1,500 documents in vault', available: true, tooltip: '3x the storage. Upload your entire knowledge base—books, research, company docs, personal notes.' },
-      { text: '300 queries per day', available: true, tooltip: 'Covers any human usage pattern.' },
-      { text: 'Unlimited chat history analysis', available: true, tooltip: 'OSQR has access to your complete conversation history.' },
-      { text: 'Council Mode (multi-model deliberation)', available: true, tooltip: 'Watch multiple AI models debate your question live, then get OSQR\'s synthesized consensus.' },
-      { text: 'Priority fast-lane processing', available: true, tooltip: 'Your requests are processed with priority.' },
       { text: '100GB storage', available: true, tooltip: 'Room for your entire professional knowledge base.' },
-      { text: 'Unlimited image analyses', available: true, tooltip: 'No monthly cap on image uploads and analysis.' },
+      { text: 'Priority processing', available: true, tooltip: 'Your requests are processed first — faster responses when it matters.' },
       { text: 'Weekly automated reviews', available: true, tooltip: 'OSQR proactively surfaces insights from your knowledge base.' },
       { text: 'Custom Agent Builder', available: true, comingSoon: true, tooltip: 'Create custom AI agents tailored to your workflows.' },
-      { text: 'VS Code Extension', available: true, comingSoon: true, tooltip: 'Access OSQR directly in your code editor for seamless development assistance.' },
+      { text: 'Early access to new features', available: true, tooltip: 'Be the first to try new OSQR capabilities.' },
     ],
     cta: 'Get Master',
     tierStyle: 'master',
     badge: 'FOUNDER PRICING',
     tier: 'master',
     limits: {
-      docs: 1500,
-      maxFile: 50,
-      models: '4+',
+      docs: TIERS.master.limits.maxDocuments,
+      maxFile: TIERS.master.limits.maxFileSizeMB,
+      models: `${TIERS.master.modelCount}+`,
       modes: 'All',
     },
   },
@@ -712,13 +720,11 @@ export default function PricingPage() {
             <ul className="space-y-3 mb-6">
               {[
                 'Everything in Master',
-                'Unlimited documents',
-                'Dedicated support',
-                'Custom model access',
+                'Unlimited documents and storage',
                 'API access for integrations',
                 'Team collaboration (coming)',
                 'SSO & advanced security',
-                '100MB max file size',
+                'Dedicated support',
               ].map((feature, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <svg className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-400" fill="currentColor" viewBox="0 0 20 20">

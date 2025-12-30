@@ -11,7 +11,7 @@ This is a mobile-first web interface that demonstrates the OSQR iOS app experien
 3. Function as a PWA for Android users to "install"
 4. Share styles/components with the main OSQR web app
 
-**The Jarvis Principle**: The phone is a microphone with a screen. The intelligence is elsewhere. Users talk or type, OSQR handles everything in the background.
+**The Core Principle**: The phone is a microphone with a screen. The intelligence is elsewhere. Users talk or type, OSQR handles everything in the background.
 
 ## Access
 

@@ -7,6 +7,7 @@ import { RightPanelBar, type HighlightTarget } from './RightPanelBar'
 import { useFocusMode } from '@/components/focus/FocusModeContext'
 import { PanelLeftOpen, PanelRightOpen } from 'lucide-react'
 import { getActiveBadge } from '@/lib/badges/config'
+import { LabPrompt } from '@/components/lab/LabPrompt'
 
 const SIDEBAR_COLLAPSED_KEY = 'osqr_sidebar_collapsed'
 
@@ -235,6 +236,9 @@ export function MainLayout({ children, user, workspaceName, workspaceId, showMSC
           <PanelRightOpen className="h-4 w-4" />
         </button>
       )}
+
+      {/* Lab prompt - shows after 5+ chats for non-members */}
+      <LabPrompt />
     </div>
   )
 }

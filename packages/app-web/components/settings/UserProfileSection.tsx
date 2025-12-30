@@ -66,9 +66,18 @@ export function UserProfileSection() {
   const [showFeedbackToast, setShowFeedbackToast] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [showTeachingModal, setShowTeachingModal] = useState(false)
+  const [hasSeenFeedbackTip, setHasSeenFeedbackTip] = useState(true) // Default true to avoid flash
+  const [dontShowFeedbackTipAgain, setDontShowFeedbackTipAgain] = useState(false)
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [feedbackSentiment, setFeedbackSentiment] = useState<'positive' | 'negative' | 'neutral' | null>(null)
   const [submittingFeedback, setSubmittingFeedback] = useState(false)
+
+  // Check localStorage for feedback tip dismissal on mount
+  useEffect(() => {
+    const dismissed = localStorage.getItem('osqr-feedback-tip-dismissed')
+    setHasSeenFeedbackTip(dismissed === 'true')
+  }, [])
 
   // Fetch profile on mount
   useEffect(() => {
@@ -128,7 +137,32 @@ export function UserProfileSection() {
   }
 
   const handleFeedback = () => {
+    // Show teaching modal first if user hasn't dismissed it
+    if (!hasSeenFeedbackTip) {
+      setShowTeachingModal(true)
+    } else {
+      setShowFeedbackModal(true)
+    }
+  }
+
+  const handleTeachingContinue = () => {
+    // Save preference if checkbox was checked
+    if (dontShowFeedbackTipAgain) {
+      localStorage.setItem('osqr-feedback-tip-dismissed', 'true')
+      setHasSeenFeedbackTip(true)
+    }
+    setShowTeachingModal(false)
     setShowFeedbackModal(true)
+  }
+
+  const handleTeachingDismiss = () => {
+    // Save preference if checkbox was checked
+    if (dontShowFeedbackTipAgain) {
+      localStorage.setItem('osqr-feedback-tip-dismissed', 'true')
+      setHasSeenFeedbackTip(true)
+    }
+    setShowTeachingModal(false)
+    setDontShowFeedbackTipAgain(false)
   }
 
   const submitFeedback = async () => {
@@ -495,6 +529,70 @@ export function UserProfileSection() {
             </div>
           )}
         </>
+      )}
+
+      {/* Teaching Modal - Gentle explanation about natural language feedback */}
+      {showTeachingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={handleTeachingDismiss}
+          />
+          <div className="relative w-full max-w-sm bg-neutral-900 border border-neutral-700 rounded-2xl p-6 shadow-xl animate-in slide-in-from-bottom-4 fade-in duration-200">
+            {/* Header with icon */}
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-cyan-500/10 rounded-lg shrink-0">
+                <Sparkles className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-medium text-white mb-1">Quick tip</h3>
+                <p className="text-sm text-neutral-300 leading-relaxed">
+                  You can share feedback just by talking to me. Try saying things like:
+                </p>
+              </div>
+            </div>
+
+            {/* Example phrases */}
+            <div className="space-y-2 mb-4 ml-11">
+              <p className="text-sm text-cyan-300">&quot;I want to leave some feedback&quot;</p>
+              <p className="text-sm text-cyan-300">&quot;That response was really helpful&quot;</p>
+              <p className="text-sm text-cyan-300">&quot;This isn&apos;t working for me&quot;</p>
+            </div>
+
+            <p className="text-sm text-neutral-400 mb-4 ml-11">
+              I&apos;ll take care of the rest.
+            </p>
+
+            {/* Don't show again checkbox */}
+            <label className="flex items-center gap-2 mb-4 ml-11 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={dontShowFeedbackTipAgain}
+                onChange={(e) => setDontShowFeedbackTipAgain(e.target.checked)}
+                className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-0 cursor-pointer"
+              />
+              <span className="text-xs text-neutral-400 group-hover:text-neutral-300 transition-colors">
+                Got it, don&apos;t show this again
+              </span>
+            </label>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 ml-11">
+              <button
+                onClick={handleTeachingDismiss}
+                className="flex-1 py-2 text-sm text-neutral-400 hover:text-white transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleTeachingContinue}
+                className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Use form anyway
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Feedback Modal */}

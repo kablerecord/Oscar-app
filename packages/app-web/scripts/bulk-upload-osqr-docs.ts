@@ -45,7 +45,7 @@ const OSCAR_APP_DOCS = [
   'docs/features/SUPREME-COURT-BUTTON.md',
   'docs/features/MEDIA-VAULT.md',
   'docs/features/PERSONALIZED-GREETING.md',
-  'docs/features/JARVIS_CAPABILITIES.md',
+  'docs/features/CAPABILITIES.md',
   'docs/features/COUNCIL-MODE.md',
   'docs/features/META_OSQR_MODE.md',
   'docs/features/BEHAVIORAL_INTELLIGENCE_LAYER.md',

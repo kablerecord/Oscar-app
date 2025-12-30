@@ -14,7 +14,6 @@ import { trackConversation, getTILContext } from '@/lib/til'
 import { runSecretaryCheck } from '@/lib/til/secretary-checklist'
 import { isPlanningRequest } from '@/lib/til/planner'
 import { isAuditRequest } from '@/lib/til/self-audit'
-import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
 import { routeQuestion } from '@/lib/ai/model-router'
 // getCachedContext and getVaultStats available for future fast-path optimization
 import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary } from '@/lib/oscar/cross-session-memory'
@@ -36,7 +35,9 @@ import { checkInput, checkOutput, getDeclineMessage } from '@/lib/osqr/constitut
 import { shouldUseFastPath } from '@/lib/osqr/router-wrapper'
 // quickRoute available for fast-path optimization
 import { hasCommitmentSignals, extractCommitments } from '@/lib/osqr/temporal-wrapper'
+import { detectFeedback, getFeedbackAcknowledgment } from '@/lib/osqr/feedback-wrapper'
 import { featureFlags, throttleConfig } from '@/lib/osqr/config'
+import { ensureSchedulerRunning } from '@/lib/osqr/scheduler-init'
 
 // Throttle & Cross-Project Memory
 import {
@@ -125,6 +126,9 @@ export async function POST(req: NextRequest) {
   // Process the request in background
   ;(async () => {
     try {
+      // 0. Ensure Learning Layer scheduler is running (no-op if already started)
+      ensureSchedulerRunning()
+
       // 1. Auth check
       const isDev = process.env.NODE_ENV === 'development'
       const session = await getServerSession()
@@ -309,6 +313,105 @@ export async function POST(req: NextRequest) {
       }
 
       // ==========================================================================
+      // NATURAL LANGUAGE FEEDBACK DETECTION
+      // Detect if user is providing feedback conversationally (e.g., "that was helpful")
+      // This trains users away from the feedback button toward natural language
+      // ==========================================================================
+      const feedbackDetection = detectFeedback(message)
+
+      if (feedbackDetection && feedbackDetection.confidence !== 'low') {
+        // User is providing feedback via natural language!
+        console.log('[Stream][Feedback] Natural language feedback detected:', {
+          sentiment: feedbackDetection.sentiment,
+          category: feedbackDetection.category,
+          confidence: feedbackDetection.confidence,
+        })
+
+        // Create thread for the feedback conversation
+        let threadId = conversationId
+        if (!threadId) {
+          const thread = await prisma.chatThread.create({
+            data: {
+              workspaceId,
+              title: 'Feedback',
+              mode: 'panel',
+            },
+          })
+          threadId = thread.id
+        }
+
+        // Save user's feedback message
+        await prisma.chatMessage.create({
+          data: {
+            threadId,
+            role: 'user',
+            content: message,
+            metadata: { isFeedback: true },
+          },
+        })
+
+        // Store in UserFeedback table (same as button feedback, but source = NATURAL_LANGUAGE)
+        try {
+          await prisma.userFeedback.create({
+            data: {
+              userId,
+              workspaceId,
+              sentiment: feedbackDetection.sentiment,
+              message: feedbackDetection.content,
+              source: 'NATURAL_LANGUAGE',
+              conversationId: threadId,
+            },
+          })
+        } catch (feedbackError) {
+          console.error('[Stream][Feedback] Error storing feedback:', feedbackError)
+          // Continue - don't block the response
+        }
+
+        // Generate acknowledgment response
+        const acknowledgment = getFeedbackAcknowledgment(feedbackDetection)
+
+        // Save assistant acknowledgment
+        const osqrMessage = await prisma.chatMessage.create({
+          data: {
+            threadId,
+            role: 'assistant',
+            provider: 'osqr-feedback',
+            content: acknowledgment,
+            metadata: {
+              feedbackProcessed: true,
+              feedbackSentiment: feedbackDetection.sentiment,
+              feedbackCategory: feedbackDetection.category,
+            },
+          },
+        })
+
+        // Track telemetry
+        try {
+          const collector = getTelemetryCollector()
+          await collector.trackFeedbackSubmitted(
+            userId,
+            workspaceId,
+            'natural_language',
+            feedbackDetection.sentiment
+          )
+        } catch (telemetryError) {
+          console.error('[Stream][Feedback] Telemetry error:', telemetryError)
+        }
+
+        // Send response
+        await sendEvent('metadata', {
+          threadId,
+          feedbackDetected: true,
+          feedbackSentiment: feedbackDetection.sentiment,
+          feedbackCategory: feedbackDetection.category,
+        })
+        await sendEvent('text', { chunk: acknowledgment })
+        await sendEvent('done', { messageId: osqrMessage.id, feedbackProcessed: true })
+        await writer.close()
+        return
+      }
+
+      // ==========================================================================
       // RENDER INTENT DETECTION: Check if user wants to create visual content
       // Handles "/render", "draw me", "visualize", "make a chart", templates, games etc.
       // ==========================================================================
@@ -412,36 +515,7 @@ export async function POST(req: NextRequest) {
         return
       }
 
-      // 6. Safety check
-      const safetyResult = performSafetyCheck(message)
-      if (!safetyResult.proceedWithNormalFlow) {
-        logSafetyEvent('crisis_detected', {
-          level: safetyResult.crisis.level,
-          confidence: safetyResult.crisis.confidence,
-        })
-
-        const thread = await prisma.chatThread.create({
-          data: { workspaceId, title: 'Support Conversation', mode: 'panel' },
-        })
-
-        await prisma.chatMessage.create({
-          data: {
-            threadId: thread.id,
-            role: 'assistant',
-            provider: 'osqr-safety',
-            content: safetyResult.interventionResponse || '',
-            metadata: { safetyIntervention: true },
-          },
-        })
-
-        await sendEvent('metadata', { threadId: thread.id, stored: false })
-        await sendEvent('text', { chunk: safetyResult.interventionResponse || '' })
-        await sendEvent('done', {})
-        await writer.close()
-        return
-      }
-
-      // 7. Check for special request types (planning, audit) - these don't stream
+      // 6. Check for special request types (planning, audit) - these don't stream
       if (isPlanningRequest(message) || isAuditRequest(message)) {
         // For these special modes, redirect to non-streaming endpoint
         await sendEvent('metadata', { redirect: '/api/oscar/ask', reason: 'special_mode' })
@@ -685,8 +759,16 @@ export async function POST(req: NextRequest) {
 
       if (isSimpleQuestion) {
         // Fast path: minimal context for simple questions
-        console.log('[Stream] Fast path: skipping heavy context for simple question')
-        autoContext = { context: '', sources: { identity: false, profile: false, msc: false, knowledge: false, threads: false, systemMode: false }, raw: {} }
+        // BUT always include vault stats so Oscar knows what's available
+        console.log('[Stream] Fast path: lightweight context for simple question')
+        autoContext = await assembleContext(workspaceId, message, {
+          includeProfile: false,
+          includeIdentity: false,
+          includeMSC: false,
+          includeKnowledge: false,
+          includeThreads: false,
+          // Vault stats are always included (lightweight, essential for awareness)
+        })
         crossSessionMemory = { recentSummaries: [], accumulatedFacts: {}, hasMemory: false }
       } else {
         // Full context assembly for complex questions
@@ -813,22 +895,28 @@ export async function POST(req: NextRequest) {
           firstChunkTime = Date.now() - startAI
           console.log(`[Stream] First AI chunk received in ${firstChunkTime}ms`)
         }
+
+        // Check for special council data marker
+        if (chunk.startsWith('__COUNCIL_DATA__') && chunk.endsWith('__END_COUNCIL_DATA__')) {
+          // Extract and send council panel data as a separate event
+          const jsonStr = chunk.slice('__COUNCIL_DATA__'.length, -'__END_COUNCIL_DATA__'.length)
+          try {
+            const councilData = JSON.parse(jsonStr)
+            await sendEvent('council', councilData)
+            console.log(`[Stream] Sent council data with ${councilData.modelOpinions?.length || 0} model opinions`)
+          } catch (e) {
+            console.error('[Stream] Failed to parse council data:', e)
+          }
+          continue // Don't add this marker to fullResponse
+        }
+
         fullResponse += chunk
         await sendEvent('text', { chunk })
       }
       console.log(`[Stream] Total AI streaming took ${Date.now() - startAI}ms`)
 
       // 13. Post-process the response
-      // Safety post-processing
-      const safetyProcessed = processSafetyResponse(fullResponse, message)
-      let processedAnswer = safetyProcessed.content
-
-      if (safetyProcessed.wasModified) {
-        logSafetyEvent(
-          safetyProcessed.content.includes("I can't help") ? 'refusal_wrapped' : 'disclaimer_added',
-          { timestamp: new Date() }
-        )
-      }
+      let processedAnswer = fullResponse
 
       // Constitutional output check
       if (featureFlags.enableConstitutionalValidation) {

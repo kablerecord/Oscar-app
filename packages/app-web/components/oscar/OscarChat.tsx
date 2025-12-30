@@ -72,7 +72,7 @@ export function OscarChat({ workspaceId, userTier = 'pro' }: OscarChatProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Pre-fetch context on mount (Jarvis awareness)
+  // Pre-fetch context on mount (instant awareness)
   useEffect(() => {
     async function prefetch() {
       try {

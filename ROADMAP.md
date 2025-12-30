@@ -1122,8 +1122,32 @@ The "Memory Vault" concept from specs is implemented across multiple systems:
 - [x] **Long-Term Memory** - PKV integration → `lib/knowledge/` + pgvector
 - [x] **Preference Memory** - user settings + patterns → `lib/uip/` (User Intelligence Profile)
 - [x] **Memory Vault Wrapper** - @osqr/core integration → `lib/osqr/memory-wrapper.ts` (Dec 2024)
+- [x] **Learning Layer** - Auto-synthesis from conversations → `@osqr/core` (Dec 30, 2024)
 - [ ] **Framework Memory** - user's philosophies embedded in OSQR (future)
 - [ ] **Cross-Project Queries** - enterprise feature, ready in `lib/osqr/memory-wrapper.ts` (feature-flagged)
+
+#### Learning Layer (COMPLETE - Dec 30, 2024)
+
+The Learning Layer transforms raw conversations into searchable long-term memories:
+
+**Core (@osqr/core):**
+- [x] LLM-based fact extraction (`synthesis/llm-extractor.ts`)
+- [x] Synthesis job queue (`synthesis/queue.ts`)
+- [x] Background scheduler (`synthesis/scheduler.ts`)
+- [x] External chat ingestion - Claude, ChatGPT, Slack, Discord, Email (`ingestion/ingest.ts`)
+- [x] Enhanced utility scoring with decay + outcome learning (`synthesis/retrospective.ts`)
+- [x] End conversation hook with auto-synthesis (`vault.ts`)
+- [x] 45+ tests, all passing
+
+**oscar-app Integration:**
+- [x] Scheduler initialization (`lib/osqr/scheduler-init.ts`)
+- [x] End conversation API (`/api/chat/threads/[threadId]/end`)
+- [x] External ingestion API (`/api/chat/ingest`)
+- [x] ask-stream route wired to start scheduler
+- [ ] Prisma migration (run `pnpm prisma db push` when DB pool available)
+
+> **Build Spec:** `@osqr/core/specs/LEARNING-LAYER-BUILD.md`
+> **Integration Checklist:** `docs/LEARNING-LAYER-INTEGRATION-CHECKLIST.md`
 
 ### 2.3 Master Summary Checklist (Master Plan: Part 2D.8)
 Current: Not implemented
@@ -1703,12 +1727,25 @@ A live, real-time, multi-agent thinking room where 2-6 AI models think in parall
 - Visualizes the "invisible panel" that already powers Thoughtful/Contemplate modes
 - Screenshots go viral ("Claude vs GPT vs Gemini — moderated by OSQR")
 
-**Dependencies (must be complete first):**
-- [ ] 3.1 Cross-Referencing Engine (stable)
-- [ ] 3.3 Model Personality Tagging (models have identities)
-- [ ] 3.4 Synthesis Engine Enhancement (weighted synthesis working)
-- [ ] Dynamic model routing (✅ implemented in model-router.ts)
+**Core Implementation: ✅ COMPLETE (Dec 2024)**
+- [x] 4-model council: Claude, GPT-4o, Gemini, Llama 3.3 (via Groq)
+- [x] Parallel model querying with Promise.allSettled
+- [x] Council data streaming via SSE (`__COUNCIL_DATA__` marker)
+- [x] CouncilPanel UI (inline, 4-column grid)
+- [x] CouncilFullView (full-screen with brand icons)
+- [x] Resizable synthesis panel with drag handle
+- [x] Brand-appropriate icons (Claude SVG, OpenAI SVG, Gemini, Llama)
+- [x] OSQR synthesis streaming after council responses
+- [x] Groq provider integration (`lib/ai/providers/groq.ts`)
+
+**Remaining Enhancements:**
+- [ ] Real-time streaming per model (currently waits for all, then shows)
+- [ ] 3.1 Cross-Referencing Engine integration
+- [ ] 3.3 Model Personality Tagging (distinct personas in prompts)
+- [ ] 3.4 Weighted synthesis based on model confidence
 - [ ] Hardened backend + rate limiting for compute-intensive queries
+- [ ] User-configurable model selection
+- [ ] Cost tracking per council query
 
 **Target:** v2.0 release (Phase 3 completion)
 **Tier:** OSQR Master exclusive ($349/mo)
@@ -1716,7 +1753,7 @@ A live, real-time, multi-agent thinking room where 2-6 AI models think in parall
 **High-level implementation:**
 ```
 ┌────────────┬────────────┬────────────┬────────────┐
-│   Claude   │   GPT-4o   │   Gemini   │    Grok    │
+│   Claude   │   GPT-4o   │   Gemini   │  Llama 3.3 │
 │  (stream)  │  (stream)  │  (stream)  │  (stream)  │
 └────────────┴────────────┴────────────┴────────────┘
 
@@ -1724,6 +1761,13 @@ A live, real-time, multi-agent thinking room where 2-6 AI models think in parall
 │    OSQR Moderator Synthesis (final answer)         │
 └────────────────────────────────────────────────────┘
 ```
+
+**Key Files:**
+- `lib/ai/oscar.ts` - councilResponseStream() method
+- `lib/ai/providers/groq.ts` - Groq/Llama provider
+- `components/council/CouncilPanel.tsx` - Inline panel UI
+- `components/council/CouncilFullView.tsx` - Full-screen view
+- `app/api/oscar/ask-stream/route.ts` - SSE council event handling
 
 **See full spec for:** UI layout, backend architecture, model routing logic, cost controls, system prompts, and future expansions.
 

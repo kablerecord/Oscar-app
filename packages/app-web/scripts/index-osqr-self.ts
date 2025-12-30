@@ -610,7 +610,7 @@ async function main() {
   console.log(`   📦 Total chunks: ${totalChunks}`)
   console.log(`   ❌ Failed: ${failed} files`)
   console.log('\n💡 OSQR is now self-aware. Try asking:')
-  console.log('   - "What Jarvis capabilities are implemented?"')
+  console.log('   - "What capabilities are implemented?"')
   console.log('   - "Where is the TIL pattern detector defined?"')
   console.log('   - "What\'s in the ROADMAP for J-6?"')
   console.log('   - "How does auto-context assembly work?"\n')

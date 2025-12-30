@@ -249,13 +249,40 @@ function shouldValidate(entry: {
 // =============================================================================
 
 /**
+ * Check if a response should NOT be cached (refusals, errors, unhelpful responses)
+ */
+function isUncacheableResponse(answer: string): boolean {
+  const lowerAnswer = answer.toLowerCase()
+
+  // Patterns that indicate unhelpful/refusal responses that shouldn't be cached
+  const uncacheablePatterns = [
+    "i can't help with that",
+    "i cannot help with that",
+    "i'm not able to help",
+    "i am not able to help",
+    "i'm unable to",
+    "i am unable to",
+    "different angle on this topic",
+    "ultimately trying to accomplish",
+    "i don't have access to",
+    "i do not have access to",
+    "i don't have information about",
+    "i do not have information about",
+    "an error occurred",
+    "something went wrong",
+  ]
+
+  return uncacheablePatterns.some(pattern => lowerAnswer.includes(pattern))
+}
+
+/**
  * Store a new answer in the cache
  */
 export async function cacheAnswer(
   question: string,
   answer: string,
   options: CacheOptions
-): Promise<string> {
+): Promise<string | null> {
   const {
     scope,
     userId,
@@ -263,6 +290,12 @@ export async function cacheAnswer(
     conversationId,
     confidenceScore = 1.0,
   } = options
+
+  // Don't cache unhelpful/refusal responses
+  if (isUncacheableResponse(answer)) {
+    console.log(`[AnswerCache] Skipping cache - detected uncacheable response pattern`)
+    return null
+  }
 
   // Validate scope/userId
   if (scope === 'USER' && !userId) {

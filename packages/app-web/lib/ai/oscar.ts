@@ -18,6 +18,8 @@ function getApiKeyForProvider(provider: ProviderType): string {
       return process.env.GOOGLE_AI_API_KEY || ''
     case 'xai':
       return process.env.XAI_API_KEY || ''
+    case 'groq':
+      return process.env.GROQ_API_KEY || ''
     default:
       throw new Error(`Unknown provider: ${provider}`)
   }
@@ -26,7 +28,7 @@ function getApiKeyForProvider(provider: ProviderType): string {
 /**
  * OSQR - The main AI orchestrator
  *
- * OSQR acts as your personal AI assistant (like Jarvis from Iron Man).
+ * OSQR is your personal AI that knows you, remembers everything, and thinks with multiple minds.
  * When you ask OSQR a question:
  * 1. OSQR consults a panel of specialized AI agents
  * 2. The panel discusses and debates privately
@@ -58,6 +60,21 @@ export interface OSQRResponse {
     modelUsed: { provider: ProviderType; model: string; name?: string }
     confidence: number // 0-1 scale
     shouldSuggestAltOpinion: boolean
+  }
+  // Council mode specific data
+  council?: {
+    modelOpinions: Array<{
+      model: string
+      content: string
+      confidence: number
+      reasoning: string
+    }>
+    consensus: {
+      level: 'full' | 'partial' | 'none'
+      agreementScore: number
+      divergentPoints: string[]
+    }
+    processingTimeMs: number
   }
 }
 
@@ -103,7 +120,7 @@ ${artifactsGuidance}`
    * OSQR will consult the panel and return a synthesized answer
    */
   static async ask(request: OSQRRequest): Promise<OSQRResponse> {
-    const { userMessage, panelAgents, context, includeDebate = false, mode = 'thoughtful', userId } = request
+    const { userMessage, panelAgents, context, includeDebate = false, mode = 'thoughtful', userId, userLevel } = request
 
     // Adjust processing based on response mode
     switch (mode) {
@@ -112,6 +129,9 @@ ${artifactsGuidance}`
 
       case 'contemplate':
         return await this.contemplativeResponse({ userMessage, panelAgents, context, includeDebate, userId })
+
+      case 'council':
+        return await this.councilResponse({ userMessage, panelAgents, context, includeDebate, userId, userLevel })
 
       case 'thoughtful':
       default:
@@ -305,6 +325,136 @@ Example of what TO do: "I'm Oscar, the intelligence layer of OSQR..."`
   }
 
   /**
+   * Council mode: Full multi-model deliberation
+   *
+   * Dispatches queries to Claude, GPT-4, and Gemini in parallel,
+   * then Oscar synthesizes a unified response with consensus analysis.
+   *
+   * Time: ~30-60 seconds (3 models + synthesis)
+   */
+  private static async councilResponse(request: Omit<OSQRRequest, 'mode'> & { userLevel?: number }): Promise<OSQRResponse> {
+    const { userMessage, context, includeDebate, userId, userLevel } = request
+
+    console.log('OSQR: Council mode - multi-model deliberation...')
+    const startTime = Date.now()
+
+    try {
+      // Define the council models - Claude, GPT-4, Gemini, and Groq (Llama)
+      const councilModels: Array<{
+        id: string
+        name: string
+        provider: ProviderType
+        model: string
+      }> = [
+        { id: 'claude', name: 'Claude', provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+        { id: 'gpt4', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o' },
+        { id: 'gemini', name: 'Gemini', provider: 'google', model: 'gemini-2.0-flash-exp' },
+        { id: 'groq', name: 'Llama 3.3', provider: 'groq', model: 'llama-3.3-70b-versatile' },
+      ]
+
+      // Build system prompt for council members
+      const councilSystemPrompt = `You are participating in a council of AI models deliberating on a user's question.
+Provide your perspective thoughtfully and concisely. Focus on your unique strengths and viewpoint.
+Be direct and substantive - no need for meta-commentary about being part of a council.`
+
+      // Query all models in parallel
+      console.log('OSQR: Querying council models in parallel...')
+      const modelResponses = await Promise.allSettled(
+        councilModels.map(async (modelConfig) => {
+          const provider = ProviderRegistry.getProvider(modelConfig.provider, {
+            apiKey: getApiKeyForProvider(modelConfig.provider),
+            model: modelConfig.model,
+          })
+
+          const messages: AIMessage[] = [
+            { role: 'system', content: councilSystemPrompt },
+          ]
+
+          if (context) {
+            messages.push({
+              role: 'system',
+              content: `Context from user's knowledge base:\n${context}`,
+            })
+          }
+
+          messages.push({ role: 'user', content: userMessage })
+
+          const response = await provider.generate({
+            messages,
+            temperature: 0.7,
+          })
+
+          return {
+            model: modelConfig.name,
+            modelId: modelConfig.id,
+            content: response,
+            confidence: 0.8, // Default confidence
+            reasoning: response.slice(0, 200) + '...',
+          }
+        })
+      )
+
+      // Extract successful responses
+      const modelOpinions = modelResponses
+        .filter((r): r is PromiseFulfilledResult<typeof modelResponses[0] extends PromiseSettledResult<infer T> ? T : never> => r.status === 'fulfilled')
+        .map(r => r.value)
+
+      console.log(`OSQR: Got ${modelOpinions.length}/${councilModels.length} council responses`)
+
+      // Transform to panel responses for synthesis
+      const panelResponses: PanelResponse[] = modelOpinions.map(opinion => ({
+        agentId: opinion.modelId,
+        content: opinion.content,
+      }))
+
+      // Synthesize the council's responses
+      console.log('OSQR: Synthesizing council responses...')
+      const synthesizedAnswer = await this.synthesize({
+        userMessage,
+        panelResponses,
+        context,
+        isDeepAnalysis: true,
+        userId,
+        userLevel,
+      })
+
+      // Simple consensus analysis
+      const agreementScore = modelOpinions.length >= 2 ? 0.75 : 0.5
+      const consensusLevel: 'full' | 'partial' | 'none' = modelOpinions.length >= 3 ? 'partial' : 'none'
+
+      const processingTimeMs = Date.now() - startTime
+
+      return {
+        answer: synthesizedAnswer,
+        panelDiscussion: includeDebate ? panelResponses : undefined,
+        routing: {
+          questionType: 'analytical' as QuestionType,
+          modelUsed: {
+            provider: 'mixed' as ProviderType,
+            model: 'council',
+            name: 'Council Mode',
+          },
+          confidence: agreementScore,
+          shouldSuggestAltOpinion: false,
+        },
+        council: {
+          modelOpinions,
+          consensus: {
+            level: consensusLevel,
+            agreementScore,
+            divergentPoints: [],
+          },
+          processingTimeMs,
+        },
+      }
+    } catch (error) {
+      console.error('OSQR: Council mode failed, falling back to thoughtful mode:', error)
+      // Fallback to thoughtful mode if council fails
+      return this.thoughtfulResponse(request)
+    }
+  }
+
+  /**
    * OSQR synthesizes panel insights into a final answer
    */
   private static async synthesize(params: {
@@ -431,6 +581,11 @@ ${context}
 
       case 'contemplate':
         yield* this.contemplativeResponseStream({ userMessage, panelAgents, context, userId, userLevel, conversationHistory })
+        break
+
+      case 'council':
+        // Council mode: query multiple models, then stream synthesis
+        yield* this.councilResponseStream({ userMessage, panelAgents, context, userId, userLevel, conversationHistory })
         break
 
       case 'thoughtful':
@@ -562,6 +717,105 @@ ${context}
       userMessage,
       panelResponses,
       roundtableResponses: secondRoundResponses,
+      context,
+      isDeepAnalysis: true,
+      userId,
+      userLevel,
+      conversationHistory,
+    })
+  }
+
+  /**
+   * Council mode streaming: Query multiple models in parallel, then stream synthesis
+   */
+  private static async *councilResponseStream(request: Omit<OSQRRequest, 'mode' | 'includeDebate'>): AsyncIterable<string> {
+    const { userMessage, context, userId, userLevel, conversationHistory } = request
+
+    console.log('OSQR: Council mode streaming - multi-model deliberation...')
+
+    // Define the council models - Claude, GPT-4, Gemini, and Groq (Llama)
+    const councilModels: Array<{
+      id: string
+      name: string
+      provider: ProviderType
+      model: string
+    }> = [
+      { id: 'claude', name: 'Claude', provider: 'anthropic', model: 'claude-sonnet-4-20250514' },
+      { id: 'gpt4', name: 'GPT-4o', provider: 'openai', model: 'gpt-4o' },
+      { id: 'gemini', name: 'Gemini', provider: 'google', model: 'gemini-2.0-flash-exp' },
+      { id: 'groq', name: 'Llama 3.3', provider: 'groq', model: 'llama-3.3-70b-versatile' },
+    ]
+
+    // Build system prompt for council members
+    const councilSystemPrompt = `You are participating in a council of AI models deliberating on a user's question.
+Provide your perspective thoughtfully and concisely. Focus on your unique strengths and viewpoint.
+Be direct and substantive - no need for meta-commentary about being part of a council.`
+
+    // Query all models in parallel
+    console.log('OSQR: Querying council models in parallel...')
+    const modelResponses = await Promise.allSettled(
+      councilModels.map(async (modelConfig) => {
+        const provider = ProviderRegistry.getProvider(modelConfig.provider, {
+          apiKey: getApiKeyForProvider(modelConfig.provider),
+          model: modelConfig.model,
+        })
+
+        const messages: AIMessage[] = [
+          { role: 'system', content: councilSystemPrompt },
+        ]
+
+        if (context) {
+          messages.push({
+            role: 'system',
+            content: `Context from user's knowledge base:\n${context}`,
+          })
+        }
+
+        messages.push({ role: 'user', content: userMessage })
+
+        const response = await provider.generate({
+          messages,
+          temperature: 0.7,
+        })
+
+        return {
+          model: modelConfig.name,
+          modelId: modelConfig.id,
+          content: response,
+        }
+      })
+    )
+
+    // Extract successful responses
+    const modelOpinions = modelResponses
+      .filter((r): r is PromiseFulfilledResult<{ model: string; modelId: string; content: string }> => r.status === 'fulfilled')
+      .map(r => r.value)
+
+    console.log(`OSQR: Got ${modelOpinions.length}/${councilModels.length} council responses`)
+
+    // Transform to panel responses for synthesis
+    const panelResponses: PanelResponse[] = modelOpinions.map(opinion => ({
+      agentId: opinion.modelId,
+      content: opinion.content,
+    }))
+
+    // Yield council panel data as a special JSON marker (will be parsed by the streaming endpoint)
+    // Format: __COUNCIL_DATA__<JSON>__END_COUNCIL_DATA__
+    const councilData = {
+      modelOpinions: modelOpinions.map((opinion) => ({
+        model: opinion.model,
+        modelId: opinion.modelId,
+        content: opinion.content,
+        provider: councilModels.find(m => m.id === opinion.modelId)?.provider || 'unknown',
+      })),
+    }
+    yield `__COUNCIL_DATA__${JSON.stringify(councilData)}__END_COUNCIL_DATA__`
+
+    // Stream the synthesis
+    console.log('OSQR: Streaming council synthesis...')
+    yield* this.synthesizeStream({
+      userMessage,
+      panelResponses,
       context,
       isDeepAnalysis: true,
       userId,

@@ -6,7 +6,7 @@
  *
  * Use cases:
  * - "Am I following my architecture principles?"
- * - "What Jarvis capabilities are missing?"
+ * - "What capabilities are missing?"
  * - "Are my priorities still aligned with my roadmap?"
  * - "Audit my system against AUTONOMOUS-GUIDELINES.md"
  */
@@ -57,7 +57,7 @@ export interface AuditReport {
  */
 const AUDIT_DOC_MAP: Record<string, string[]> = {
   architecture: ['ARCHITECTURE.md', 'ASSUMPTIONS.md', 'lib/ai/oscar.ts'],
-  roadmap: ['ROADMAP.md', 'PROGRESS.md', 'docs/JARVIS_CAPABILITIES.md'],
+  roadmap: ['ROADMAP.md', 'PROGRESS.md', 'docs/CAPABILITIES.md'],
   priorities: ['ROADMAP.md', 'PROGRESS.md', 'BLOCKED.md'],
   autonomous: ['AUTONOMOUS-GUIDELINES.md', 'lib/autonomy/rails.ts'],
   comprehensive: [

@@ -22,6 +22,7 @@ export interface AutoContextResult {
     msc: boolean
     knowledge: boolean
     threads: boolean
+    vaultStats: boolean // True if vault overview included
     systemMode: boolean // True if restricted to OSQR system docs only
   }
   // Raw data for potential UI display
@@ -29,7 +30,15 @@ export interface AutoContextResult {
     mscItems?: MSCContextItem[]
     knowledgeChunks?: string
     recentThreads?: ThreadSummary[]
+    vaultStats?: VaultStatsContext
   }
+}
+
+interface VaultStatsContext {
+  documentCount: number
+  indexedDocumentCount: number
+  topTopics: string[]
+  documentSummaries: Array<{ title: string; summary: string; topics: string[] }>
 }
 
 interface MSCContextItem {
@@ -88,6 +97,7 @@ export async function assembleContext(
     msc: false,
     knowledge: false,
     threads: false,
+    vaultStats: false,
     systemMode,
   }
   const raw: AutoContextResult['raw'] = {}
@@ -122,6 +132,41 @@ export async function assembleContext(
     if (profile) {
       sections.push(`## About the User\n${profile}`)
       sources.profile = true
+    }
+  }
+
+  // 2b. Vault Stats - high-level overview of user's knowledge vault
+  // This gives Oscar awareness of what's in the vault without full retrieval
+  // Skip in system mode - this is user-specific
+  if (includeUserContext) {
+    try {
+      const vaultStats = await getVaultStatsContext(workspaceId)
+      if (vaultStats) {
+        let vaultText = `## Your Knowledge Vault Overview\n`
+        vaultText += `You have access to the user's personal knowledge vault containing ${vaultStats.documentCount} documents.`
+        if (vaultStats.indexedDocumentCount !== vaultStats.documentCount) {
+          vaultText += ` (${vaultStats.indexedDocumentCount} are indexed and searchable)`
+        }
+        if (vaultStats.topTopics.length > 0) {
+          vaultText += `\n\n**Main topics:** ${vaultStats.topTopics.join(', ')}`
+        }
+        // Include document summaries so Oscar "knows" what's in the vault
+        if (vaultStats.documentSummaries.length > 0) {
+          vaultText += `\n\n**What's in the vault:**`
+          for (const doc of vaultStats.documentSummaries) {
+            vaultText += `\n- **${doc.title}**: ${doc.summary}`
+            if (doc.topics.length > 0) {
+              vaultText += ` [${doc.topics.slice(0, 3).join(', ')}]`
+            }
+          }
+        }
+        vaultText += `\n\nYou can reference this knowledge when answering questions. The user may not explicitly mention their vault - use it proactively when relevant.`
+        sections.push(vaultText)
+        sources.vaultStats = true
+        raw.vaultStats = vaultStats
+      }
+    } catch (error) {
+      console.error('[Auto-Context] Vault stats error:', error)
     }
   }
 
@@ -343,6 +388,91 @@ export async function hasContext(workspaceId: string): Promise<boolean> {
   ])
 
   return profileCount > 0 || mscCount > 0 || docCount > 0
+}
+
+/**
+ * Get vault stats context - overview of user's knowledge vault
+ *
+ * This provides Oscar with awareness of what's in the vault without
+ * doing full document retrieval. It uses the DocumentInventory's
+ * auto-generated summaries (created on upload using Haiku).
+ */
+async function getVaultStatsContext(workspaceId: string): Promise<VaultStatsContext | null> {
+  // Get document counts
+  const [documentCount, indexedDocumentCount] = await Promise.all([
+    prisma.document.count({ where: { workspaceId } }),
+    prisma.document.count({
+      where: {
+        workspaceId,
+        chunks: { some: {} }, // Has at least one chunk = indexed
+      },
+    }),
+  ])
+
+  if (documentCount === 0) {
+    return null // No vault to describe
+  }
+
+  // Get top topics and document summaries from inventory
+  let topTopics: string[] = []
+  let documentSummaries: Array<{ title: string; summary: string; topics: string[] }> = []
+
+  try {
+    // Get document IDs for this workspace
+    const workspaceDocs = await prisma.document.findMany({
+      where: { workspaceId },
+      select: { id: true },
+      orderBy: { createdAt: 'desc' },
+      take: 50, // Sample recent docs
+    })
+    const docIds = workspaceDocs.map(d => d.id)
+
+    // Get inventory with summaries
+    const inventoryItems = await prisma.documentInventory.findMany({
+      where: {
+        documentId: { in: docIds },
+      },
+      select: {
+        title: true,
+        autoSummary: true,
+        topicTags: true,
+      },
+      orderBy: { uploadedAt: 'desc' },
+      take: 15, // Limit to keep context manageable
+    })
+
+    // Build document summaries for context
+    documentSummaries = inventoryItems
+      .filter(item => item.autoSummary && item.autoSummary.length > 10)
+      .map(item => ({
+        title: item.title,
+        summary: item.autoSummary.slice(0, 200), // Truncate long summaries
+        topics: item.topicTags.slice(0, 3),
+      }))
+
+    // Flatten and count topics
+    const topicCounts = new Map<string, number>()
+    for (const item of inventoryItems) {
+      for (const tag of item.topicTags) {
+        topicCounts.set(tag, (topicCounts.get(tag) || 0) + 1)
+      }
+    }
+
+    // Get top 5 topics
+    topTopics = Array.from(topicCounts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([tag]) => tag)
+  } catch {
+    // DocumentInventory might not exist or be empty - that's fine
+  }
+
+  return {
+    documentCount,
+    indexedDocumentCount,
+    topTopics,
+    documentSummaries,
+  }
 }
 
 // ============================================

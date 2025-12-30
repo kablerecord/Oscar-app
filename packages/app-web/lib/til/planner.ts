@@ -196,7 +196,7 @@ CRITICAL RULES:
 - For "aggressive" mode: assume 110% of historical velocity, but flag risks
 - Each week needs a clear focus, concrete goals, and identified risks
 - Acknowledge when data is limited (< 14 days) with lower confidence scores
-- Be specific about Jarvis capabilities and when they'll be completed
+- Be specific about capabilities and when they'll be completed
 - Include buffer time for unexpected blockers (historically ~20% of time)
 
 OUTPUT FORMAT (JSON):
@@ -274,7 +274,7 @@ export async function generatePlan90(request: Plan90Request): Promise<Plan90> {
 - Overall momentum: ${insights.workspace_momentum}`
 
   const roadmapStr = `
-- Remaining Jarvis items: ${roadmap.remainingItems.join(', ') || 'None'}
+- Remaining items: ${roadmap.remainingItems.join(', ') || 'None'}
 - Estimated remaining time: ${roadmap.estimatedTotalMinutes} minutes autonomous build
 - Current goals: ${roadmap.currentGoals.join(', ') || 'None set'}
 - Current projects: ${roadmap.currentProjects.join(', ') || 'None set'}`

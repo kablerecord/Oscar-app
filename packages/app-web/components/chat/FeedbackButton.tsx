@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { MessageCircle, X, Loader2, ThumbsUp, ThumbsDown, Check } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { MessageCircle, X, Loader2, ThumbsUp, ThumbsDown, Check, Sparkles } from 'lucide-react'
 import {
   Tooltip,
   TooltipContent,
@@ -16,13 +16,16 @@ interface FeedbackButtonProps {
   position?: 'bottom-right' | 'bottom-left' | 'inline'
 }
 
-type FeedbackStep = 'button' | 'form' | 'submitted'
+type FeedbackStep = 'button' | 'teaching' | 'form' | 'submitted'
+
+const STORAGE_KEY = 'osqr-feedback-tip-dismissed'
 
 /**
  * FeedbackButton Component
  *
  * Part of the training pattern: Add button, but train users toward natural language.
- * When clicked, shows a hint that users can just say "leave feedback" in chat.
+ * When clicked for the first time, shows a gentle teaching modal explaining
+ * that users can just talk to OSQR instead of using buttons.
  *
  * Success metric: Natural language feedback > button feedback (10:1 ratio removes button)
  *
@@ -37,7 +40,14 @@ export function FeedbackButton({
   const [sentiment, setSentiment] = useState<'positive' | 'negative' | null>(null)
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showTip, setShowTip] = useState(false)
+  const [hasSeenTip, setHasSeenTip] = useState(true) // Default true to avoid flash
+  const [dontShowAgain, setDontShowAgain] = useState(false)
+
+  // Check localStorage on mount
+  useEffect(() => {
+    const dismissed = localStorage.getItem(STORAGE_KEY)
+    setHasSeenTip(dismissed === 'true')
+  }, [])
 
   const handleButtonClick = async () => {
     // Track button click
@@ -47,19 +57,38 @@ export function FeedbackButton({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventType: 'feedback_button_clicked',
-          data: {},
+          data: { hasSeenTip },
         }),
       })
     } catch {
       // Silent fail - don't block UX
     }
 
-    // Show tip first, then form
-    setShowTip(true)
-    setTimeout(() => {
-      setShowTip(false)
+    // Show teaching modal if user hasn't dismissed it permanently
+    if (!hasSeenTip) {
+      setStep('teaching')
+    } else {
       setStep('form')
-    }, 3000)
+    }
+  }
+
+  const handleTeachingContinue = () => {
+    // Save preference if checkbox was checked
+    if (dontShowAgain) {
+      localStorage.setItem(STORAGE_KEY, 'true')
+      setHasSeenTip(true)
+    }
+    setStep('form')
+  }
+
+  const handleTeachingDismiss = () => {
+    // Save preference if checkbox was checked
+    if (dontShowAgain) {
+      localStorage.setItem(STORAGE_KEY, 'true')
+      setHasSeenTip(true)
+    }
+    setStep('button')
+    setDontShowAgain(false)
   }
 
   const handleSubmit = async () => {
@@ -99,7 +128,7 @@ export function FeedbackButton({
     setStep('button')
     setSentiment(null)
     setMessage('')
-    setShowTip(false)
+    setDontShowAgain(false)
   }
 
   // Position classes
@@ -113,26 +142,13 @@ export function FeedbackButton({
   return (
     <TooltipProvider>
       <div className={`z-40 ${positionClasses}`}>
-        {/* Tip Toast */}
-        {showTip && (
-          <div className="absolute bottom-14 right-0 animate-in slide-in-from-bottom-2 fade-in duration-200">
-            <div className="bg-neutral-800 border border-neutral-700 rounded-lg px-4 py-3 shadow-xl max-w-xs">
-              <p className="text-sm text-neutral-200">
-                <span className="text-cyan-400 font-medium">Tip:</span> You can also just tell OSQR{' '}
-                <span className="text-cyan-300">&quot;I want to leave feedback&quot;</span> anytime in the chat.
-              </p>
-            </div>
-            <div className="absolute -bottom-1 right-4 w-2 h-2 bg-neutral-800 border-b border-r border-neutral-700 transform rotate-45" />
-          </div>
-        )}
-
         {/* Button State */}
-        {step === 'button' && !showTip && (
+        {step === 'button' && (
           <Tooltip>
             <TooltipTrigger asChild>
               <button
                 onClick={handleButtonClick}
-                className="p-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-full shadow-lg transition-all hover:scale-105 group"
+                className="p-3 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-full shadow-lg transition-all hover:scale-105 group cursor-pointer"
               >
                 <MessageCircle className="h-5 w-5 text-neutral-400 group-hover:text-cyan-400 transition-colors" />
               </button>
@@ -143,14 +159,62 @@ export function FeedbackButton({
           </Tooltip>
         )}
 
-        {/* Tip showing with button visible but disabled */}
-        {showTip && (
-          <button
-            disabled
-            className="p-3 bg-neutral-800 border border-cyan-500/50 rounded-full shadow-lg cursor-default"
-          >
-            <MessageCircle className="h-5 w-5 text-cyan-400" />
-          </button>
+        {/* Teaching Modal - Gentle explanation about natural language */}
+        {step === 'teaching' && (
+          <div className="bg-neutral-900 border border-neutral-700 rounded-xl shadow-2xl p-5 w-80 animate-in slide-in-from-bottom-2 fade-in duration-200">
+            {/* Header with icon */}
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-cyan-500/10 rounded-lg shrink-0">
+                <Sparkles className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-white mb-1">Quick tip</h3>
+                <p className="text-sm text-neutral-300 leading-relaxed">
+                  You can share feedback just by talking to me. Try saying things like:
+                </p>
+              </div>
+            </div>
+
+            {/* Example phrases */}
+            <div className="space-y-2 mb-4 ml-11">
+              <p className="text-sm text-cyan-300">&quot;I want to leave some feedback&quot;</p>
+              <p className="text-sm text-cyan-300">&quot;That response was really helpful&quot;</p>
+              <p className="text-sm text-cyan-300">&quot;This isn&apos;t working for me&quot;</p>
+            </div>
+
+            <p className="text-sm text-neutral-400 mb-4 ml-11">
+              I&apos;ll take care of the rest.
+            </p>
+
+            {/* Don't show again checkbox */}
+            <label className="flex items-center gap-2 mb-4 ml-11 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={dontShowAgain}
+                onChange={(e) => setDontShowAgain(e.target.checked)}
+                className="w-4 h-4 rounded border-neutral-600 bg-neutral-800 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-0 cursor-pointer"
+              />
+              <span className="text-xs text-neutral-400 group-hover:text-neutral-300 transition-colors">
+                Got it, don&apos;t show this again
+              </span>
+            </label>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 ml-11">
+              <button
+                onClick={handleTeachingDismiss}
+                className="flex-1 py-2 text-sm text-neutral-400 hover:text-white transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={handleTeachingContinue}
+                className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Use form anyway
+              </button>
+            </div>
+          </div>
         )}
 
         {/* Form State */}

@@ -24,6 +24,7 @@ export * as Bubble from './bubble';
 export * as DesignSystem from './design-system';
 export * as DocumentIndexing from './document-indexing';
 export * as Throttle from './throttle';
+export * as Feedback from './feedback';
 
 // ============================================================================
 // Key Router Enums (commonly used directly)

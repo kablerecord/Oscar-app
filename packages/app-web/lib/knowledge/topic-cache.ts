@@ -58,7 +58,7 @@ const TOPIC_PATTERNS = [
   /\b(?:OpenAI|Anthropic|Claude|GPT|Gemini|DeepSeek|Groq|Grok)\b/gi,
 
   // OSQR concepts
-  /\b(?:OSQR|Oscar|Jarvis|TIL|MSC|PKV|GKVI|UIP)\b/gi,
+  /\b(?:OSQR|Oscar|TIL|MSC|PKV|GKVI|UIP)\b/gi,
   /\b(?:identity.?dimension|auto.?context|temporal.?intelligence)\b/gi,
   /\b(?:council.?mode|bubble.?component|render.?system)\b/gi,
   /\b(?:capture.?router|deep.?research|spoken.?architecture)\b/gi,
@@ -394,7 +394,7 @@ export async function checkQueryRelevance(
 
   // Third: determine scope based on matched topics
   // System scope indicators (OSQR internals)
-  const systemIndicators = ['osqr', 'jarvis', 'roadmap', 'architecture', 'til', 'msc', 'pkv', 'gkvi', 'uip']
+  const systemIndicators = ['osqr', 'roadmap', 'architecture', 'til', 'msc', 'pkv', 'gkvi', 'uip']
   const isSystemQuery = matchedTopics.some(t => systemIndicators.includes(t))
 
   const scope = isSystemQuery ? 'system' : 'user'

@@ -15,7 +15,6 @@ import { trackConversation, getTILContext } from '@/lib/til'
 import { runSecretaryCheck } from '@/lib/til/secretary-checklist'
 import { isPlanningRequest, extractPlanParams, generatePlan90, formatPlanForChat } from '@/lib/til/planner'
 import { isAuditRequest, extractAuditParams, runSelfAudit, formatAuditForChat } from '@/lib/til/self-audit'
-import { performSafetyCheck, processSafetyResponse, logSafetyEvent } from '@/lib/safety'
 import { routeQuestion } from '@/lib/ai/model-router'
 import { getCachedContext, getVaultStats } from '@/lib/context/prefetch'
 import { isDevWorkspace, createTimer, analyzeQuestion, logAnalytics, type AnalyticsEvent } from '@/lib/analytics/dev-analytics'
@@ -688,54 +687,6 @@ Guidelines:
       console.log(`[OSQR] Auto-routed to: ${effectiveMode} (${questionType}, complexity: ${complexity})`)
     }
 
-    // ==========================================================================
-    // SAFETY CHECK: Detect crisis signals BEFORE any processing
-    // ==========================================================================
-    const safetyResult = performSafetyCheck(message)
-
-    if (!safetyResult.proceedWithNormalFlow) {
-      // Crisis detected - return empathetic response immediately
-      // DO NOT store this message (privacy protection)
-      console.log('[OSQR] Safety intervention triggered - crisis level:', safetyResult.crisis.level)
-
-      // Log safety event (metadata only, never content)
-      logSafetyEvent('crisis_detected', {
-        level: safetyResult.crisis.level,
-        confidence: safetyResult.crisis.confidence,
-      })
-
-      // Create a thread but mark it specially (for continuity if user responds)
-      const thread = await prisma.chatThread.create({
-        data: {
-          workspaceId,
-          title: 'Support Conversation',
-          mode: 'panel',
-        },
-      })
-
-      // DO NOT save the user's message content (crisis content never stored)
-      // Only save OSQR's supportive response
-      await prisma.chatMessage.create({
-        data: {
-          threadId: thread.id,
-          role: 'assistant',
-          provider: 'osqr-safety',
-          content: safetyResult.interventionResponse || '',
-          metadata: {
-            safetyIntervention: true,
-            // Never store: crisis level, signals, or any identifying info
-          },
-        },
-      })
-
-      return NextResponse.json({
-        answer: safetyResult.interventionResponse,
-        threadId: thread.id,
-        // Don't include routing info for safety responses
-        stored: false, // Signal to client that user message was not stored
-      })
-    }
-
     // TIL-PLANNER: Check if this is a 90-day planning request
     if (isPlanningRequest(message)) {
       console.log('[OSQR] Detected planning request, routing to TIL Planner')
@@ -968,19 +919,7 @@ Guidelines:
     }
 
     const response = await OSQR.ask(osqrRequest)
-
-    // ==========================================================================
-    // SAFETY POST-PROCESSING: Wrap refusals and add disclaimers
-    // ==========================================================================
-    const safetyProcessed = processSafetyResponse(response.answer, message)
-    let processedAnswer = safetyProcessed.content
-
-    if (safetyProcessed.wasModified) {
-      logSafetyEvent(
-        safetyProcessed.content.includes("I can't help") ? 'refusal_wrapped' : 'disclaimer_added',
-        { timestamp: new Date() }
-      )
-    }
+    let processedAnswer = response.answer
 
     // ==========================================================================
     // CONSTITUTIONAL OUTPUT VALIDATION (I-1): Check AI response before sending
@@ -1293,6 +1232,8 @@ Guidelines:
         threadId: thread.id,
         panelDiscussion: response.panelDiscussion,
         roundtableDiscussion: response.roundtableDiscussion,
+        // Council mode specific data - full model opinions and consensus analysis
+        council: response.council,
         // New routing metadata - "OSQR knows when to think"
         routing: {
           ...response.routing,

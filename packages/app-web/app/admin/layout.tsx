@@ -13,8 +13,10 @@ const navItems = [
   { href: '/admin/users', label: 'Users', icon: '👥' },
   { href: '/admin/analytics', label: 'Analytics', icon: '📈' },
   { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
+  { href: '/admin/testimonials', label: 'Testimonials', icon: '💜' },
   { href: '/admin/health', label: 'Platform Health', icon: '💚' },
   { href: '/admin/cognitive', label: 'Cognitive Profiles', icon: '🧠' },
+  { href: '/admin/lab', label: 'Oscar Lab', icon: '🧪' },
 ]
 
 export default function AdminLayout({

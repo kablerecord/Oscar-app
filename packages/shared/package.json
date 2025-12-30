@@ -1,0 +1,36 @@
+{
+  "name": "@osqr/shared",
+  "version": "0.1.0",
+  "description": "Shared configuration and types for OSQR",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./tiers": {
+      "types": "./dist/tiers/index.d.ts",
+      "import": "./dist/tiers/index.js",
+      "require": "./dist/tiers/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "osqr",
+    "shared",
+    "config"
+  ],
+  "author": "Kable",
+  "license": "UNLICENSED",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

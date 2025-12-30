@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle, Award, Gift, Copy, Users, Link2, RefreshCw } from 'lucide-react'
+import { User, CreditCard, Settings2, Flame, Download, Loader2, Check, Lightbulb, Bell, BellOff, Volume2, Shield, AlertTriangle, Award, Gift, Copy, Users, Link2, RefreshCw, MessageSquareQuote, ChevronDown, ChevronUp } from 'lucide-react'
 import { getAllEarnedBadges, BADGES, BADGE_CATEGORIES, UserStats } from '@/lib/badges/config'
 import { MainLayout } from '@/components/layout/MainLayout'
 import { UserProfileSection } from '@/components/settings/UserProfileSection'
+import { AICapabilitiesSection } from '@/components/settings/AICapabilitiesSection'
+import { LabFeedbackSection } from '@/components/settings/LabFeedbackSection'
 
 interface UserData {
   name: string
@@ -99,6 +101,23 @@ export default function SettingsPage() {
   const [codeCopied, setCodeCopied] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
 
+  // Testimonial state
+  const [testimonialContent, setTestimonialContent] = useState('')
+  const [testimonialDisplayName, setTestimonialDisplayName] = useState('')
+  const [testimonialRole, setTestimonialRole] = useState('')
+  const [testimonialStatus, setTestimonialStatus] = useState<'idle' | 'loading' | 'submitted' | 'error'>('idle')
+  const [existingTestimonial, setExistingTestimonial] = useState<{
+    id: string
+    content: string
+    displayName: string | null
+    role: string | null
+    status: string
+  } | null>(null)
+  const [testimonialError, setTestimonialError] = useState<string | null>(null)
+
+  // Achievements section expanded state
+  const [achievementsExpanded, setAchievementsExpanded] = useState(false)
+
   useEffect(() => {
     async function fetchUserData() {
       try {
@@ -177,6 +196,25 @@ export default function SettingsPage() {
       }
     }
     fetchPrivacySettings()
+  }, [])
+
+  // Fetch existing testimonial
+  useEffect(() => {
+    async function fetchTestimonial() {
+      try {
+        const res = await fetch('/api/testimonials')
+        if (res.ok) {
+          const data = await res.json()
+          if (data.hasSubmitted && data.testimonial) {
+            setExistingTestimonial(data.testimonial)
+            setTestimonialStatus('submitted')
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch testimonial:', error)
+      }
+    }
+    fetchTestimonial()
   }, [])
 
   // Fetch referral stats
@@ -336,6 +374,52 @@ export default function SettingsPage() {
       setTimeout(() => setLinkCopied(false), 2000)
     } catch (error) {
       console.error('Failed to copy share link:', error)
+    }
+  }
+
+  // Submit testimonial
+  const handleSubmitTestimonial = async () => {
+    if (!testimonialContent.trim()) {
+      setTestimonialError('Please write a testimonial')
+      return
+    }
+
+    setTestimonialStatus('loading')
+    setTestimonialError(null)
+
+    try {
+      const res = await fetch('/api/testimonials', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: testimonialContent.trim(),
+          displayName: testimonialDisplayName.trim() || null,
+          role: testimonialRole.trim() || null,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        setExistingTestimonial({
+          id: data.testimonialId,
+          content: testimonialContent.trim(),
+          displayName: testimonialDisplayName.trim() || null,
+          role: testimonialRole.trim() || null,
+          status: 'PENDING',
+        })
+        setTestimonialStatus('submitted')
+        setTestimonialContent('')
+        setTestimonialDisplayName('')
+        setTestimonialRole('')
+      } else {
+        const errorData = await res.json()
+        setTestimonialError(errorData.error || 'Failed to submit testimonial')
+        setTestimonialStatus('error')
+      }
+    } catch (error) {
+      console.error('Failed to submit testimonial:', error)
+      setTestimonialError('Network error - please try again')
+      setTestimonialStatus('error')
     }
   }
 
@@ -525,138 +609,221 @@ export default function SettingsPage() {
 
         {/* Badges Section */}
         <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 bg-amber-500/20 rounded-lg">
-              <Award className="h-5 w-5 text-amber-400" />
+          {/* Header - Clickable to expand/collapse */}
+          <div
+            className="flex items-center justify-between cursor-pointer"
+            onClick={() => setAchievementsExpanded(!achievementsExpanded)}
+          >
+            <div className="flex items-center gap-3">
+              {/* Expand/Collapse Chevron */}
+              <div className="p-1.5 rounded-lg hover:bg-neutral-800 transition-colors">
+                {achievementsExpanded ? (
+                  <ChevronUp className="h-5 w-5 text-neutral-400" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-neutral-400" />
+                )}
+              </div>
+              <div className="p-2 bg-amber-500/20 rounded-lg">
+                <Award className="h-5 w-5 text-amber-400" />
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-white">Achievements</h2>
+                <p className="text-sm text-neutral-400">
+                  {achievementsExpanded
+                    ? 'Your badges and milestones'
+                    : 'Click to expand and view all badges'}
+                </p>
+              </div>
             </div>
-            <h2 className="text-xl font-semibold text-white">Achievements</h2>
           </div>
 
-          {userStats ? (
-            <div className="space-y-6">
-              {/* Stats Summary at top */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                <div className="bg-neutral-800/50 rounded-lg p-3">
-                  <p className="text-2xl font-bold text-white">{userStats.totalQuestions}</p>
-                  <p className="text-xs text-neutral-400">Questions</p>
+          {/* Preview when collapsed */}
+          {!achievementsExpanded && userStats && (
+            <div
+              className="mt-4 pt-4 border-t border-neutral-800 cursor-pointer"
+              onClick={() => setAchievementsExpanded(true)}
+            >
+              <div className="flex flex-wrap gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <span className="text-neutral-500">Badges:</span>
+                  <span className="text-amber-400 font-medium">
+                    {getAllEarnedBadges(userStats).length}/{Object.keys(BADGES).length} earned
+                  </span>
                 </div>
-                <div className="bg-neutral-800/50 rounded-lg p-3">
-                  <p className="text-2xl font-bold text-white">{userStats.totalActiveDays || 0}</p>
-                  <p className="text-xs text-neutral-400">Active Days</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-neutral-500">Questions:</span>
+                  <span className="text-neutral-300">{userStats.totalQuestions}</span>
                 </div>
-                <div className="bg-neutral-800/50 rounded-lg p-3">
-                  <p className="text-2xl font-bold text-white">{userStats.documentsIndexed}</p>
-                  <p className="text-xs text-neutral-400">Docs Indexed</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-neutral-500">Active Days:</span>
+                  <span className="text-neutral-300">{userStats.totalActiveDays || 0}</span>
                 </div>
-                <div className="bg-neutral-800/50 rounded-lg p-3">
-                  <p className="text-2xl font-bold text-amber-400">{getAllEarnedBadges(userStats).length}/{Object.keys(BADGES).length}</p>
-                  <p className="text-xs text-neutral-400">Badges Earned</p>
-                </div>
+                <span className="text-amber-400">• Click to expand</span>
               </div>
+            </div>
+          )}
 
-              {/* Badges by Category */}
-              {(() => {
-                const earnedBadges = getAllEarnedBadges(userStats)
-                const earnedBadgeIds = new Set(earnedBadges.map(b => b.id))
+          {/* Expanded Content */}
+          {achievementsExpanded && (
+            <>
+              {userStats ? (
+                <div className="space-y-6 mt-6">
+                  {/* Stats Summary at top */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                    <div className="bg-neutral-800/50 rounded-lg p-3">
+                      <p className="text-2xl font-bold text-white">{userStats.totalQuestions}</p>
+                      <p className="text-xs text-neutral-400">Questions</p>
+                    </div>
+                    <div className="bg-neutral-800/50 rounded-lg p-3">
+                      <p className="text-2xl font-bold text-white">{userStats.totalActiveDays || 0}</p>
+                      <p className="text-xs text-neutral-400">Active Days</p>
+                    </div>
+                    <div className="bg-neutral-800/50 rounded-lg p-3">
+                      <p className="text-2xl font-bold text-white">{userStats.documentsIndexed}</p>
+                      <p className="text-xs text-neutral-400">Docs Indexed</p>
+                    </div>
+                    <div className="bg-neutral-800/50 rounded-lg p-3">
+                      <p className="text-2xl font-bold text-amber-400">{getAllEarnedBadges(userStats).length}/{Object.keys(BADGES).length}</p>
+                      <p className="text-xs text-neutral-400">Badges Earned</p>
+                    </div>
+                  </div>
 
-                return (
-                  <div className="space-y-6">
-                    {Object.entries(BADGE_CATEGORIES).map(([categoryId, category]) => {
-                      const categoryBadges = category.badges
-                      const earnedInCategory = categoryBadges.filter(id => earnedBadgeIds.has(id))
+                  {/* Badges by Category */}
+                  {(() => {
+                    const earnedBadges = getAllEarnedBadges(userStats)
+                    const earnedBadgeIds = new Set(earnedBadges.map(b => b.id))
 
-                      return (
-                        <div key={categoryId} className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="text-sm font-medium text-white">{category.name}</h3>
-                              <p className="text-xs text-neutral-500">{category.description}</p>
-                            </div>
-                            <span className="text-xs text-neutral-400">
-                              {earnedInCategory.length}/{categoryBadges.length}
-                            </span>
-                          </div>
+                    return (
+                      <div className="space-y-6">
+                        {Object.entries(BADGE_CATEGORIES).map(([categoryId, category]) => {
+                          const categoryBadges = category.badges
+                          const earnedInCategory = categoryBadges.filter(id => earnedBadgeIds.has(id))
 
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                            {categoryBadges.map((badgeId) => {
-                              const badge = BADGES[badgeId]
-                              if (!badge) return null
-                              const isEarned = earnedBadgeIds.has(badgeId)
-
-                              return (
-                                <div
-                                  key={badgeId}
-                                  className={`flex items-center gap-2 p-2.5 rounded-lg transition-all ${
-                                    isEarned
-                                      ? badge.color
-                                      : 'bg-neutral-800/30 opacity-40'
-                                  }`}
-                                  title={badge.description}
-                                >
-                                  <span className={`text-xl ${isEarned ? '' : 'grayscale'}`}>
-                                    {badge.icon}
-                                  </span>
-                                  <div className="min-w-0 flex-1">
-                                    <p className={`text-xs font-medium truncate ${
-                                      isEarned ? 'text-white' : 'text-neutral-500'
-                                    }`}>
-                                      {badge.name}
-                                    </p>
-                                  </div>
+                          return (
+                            <div key={categoryId} className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h3 className="text-sm font-medium text-white">{category.name}</h3>
+                                  <p className="text-xs text-neutral-500">{category.description}</p>
                                 </div>
-                              )
-                            })}
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+                                <span className="text-xs text-neutral-400">
+                                  {earnedInCategory.length}/{categoryBadges.length}
+                                </span>
+                              </div>
 
-              {/* Progress indicators for long-term badges */}
-              {userStats.consecutiveMonthsActive !== undefined && userStats.consecutiveMonthsActive > 0 && userStats.consecutiveMonthsActive < 12 && (
-                <div className="border-t border-neutral-800 pt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-neutral-400">Journey Progress</span>
-                    <span className="text-xs text-neutral-500">
-                      {userStats.consecutiveMonthsActive} month{userStats.consecutiveMonthsActive !== 1 ? 's' : ''} active
-                    </span>
-                  </div>
-                  <div className="flex gap-1">
-                    {Array.from({ length: 12 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={`h-2 flex-1 rounded-full ${
-                          i < userStats.consecutiveMonthsActive!
-                            ? i < 3
-                              ? 'bg-emerald-500'
-                              : i < 6
-                              ? 'bg-blue-500'
-                              : 'bg-amber-500'
-                            : 'bg-neutral-800'
-                        }`}
-                        title={
-                          i === 2 ? 'Quarterly Quest (3 months)' :
-                          i === 5 ? 'Semester Scholar (6 months)' :
-                          i === 11 ? 'Year One (12 months)' :
-                          `Month ${i + 1}`
-                        }
-                      />
-                    ))}
-                  </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-[10px] text-neutral-600">3mo</span>
-                    <span className="text-[10px] text-neutral-600">6mo</span>
-                    <span className="text-[10px] text-neutral-600">12mo</span>
-                  </div>
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {categoryBadges.map((badgeId) => {
+                                  const badge = BADGES[badgeId]
+                                  if (!badge) return null
+                                  const isEarned = earnedBadgeIds.has(badgeId)
+                                  const badgeWithReq = badge as typeof badge & { requirement?: string }
+
+                                  return (
+                                    <div
+                                      key={badgeId}
+                                      className={`relative group/badge flex items-center gap-2 p-2.5 rounded-lg transition-all cursor-default ${
+                                        isEarned
+                                          ? badge.color
+                                          : 'bg-neutral-800/30 opacity-60 hover:opacity-80'
+                                      }`}
+                                    >
+                                      <span className={`text-xl ${isEarned ? '' : 'grayscale'}`}>
+                                        {badge.icon}
+                                      </span>
+                                      <div className="min-w-0 flex-1">
+                                        <p className={`text-xs font-medium truncate ${
+                                          isEarned ? 'text-white' : 'text-neutral-500'
+                                        }`}>
+                                          {badge.name}
+                                        </p>
+                                      </div>
+
+                                      {/* Custom Tooltip */}
+                                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover/badge:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                                        <div className={`px-3 py-2 rounded-lg shadow-xl whitespace-nowrap ${
+                                          isEarned
+                                            ? 'bg-neutral-800 border border-neutral-700'
+                                            : 'bg-neutral-900 border border-neutral-700'
+                                        }`}>
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="text-base">{badge.icon}</span>
+                                            <span className="text-sm font-medium text-white">{badge.name}</span>
+                                            {isEarned && (
+                                              <Check className="h-3.5 w-3.5 text-green-400" />
+                                            )}
+                                          </div>
+                                          <p className="text-xs text-neutral-400 max-w-[200px] whitespace-normal">
+                                            {isEarned ? badge.description : badgeWithReq.requirement || badge.description}
+                                          </p>
+                                          {!isEarned && (
+                                            <p className="text-[10px] text-amber-400/80 mt-1">
+                                              Not yet earned
+                                            </p>
+                                          )}
+                                        </div>
+                                        {/* Tooltip arrow */}
+                                        <div className={`absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 rotate-45 ${
+                                          isEarned
+                                            ? 'bg-neutral-800 border-b border-r border-neutral-700'
+                                            : 'bg-neutral-900 border-b border-r border-neutral-700'
+                                        }`} />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+
+                  {/* Progress indicators for long-term badges */}
+                  {userStats.consecutiveMonthsActive !== undefined && userStats.consecutiveMonthsActive > 0 && userStats.consecutiveMonthsActive < 12 && (
+                    <div className="border-t border-neutral-800 pt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-neutral-400">Journey Progress</span>
+                        <span className="text-xs text-neutral-500">
+                          {userStats.consecutiveMonthsActive} month{userStats.consecutiveMonthsActive !== 1 ? 's' : ''} active
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        {Array.from({ length: 12 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={`h-2 flex-1 rounded-full ${
+                              i < userStats.consecutiveMonthsActive!
+                                ? i < 3
+                                  ? 'bg-emerald-500'
+                                  : i < 6
+                                  ? 'bg-blue-500'
+                                  : 'bg-amber-500'
+                                : 'bg-neutral-800'
+                            }`}
+                            title={
+                              i === 2 ? 'Quarterly Quest (3 months)' :
+                              i === 5 ? 'Semester Scholar (6 months)' :
+                              i === 11 ? 'Year One (12 months)' :
+                              `Month ${i + 1}`
+                            }
+                          />
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-[10px] text-neutral-600">3mo</span>
+                        <span className="text-[10px] text-neutral-600">6mo</span>
+                        <span className="text-[10px] text-neutral-600">12mo</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex items-center justify-center py-8 mt-6">
+                  <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
                 </div>
               )}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-neutral-400" />
-            </div>
+            </>
           )}
         </section>
 
@@ -975,6 +1142,125 @@ export default function SettingsPage() {
           )}
         </section>
 
+        {/* Share a Testimonial Section */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="p-2 bg-indigo-500/20 rounded-lg">
+              <MessageSquareQuote className="h-5 w-5 text-indigo-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-white">Share a Testimonial</h2>
+              <p className="text-sm text-neutral-400">Tell us how Oscar has helped you</p>
+            </div>
+          </div>
+
+          {testimonialStatus === 'submitted' && existingTestimonial ? (
+            <div className="space-y-4">
+              <div className="bg-indigo-500/10 border border-indigo-500/30 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <Check className="h-5 w-5 text-indigo-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-indigo-300 font-medium">Thank you for your testimonial!</p>
+                    <p className="text-sm text-neutral-400 mt-1">
+                      {existingTestimonial.status === 'PENDING'
+                        ? "We're reviewing it and may feature it on our website."
+                        : existingTestimonial.status === 'APPROVED'
+                        ? 'Your testimonial has been approved and may appear on our website.'
+                        : 'Your testimonial has been reviewed.'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-neutral-800 rounded-lg p-4">
+                <p className="text-neutral-300 italic">&quot;{existingTestimonial.content}&quot;</p>
+                {(existingTestimonial.displayName || existingTestimonial.role) && (
+                  <p className="text-sm text-neutral-500 mt-2">
+                    — {existingTestimonial.displayName || 'Anonymous'}
+                    {existingTestimonial.role && `, ${existingTestimonial.role}`}
+                  </p>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-400 mb-2">
+                  Your testimonial
+                </label>
+                <textarea
+                  value={testimonialContent}
+                  onChange={(e) => {
+                    setTestimonialContent(e.target.value)
+                    setTestimonialError(null)
+                  }}
+                  placeholder="How has Oscar helped you? What do you love about it?"
+                  rows={4}
+                  maxLength={1000}
+                  className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                />
+                <p className="text-xs text-neutral-500 mt-1 text-right">
+                  {testimonialContent.length}/1000
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-2">
+                    Display name <span className="text-neutral-600">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={testimonialDisplayName}
+                    onChange={(e) => setTestimonialDisplayName(e.target.value)}
+                    placeholder="How you'd like to be credited"
+                    className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-400 mb-2">
+                    Role/Title <span className="text-neutral-600">(optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={testimonialRole}
+                    onChange={(e) => setTestimonialRole(e.target.value)}
+                    placeholder="e.g., Startup Founder"
+                    className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 rounded-lg text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
+
+              {testimonialError && (
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-400">
+                  {testimonialError}
+                </div>
+              )}
+
+              <button
+                onClick={handleSubmitTestimonial}
+                disabled={testimonialStatus === 'loading' || !testimonialContent.trim()}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                {testimonialStatus === 'loading' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <MessageSquareQuote className="h-4 w-4" />
+                    Submit Testimonial
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-neutral-500">
+                By submitting, you agree that we may use your testimonial on our website and marketing materials.
+              </p>
+            </div>
+          )}
+        </section>
+
         {/* Preferences Section */}
         <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">
           <div className="flex items-center gap-3 mb-6">
@@ -1036,6 +1322,12 @@ export default function SettingsPage() {
             </div>
           </div>
         </section>
+
+        {/* AI Capabilities Section */}
+        <AICapabilitiesSection />
+
+        {/* Oscar Lab Section */}
+        <LabFeedbackSection />
 
         {/* OSQR Bubble Settings Section */}
         <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6">

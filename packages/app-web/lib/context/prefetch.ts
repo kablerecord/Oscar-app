@@ -1,7 +1,7 @@
 /**
  * OSQR Pre-fetch System
  *
- * "Jarvis Awareness" - Pre-load user context in the background so OSQR
+ * "Instant Awareness" - Pre-load user context in the background so OSQR
  * always feels instantly aware. Like Netflix buffering before you hit play.
  *
  * Architecture:

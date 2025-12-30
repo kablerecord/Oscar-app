@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { TIERS, type TierName, hasYearlyOption } from '@/lib/tiers/config'
-import { Check, Crown, Star, ArrowLeft, Building2, X, Loader2, Zap } from 'lucide-react'
+import { Check, Crown, Star, ArrowLeft, Building2, X, Loader2, Zap, Users } from 'lucide-react'
+import { FounderCountdown } from '@/components/pricing/FounderCountdown'
 
 export default function PricingPage() {
   // Only show Pro and Master tiers (Lite launches post-1,000 users)
@@ -28,26 +29,19 @@ export default function PricingPage() {
         {/* Header */}
         <div className="text-center mb-4">
           <h1 className="text-4xl font-bold text-white mb-4">
-            Don&apos;t Just Ask AI. Start Thinking With One.
+            An AI That Knows You, Remembers Everything, and Thinks With Multiple Minds
           </h1>
           <p className="text-xl text-neutral-400 max-w-2xl mx-auto mb-2">
-            One Question. Many Minds. One Clear Answer.
+            Council Mode: One Question. Many AI Perspectives. One Clear Answer.
           </p>
           <p className="text-base text-neutral-500 max-w-xl mx-auto">
             Built for founders, operators, and high-performers who want elite decision-making and world-class clarity.
           </p>
         </div>
 
-        {/* Founder Edition Banner */}
-        <div className="text-center mb-8">
-          <div className="inline-block bg-neutral-800/50 border border-neutral-600 rounded-lg px-6 py-3">
-            <p className="text-sm font-medium text-white">
-              Founder Edition Pricing — Available for the first 500 users
-            </p>
-            <p className="text-xs text-green-400 mt-1">
-              Lock in lifetime pricing before rates increase
-            </p>
-          </div>
+        {/* Founder Countdown Component */}
+        <div className="max-w-md mx-auto mb-8">
+          <FounderCountdown />
         </div>
 
         {/* Billing Toggle */}
@@ -117,13 +111,11 @@ export default function PricingPage() {
             <ul className="space-y-3 mb-6">
               {[
                 'Everything in Master',
-                'Unlimited documents',
-                'Dedicated support',
-                'Custom model access',
+                'Unlimited documents and storage',
                 'API access for integrations',
                 'Team collaboration (coming)',
                 'SSO & advanced security',
-                '100MB max file size',
+                'Dedicated support',
               ].map((feature, i) => (
                 <li key={i} className="flex items-start gap-2">
                   <Check className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-400" />
@@ -164,6 +156,80 @@ export default function PricingPage() {
           <EnterpriseModal onClose={() => setShowEnterpriseModal(false)} />
         )}
 
+        {/* Feature Comparison Table */}
+        <div className="mt-16">
+          <h2 className="text-2xl font-bold text-white text-center mb-8">
+            Compare Plans
+          </h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-neutral-700">
+                  <th className="py-4 px-4 text-left text-neutral-400 font-medium">Feature</th>
+                  <th className="py-4 px-4 text-center text-cyan-400 font-bold">Pro</th>
+                  <th className="py-4 px-4 text-center text-purple-400 font-bold">Master</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-800">
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">Monthly Price</td>
+                  <td className="py-3 px-4 text-center text-white font-semibold">
+                    <span className="text-green-400">$39</span>
+                    <span className="text-neutral-500 text-xs ml-1">(founder)</span>
+                  </td>
+                  <td className="py-3 px-4 text-center text-white font-semibold">
+                    <span className="text-green-400">$119</span>
+                    <span className="text-neutral-500 text-xs ml-1">(founder)</span>
+                  </td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">Regular Price</td>
+                  <td className="py-3 px-4 text-center text-neutral-400">$49/mo</td>
+                  <td className="py-3 px-4 text-center text-neutral-400">$149/mo</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">Queries per Day</td>
+                  <td className="py-3 px-4 text-center text-white">75</td>
+                  <td className="py-3 px-4 text-center text-white">200</td>
+                </tr>
+                <tr className="bg-purple-500/5">
+                  <td className="py-3 px-4 text-neutral-300 flex items-center gap-2">
+                    <Users className="h-4 w-4 text-purple-400" />
+                    Council Mode
+                  </td>
+                  <td className="py-3 px-4 text-center text-white font-medium">5/day</td>
+                  <td className="py-3 px-4 text-center text-white font-medium">15/day</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">Documents in Vault</td>
+                  <td className="py-3 px-4 text-center text-white">500</td>
+                  <td className="py-3 px-4 text-center text-white">1,500</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">Storage</td>
+                  <td className="py-3 px-4 text-center text-white">10GB</td>
+                  <td className="py-3 px-4 text-center text-white">100GB</td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">VS Code Extension</td>
+                  <td className="py-3 px-4 text-center"><Check className="h-5 w-5 text-green-400 mx-auto" /></td>
+                  <td className="py-3 px-4 text-center"><Check className="h-5 w-5 text-green-400 mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">Priority Processing</td>
+                  <td className="py-3 px-4 text-center"><X className="h-5 w-5 text-neutral-600 mx-auto" /></td>
+                  <td className="py-3 px-4 text-center"><Check className="h-5 w-5 text-green-400 mx-auto" /></td>
+                </tr>
+                <tr>
+                  <td className="py-3 px-4 text-neutral-300">Weekly Reviews</td>
+                  <td className="py-3 px-4 text-center"><X className="h-5 w-5 text-neutral-600 mx-auto" /></td>
+                  <td className="py-3 px-4 text-center"><Check className="h-5 w-5 text-green-400 mx-auto" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Guarantee Section */}
         <div className="mt-16 text-center">
           <div className="bg-neutral-800/50 border border-neutral-700 rounded-xl p-6 max-w-2xl mx-auto">
@@ -187,6 +253,10 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
   const isMaster = tier.name === 'master'
   const hasYearly = hasYearlyOption(tier.name)
 
+  // Get founder price if available
+  const founderPrice = (tier as { founderPrice?: number }).founderPrice
+  const hasFounderPricing = founderPrice !== undefined && founderPrice < tier.price
+
   // Stripe payment links
   const paymentLinks: Record<TierName, { monthly: string; yearly: string }> = {
     lite: {
@@ -194,11 +264,11 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
       yearly: '/signup?plan=lite&billing=monthly', // Lite is monthly only
     },
     pro: {
-      monthly: process.env.NEXT_PUBLIC_STRIPE_PRO_LINK || '/signup?plan=pro&billing=monthly',
+      monthly: process.env.NEXT_PUBLIC_STRIPE_PRO_FOUNDER_LINK || '/signup?plan=pro&billing=monthly&founder=true',
       yearly: process.env.NEXT_PUBLIC_STRIPE_PRO_YEARLY_LINK || '/signup?plan=pro&billing=yearly',
     },
     master: {
-      monthly: process.env.NEXT_PUBLIC_STRIPE_MASTER_LINK || '/signup?plan=master&billing=monthly',
+      monthly: process.env.NEXT_PUBLIC_STRIPE_MASTER_FOUNDER_LINK || '/signup?plan=master&billing=monthly&founder=true',
       yearly: process.env.NEXT_PUBLIC_STRIPE_MASTER_YEARLY_LINK || '/signup?plan=master&billing=yearly',
     },
   }
@@ -211,8 +281,10 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
     window.location.href = paymentLinks[tier.name].monthly
   }
 
-  // Calculate display price
-  const displayPrice = isYearly && hasYearly ? tier.yearlyPrice : tier.price
+  // Calculate display price - show founder price during founder period
+  const displayPrice = isYearly && hasYearly
+    ? tier.yearlyPrice
+    : (hasFounderPricing ? founderPrice : tier.price)
   const priceLabel = isYearly && hasYearly ? '/year' : '/month'
 
   // Style configurations
@@ -302,12 +374,18 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
           </>
         ) : (
           <>
-            <p className="text-xs text-neutral-500 mt-1">
-              {tier.futurePrice > tier.price ? `Early Launch Price — Future price $${tier.futurePrice}/mo` : 'Monthly billing'}
-            </p>
-            {tier.futurePrice > tier.price && (
-              <p className="text-xs font-medium text-green-400 mt-1">
-                Founder rate locked in for life
+            {hasFounderPricing ? (
+              <>
+                <p className="text-xs text-neutral-500 mt-1">
+                  <span className="line-through">${tier.price}/mo</span> — Founder pricing
+                </p>
+                <p className="text-xs font-medium text-green-400 mt-1">
+                  Locked in for life as a founder
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-neutral-500 mt-1">
+                Monthly billing
               </p>
             )}
           </>
@@ -332,7 +410,7 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
         {`Get ${tier.displayName}${isYearly && hasYearly ? ' (Yearly)' : ''}`}
       </button>
 
-      {/* Comparison card - NO query limits shown */}
+      {/* Comparison card - Show key limits including Council Mode */}
       <div className="mt-4 pt-4 border-t border-neutral-700">
         <div className="grid grid-cols-2 gap-2 text-xs text-neutral-400">
           <div>
@@ -342,12 +420,14 @@ function PricingCard({ tier, isYearly }: { tier: typeof TIERS[TierName]; isYearl
             <span className="font-medium text-neutral-300">{tier.limits.maxFileSizeMB}MB</span> max file
           </div>
           <div>
-            <span className="font-medium text-neutral-300">{tier.modelCount}</span> AI model{tier.modelCount > 1 ? 's' : ''}
+            <span className="font-medium text-neutral-300">{tier.limits.panelQueriesPerDay}</span>/day queries
           </div>
           <div>
-            <span className="font-medium text-neutral-300">
-              {tier.limits.hasCouncilMode ? 'All' : tier.limits.hasThoughtfulMode ? '2' : '1'}
-            </span> mode{tier.limits.hasCouncilMode || tier.limits.hasThoughtfulMode ? 's' : ''}
+            {tier.limits.hasCouncilMode ? (
+              <><span className="font-medium text-neutral-300">{tier.limits.councilPerDay}</span>/day council</>
+            ) : (
+              <span className="text-neutral-500">No council</span>
+            )}
           </div>
         </div>
       </div>

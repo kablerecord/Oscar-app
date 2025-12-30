@@ -18,8 +18,10 @@ import {
   Maximize2,
   X,
   Check,
+  BookOpen,
 } from 'lucide-react'
 import type { ArtifactBlock, ArtifactType } from '@/lib/artifacts/types'
+import { ResearchReportView, type ResearchReport } from './ResearchReport'
 
 interface ArtifactPanelProps {
   artifacts: ArtifactBlock[]
@@ -37,6 +39,7 @@ const typeIcons: Record<ArtifactType, React.ElementType> = {
   JSON: Database,
   CSV: Table,
   REACT: Component,
+  RESEARCH: BookOpen,
 }
 
 const typeLabels: Record<ArtifactType, string> = {
@@ -50,6 +53,7 @@ const typeLabels: Record<ArtifactType, string> = {
   JSON: 'JSON',
   CSV: 'CSV',
   REACT: 'React',
+  RESEARCH: 'Research',
 }
 
 const typeColors: Record<ArtifactType, string> = {
@@ -63,6 +67,7 @@ const typeColors: Record<ArtifactType, string> = {
   JSON: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400',
   CSV: 'bg-teal-100 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400',
   REACT: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-400',
+  RESEARCH: 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400',
 }
 
 export function ArtifactPanel({ artifacts, onClose }: ArtifactPanelProps) {
@@ -93,6 +98,7 @@ export function ArtifactPanel({ artifacts, onClose }: ArtifactPanelProps) {
       JSON: 'json',
       CSV: 'csv',
       REACT: 'tsx',
+      RESEARCH: 'md',
     }
 
     const ext = extensions[currentArtifact.type]
@@ -219,6 +225,8 @@ function ArtifactContent({ artifact }: { artifact: ArtifactBlock }) {
       return <DiagramPreview content={artifact.content} />
     case 'JSON':
       return <JsonPreview content={artifact.content} />
+    case 'RESEARCH':
+      return <ResearchPreview content={artifact.content} />
     default:
       return <CodePreview content={artifact.content} language={artifact.language} />
   }
@@ -287,4 +295,15 @@ function JsonPreview({ content }: { content: string }) {
     // Keep original if not valid JSON
   }
   return <CodePreview content={formatted} language="json" />
+}
+
+function ResearchPreview({ content }: { content: string }) {
+  // Research reports are stored as JSON
+  try {
+    const report = JSON.parse(content) as ResearchReport
+    return <ResearchReportView report={report} />
+  } catch {
+    // Fallback to code preview if not valid JSON
+    return <CodePreview content={content} language="json" />
+  }
 }

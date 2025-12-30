@@ -29,6 +29,7 @@ import {
   Lock,
   Crown,
   Scale, // Supreme Court icon
+  Gavel, // Council Mode icon
   Mic,
   MicOff,
   ThumbsUp,
@@ -38,6 +39,7 @@ import {
 import { RoutingNotification } from '@/components/oscar/RoutingNotification'
 import { ShareActions } from '@/components/share/ShareActions'
 import { ResponseActions } from '@/components/chat/ResponseActions'
+import { QuickReactionWidget } from '@/components/lab/QuickReactionWidget'
 import {
   type OnboardingState,
   getInitialOnboardingState,
@@ -46,6 +48,7 @@ import {
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
 import { CouncilPanel, CouncilBadge, type PanelMemberResponse } from '@/components/council/CouncilPanel'
+import { CouncilFullView, type CouncilResponse, type CouncilSynthesisData } from '@/components/council/CouncilFullView'
 import {
   Tooltip,
   TooltipContent,
@@ -53,6 +56,11 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { ArtifactPreview } from '@/components/render/ArtifactPreview'
+import { CapabilityBar, DEFAULT_CAPABILITY_STATE, type CapabilityBarState } from '@/components/oscar/CapabilityBar'
+import { AttachmentArea } from '@/components/oscar/AttachmentArea'
+import { IntentHint } from '@/components/oscar/IntentHint'
+import { VoiceInput, VoiceOutput } from '@/components/oscar/VoiceComponents'
+import { useCapabilities, type Attachment } from '@/hooks/useCapabilities'
 
 interface AltOpinion {
   answer: string
@@ -276,9 +284,20 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   // One-shot toggle to force panel mode for a single question (auto-resets after response)
   // Also shows the council deliberation when panel responses are returned
   const [forcePanel, setForcePanel] = useState(false)
+  // Council Mode - full multi-model deliberation with Oscar synthesis
+  const [forceCouncil, setForceCouncil] = useState(false)
+  // Council Full View state
+  const [councilViewOpen, setCouncilViewOpen] = useState(false)
+  const [councilViewQuery, setCouncilViewQuery] = useState('')
+  const [councilViewResponses, setCouncilViewResponses] = useState<CouncilResponse[]>([])
+  const [councilViewSynthesis, setCouncilViewSynthesis] = useState<CouncilSynthesisData | undefined>(undefined)
+  const [councilViewProcessing, setCouncilViewProcessing] = useState(false)
   const [showUpgradeModal, setShowUpgradeModal] = useState(false)
   const [showSupremeLockedModal, setShowSupremeLockedModal] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [showTeachingModal, setShowTeachingModal] = useState(false)
+  const [hasSeenFeedbackTip, setHasSeenFeedbackTip] = useState(true) // Default true to avoid flash
+  const [dontShowFeedbackTipAgain, setDontShowFeedbackTipAgain] = useState(false)
   const [feedbackMessage, setFeedbackMessage] = useState('')
   const [feedbackSentiment, setFeedbackSentiment] = useState<'positive' | 'negative' | null>(null)
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
@@ -298,6 +317,26 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [isRecording, setIsRecording] = useState(false)
   const [isVoiceSupported, setIsVoiceSupported] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+
+  // Capability bar state - AI capabilities (search, code, image, etc.)
+  const [capabilityState, setCapabilityState] = useState<CapabilityBarState>(DEFAULT_CAPABILITY_STATE)
+
+  // Attachments state for file uploads
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+
+  // Capabilities hook for API calls
+  const {
+    uploadAttachments,
+    isUploading,
+    synthesizeSpeech,
+    isSynthesizing,
+  } = useCapabilities()
+
+  // Notification state for errors/success
+  const [notification, setNotification] = useState<{
+    type: 'error' | 'success' | 'info'
+    message: string
+  } | null>(null)
 
   // AbortController for stopping streaming requests
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -481,6 +520,12 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const handleViewRender = useCallback((artifactId: string) => {
     router.push(`/r/${artifactId}`)
   }, [router])
+
+  // Check localStorage for feedback tip dismissal on mount
+  useEffect(() => {
+    const dismissed = localStorage.getItem('osqr-feedback-tip-dismissed')
+    setHasSeenFeedbackTip(dismissed === 'true')
+  }, [])
 
   // Load useKnowledge from localStorage (synced with Settings page)
   useEffect(() => {
@@ -901,6 +946,15 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
     // Set bubble to thinking state (purple pulse)
     setStreamingState('thinking')
 
+    // If council mode, open the full view immediately
+    if (forceCouncil) {
+      setCouncilViewQuery(finalQuestion)
+      setCouncilViewResponses([])
+      setCouncilViewSynthesis(undefined)
+      setCouncilViewProcessing(true)
+      setCouncilViewOpen(true)
+    }
+
     try {
       // Build conversation history from current messages (excluding the thinking placeholder we just added)
       const conversationHistory = messages
@@ -921,9 +975,10 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           message: finalQuestion,
           workspaceId,
           useKnowledge,
-          includeDebate: forcePanel, // Show council when panel is forced
-          // Only send mode if user explicitly requested panel mode
-          ...(forcePanel && { mode: 'thoughtful' }),
+          includeDebate: forcePanel || forceCouncil, // Show council when panel or council is forced
+          // Only send mode if user explicitly requested panel/council mode
+          ...(forceCouncil && { mode: 'council' }),
+          ...(forcePanel && !forceCouncil && { mode: 'thoughtful' }),
           conversationHistory,
         }),
         signal: abortControllerRef.current.signal,
@@ -1021,6 +1076,29 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                   }
                   break
 
+                case 'council':
+                  // Council mode: received model panel responses before synthesis
+                  // Transform to PanelMemberResponse format for the UI
+                  const councilResponses: PanelMemberResponse[] = (data.modelOpinions || []).map((opinion: any) => ({
+                    agentId: opinion.modelId,
+                    agentName: opinion.model,
+                    modelId: opinion.modelId, // Use the short ID (claude, gpt4, gemini, groq)
+                    provider: opinion.provider,
+                    content: opinion.content,
+                  }))
+
+                  // Update council view with the responses - use modelId for lookup
+                  const councilViewData: CouncilResponse[] = councilResponses.map(r => ({
+                    modelId: r.modelId, // This is what CouncilFullView expects
+                    content: r.content,
+                    reasoning: r.content.slice(0, 200) + '...',
+                  }))
+                  setCouncilViewResponses(councilViewData)
+
+                  // Store in metadata for later use when finalizing the message
+                  ;(metadata as any).councilResponses = councilResponses
+                  break
+
                 case 'text':
                   // Append streamed text chunk
                   streamedContent += data.chunk || ''
@@ -1068,6 +1146,8 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                         messageId: data.messageId,
                         // Use effectiveMode from routing (auto-routed by OSQR)
                         mode: metadata.routing?.effectiveMode || 'quick',
+                        // Include council responses if present (from council event)
+                        councilResponses: (metadata as any).councilResponses,
                       }
                     }
                     return updated
@@ -1077,6 +1157,16 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                   if (data.artifacts && data.artifacts.length > 0) {
                     setCurrentArtifacts(data.artifacts)
                     setShowArtifacts(true)
+                  }
+
+                  // Update council view synthesis when in council mode
+                  if ((metadata as any).councilResponses) {
+                    setCouncilViewSynthesis({
+                      content: streamedContent, // Use 'content' not 'synthesis'
+                      agreements: [],
+                      disagreements: [],
+                    })
+                    setCouncilViewProcessing(false)
                   }
                   break
 
@@ -1130,8 +1220,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       setRefineResult(null)
       setRefinedQuestion('')
       setClarifyingAnswers([])
-      // Reset one-shot panel toggle (user must re-enable for next question)
+      // Reset one-shot panel/council toggles (user must re-enable for next question)
       setForcePanel(false)
+      setForceCouncil(false)
       // PERSISTENCE: Clear pending request since we got a response
       if (typeof window !== 'undefined') {
         localStorage.removeItem(PENDING_REQUEST_KEY(workspaceId))
@@ -1181,9 +1272,10 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           message: finalQuestion,
           workspaceId,
           useKnowledge,
-          includeDebate: forcePanel, // Show council when panel is forced
-          // Only send mode if user explicitly requested panel mode
-          ...(forcePanel && { mode: 'thoughtful' }),
+          includeDebate: forcePanel || forceCouncil, // Show council when panel or council is forced
+          // Only send mode if user explicitly requested panel/council mode
+          ...(forceCouncil && { mode: 'council' }),
+          ...(forcePanel && !forceCouncil && { mode: 'thoughtful' }),
           conversationHistory,
         }),
       })
@@ -1194,15 +1286,32 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
       const data = await response.json()
 
-      // Transform panel discussion into structured council responses
-      const councilResponses: PanelMemberResponse[] = (data.panelDiscussion || []).map((p: any, i: number) => ({
-        agentId: p.agentId || `agent-${i}`,
-        agentName: `Expert ${i + 1}`,
-        modelId: p.modelId || 'unknown',
-        provider: p.provider || 'unknown',
-        content: p.content || '',
-        error: p.error,
-      }))
+      // Transform council data or panel discussion into structured council responses
+      // If we have rich council data from @osqr/core, use that; otherwise fall back to panel discussion
+      let councilResponses: PanelMemberResponse[] = []
+      if (data.council?.modelOpinions) {
+        // Rich council data from @osqr/core Council mode
+        councilResponses = data.council.modelOpinions.map((opinion: any, i: number) => ({
+          agentId: opinion.model || `council-${i}`,
+          agentName: opinion.model,
+          modelId: opinion.model,
+          provider: 'council',
+          content: opinion.content || '',
+          confidence: opinion.confidence,
+          reasoning: opinion.reasoning,
+        }))
+      } else if (data.panelDiscussion) {
+        // Fallback to panel discussion (thoughtful/contemplate modes)
+        councilResponses = (data.panelDiscussion || []).map((p: any, i: number) => ({
+          agentId: p.agentId || `agent-${i}`,
+          agentName: `Expert ${i + 1}`,
+          modelId: p.modelId || 'unknown',
+          provider: p.provider || 'unknown',
+          content: p.content || '',
+          error: p.error,
+        }))
+      }
+
       const councilRoundtable: PanelMemberResponse[] = (data.roundtableDiscussion || []).map((p: any, i: number) => ({
         agentId: p.agentId || `agent-${i}`,
         agentName: `Expert ${i + 1}`,
@@ -1211,6 +1320,28 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         content: p.content || '',
         error: p.error,
       }))
+
+      // Update council full view if open
+      if (forceCouncil && councilViewOpen) {
+        const councilViewData: CouncilResponse[] = councilResponses.map(r => ({
+          modelId: r.modelId,
+          content: r.content,
+          error: r.error,
+          confidence: r.confidence ? Math.round(r.confidence * 100) : undefined,
+        }))
+        setCouncilViewResponses(councilViewData)
+        // Use council consensus data if available, otherwise fall back to synthesis
+        const consensusLevel = data.council?.consensus?.level === 'full' ? 'high' :
+                              data.council?.consensus?.level === 'partial' ? 'moderate' :
+                              data.council?.consensus?.level === 'none' ? 'low' : 'moderate'
+        setCouncilViewSynthesis({
+          content: data.answer,
+          agreements: data.council?.consensus?.divergentPoints?.length === 0 ? ['Models reached consensus'] : [],
+          disagreements: data.council?.consensus?.divergentPoints || [],
+          consensusLevel: consensusLevel as 'high' | 'moderate' | 'low' | 'split',
+        })
+        setCouncilViewProcessing(false)
+      }
 
       setMessages((prev) => {
         const updated = [...prev]
@@ -1222,9 +1353,9 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
           // Use effectiveMode from routing (auto-routed by OSQR)
           mode: data.routing?.effectiveMode || 'quick',
           routing: data.routing,
-          councilResponses: forcePanel && councilResponses.length > 0 ? councilResponses : undefined,
-          councilRoundtable: forcePanel && councilRoundtable.length > 0 ? councilRoundtable : undefined,
-          debug: forcePanel
+          councilResponses: (forcePanel || forceCouncil) && councilResponses.length > 0 ? councilResponses : undefined,
+          councilRoundtable: (forcePanel || forceCouncil) && councilRoundtable.length > 0 ? councilRoundtable : undefined,
+          debug: forcePanel || forceCouncil
             ? {
                 panelDiscussion: data.panelDiscussion,
                 roundtableDiscussion: data.roundtableDiscussion,
@@ -1490,6 +1621,17 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                       />
                     )}
 
+                    {/* Oscar Lab Quick Reaction Widget */}
+                    {!message.thinking && message.content && message.messageId && (
+                      <QuickReactionWidget
+                        messageId={message.messageId}
+                        responseMode={message.mode || 'quick'}
+                        modelUsed={message.routing?.modelUsed?.model || 'unknown'}
+                        hadPanelDiscussion={(message.councilResponses?.length || 0) > 0}
+                        retrievalUsed={useKnowledge}
+                      />
+                    )}
+
                     {/* Render Complete Actions - Preview + "Would you like to see it?" buttons */}
                     {!message.thinking && message.renderComplete && (
                       <div className="mt-3 space-y-3">
@@ -1596,19 +1738,18 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                     {/* J-4: Council Panel - Visible Multi-Model Reasoning */}
                     {message.councilResponses && message.councilResponses.length > 0 && (
                       <div className="mt-4">
-                        <button
+                        <div
                           onClick={() => setExpandedDebug(expandedDebug === idx ? null : idx)}
-                          className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 mb-2"
+                          className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-200 mb-2 cursor-pointer"
                         >
                           <CouncilBadge
                             modelCount={message.councilResponses.length}
-                            onClick={() => setExpandedDebug(expandedDebug === idx ? null : idx)}
                           />
                           {expandedDebug === idx ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                           <span>
                             {expandedDebug === idx ? 'Hide council discussion' : 'View council discussion'}
                           </span>
-                        </button>
+                        </div>
 
                         {expandedDebug === idx && (
                           <CouncilPanel
@@ -1949,6 +2090,14 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
 
         {/* Input area */}
         <div className="mt-4 space-y-3">
+          {/* Capability Bar - AI capabilities selection */}
+          <CapabilityBar
+            state={capabilityState}
+            onStateChange={setCapabilityState}
+            disabled={isLoading}
+            userTier={userTier}
+          />
+
           {/* One-shot panel toggle and Feedback button - OSQR auto-routes by default */}
           <div className="flex items-center justify-between gap-2 sm:gap-3">
             <div className="flex items-center gap-2 sm:gap-3">
@@ -1979,6 +2128,36 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                     <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[220px]">
                       <p className="font-medium text-blue-400">Ask the panel</p>
                       <p className="text-xs text-slate-400">Get multiple AI perspectives for this question. Resets after each response.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+
+                {/* Council Mode Button - Full multi-model deliberation */}
+                <div className="flex p-1 bg-slate-800 rounded-xl ring-1 ring-slate-700/50">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => setForceCouncil(!forceCouncil)}
+                        disabled={isLoading}
+                        className={`group relative flex items-center justify-center sm:justify-start space-x-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 flex-1 sm:flex-initial ${
+                          forceCouncil
+                            ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg shadow-purple-500/30 scale-[1.02]'
+                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+                        } ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                      >
+                        <Gavel className={`h-4 w-4 transition-transform duration-300 ${forceCouncil ? 'animate-pulse' : 'group-hover:scale-110'}`} />
+                        <span className="hidden sm:inline">Council</span>
+                        {forceCouncil && (
+                          <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-300"></span>
+                          </span>
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="bg-slate-800 border-slate-700 max-w-[220px]">
+                      <p className="font-medium text-purple-400">Council Mode</p>
+                      <p className="text-xs text-slate-400">Full multi-model deliberation. Claude, GPT-4, and Gemini discuss, then Oscar synthesizes.</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -2017,8 +2196,14 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setShowFeedbackModal(true)}
-                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 hover:text-cyan-400 bg-slate-800 hover:bg-slate-700 rounded-lg ring-1 ring-slate-700/50 transition-all"
+                    onClick={() => {
+                      if (!hasSeenFeedbackTip) {
+                        setShowTeachingModal(true)
+                      } else {
+                        setShowFeedbackModal(true)
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-slate-400 hover:text-cyan-400 bg-slate-800 hover:bg-slate-700 rounded-lg ring-1 ring-slate-700/50 transition-all cursor-pointer"
                   >
                     <MessageSquare className="h-4 w-4" />
                     <span className="hidden sm:inline">Feedback</span>
@@ -2069,6 +2254,49 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
             </div>
           )}
 
+          {/* Intent hints - shows what OSQR will do based on query */}
+          {input.trim().length > 5 && (
+            <IntentHint
+              query={input}
+              capabilityState={capabilityState}
+              onDismiss={(cap) => {
+                // Add capability to disabled list
+                setCapabilityState(prev => ({
+                  ...prev,
+                  disabledCapabilities: [...(prev.disabledCapabilities || []), cap],
+                }))
+              }}
+              className="px-3 py-1"
+            />
+          )}
+
+          {/* Attachments area - for uploading files */}
+          <AttachmentArea
+            attachments={attachments}
+            onAttachmentsChange={setAttachments}
+            onUpload={uploadAttachments}
+            isUploading={isUploading}
+            disabled={isLoading}
+            className="px-3"
+          />
+
+          {/* Notification toast */}
+          {notification && (
+            <div className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg mx-3 ${
+              notification.type === 'error' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+              notification.type === 'success' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+              'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+            }`}>
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>{notification.message}</span>
+              <button
+                onClick={() => setNotification(null)}
+                className="ml-auto p-0.5 hover:bg-slate-700 rounded"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Input */}
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
@@ -2090,26 +2318,30 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                 disabled={isLoading || (chatStage === 'refined' && !refineResult?.readyToFire)}
                 className="flex-1 min-h-[60px] sm:min-h-[80px] pr-12 w-full"
               />
-              {/* Voice input button */}
-              {isVoiceSupported && (
-                <button
-                  type="button"
-                  onClick={toggleVoiceRecording}
+              {/* Voice input button - using VoiceInput component */}
+              <div className="absolute right-2 bottom-2">
+                <VoiceInput
+                  onTranscript={(text) => {
+                    setInput(prev => {
+                      const separator = prev.trim() ? ' ' : ''
+                      return prev.trim() + separator + text
+                    })
+                  }}
+                  onError={(error) => {
+                    setNotification({
+                      type: 'error',
+                      message: error.message,
+                    })
+                    // Clear notification after 5 seconds
+                    setTimeout(() => setNotification(null), 5000)
+                  }}
+                  onStateChange={(state) => {
+                    setIsRecording(state === 'listening')
+                  }}
                   disabled={isLoading}
-                  className={`absolute right-2 bottom-2 p-2 rounded-full transition-all ${
-                    isRecording
-                      ? 'bg-red-500 text-white animate-pulse'
-                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600 hover:text-slate-300'
-                  }`}
-                  title={isRecording ? 'Stop recording' : 'Start voice input'}
-                >
-                  {isRecording ? (
-                    <MicOff className="h-4 w-4" />
-                  ) : (
-                    <Mic className="h-4 w-4" />
-                  )}
-                </button>
-              )}
+                  size="sm"
+                />
+              </div>
             </div>
             <div className="flex sm:flex-col gap-2">
               {/* Stop button - shows when loading */}
@@ -2179,6 +2411,19 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
       {showArtifacts && currentArtifacts.length > 0 && (
         <ArtifactPanel artifacts={currentArtifacts} onClose={() => setShowArtifacts(false)} />
       )}
+
+      {/* Council Full View - Multi-panel deliberation display */}
+      <CouncilFullView
+        isOpen={councilViewOpen}
+        onClose={() => {
+          setCouncilViewOpen(false)
+          setCouncilViewProcessing(false)
+        }}
+        query={councilViewQuery}
+        responses={councilViewResponses}
+        synthesis={councilViewSynthesis}
+        isProcessing={councilViewProcessing}
+      />
 
       {/* Upgrade Modal for Contemplate Mode */}
       {showUpgradeModal && (
@@ -2288,6 +2533,91 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
         routing={routingNotification}
         onDismiss={() => setRoutingNotification(null)}
       />
+
+      {/* Teaching Modal - Gentle explanation about natural language feedback */}
+      {showTeachingModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => {
+              if (dontShowFeedbackTipAgain) {
+                localStorage.setItem('osqr-feedback-tip-dismissed', 'true')
+                setHasSeenFeedbackTip(true)
+              }
+              setShowTeachingModal(false)
+              setDontShowFeedbackTipAgain(false)
+            }}
+          />
+          <div className="relative w-full max-w-sm bg-slate-900 border border-slate-700 rounded-2xl p-6 shadow-xl animate-in zoom-in-95 fade-in duration-200">
+            {/* Header with icon */}
+            <div className="flex items-start gap-3 mb-4">
+              <div className="p-2 bg-cyan-500/10 rounded-lg shrink-0">
+                <Sparkles className="h-5 w-5 text-cyan-400" />
+              </div>
+              <div>
+                <h3 className="text-base font-medium text-white mb-1">Quick tip</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">
+                  You can share feedback just by talking to me. Try saying things like:
+                </p>
+              </div>
+            </div>
+
+            {/* Example phrases */}
+            <div className="space-y-2 mb-4 ml-11">
+              <p className="text-sm text-cyan-300">&quot;I want to leave some feedback&quot;</p>
+              <p className="text-sm text-cyan-300">&quot;That response was really helpful&quot;</p>
+              <p className="text-sm text-cyan-300">&quot;This isn&apos;t working for me&quot;</p>
+            </div>
+
+            <p className="text-sm text-slate-400 mb-4 ml-11">
+              I&apos;ll take care of the rest.
+            </p>
+
+            {/* Don't show again checkbox */}
+            <label className="flex items-center gap-2 mb-4 ml-11 cursor-pointer group">
+              <input
+                type="checkbox"
+                checked={dontShowFeedbackTipAgain}
+                onChange={(e) => setDontShowFeedbackTipAgain(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-cyan-500 focus:ring-cyan-500/50 focus:ring-offset-0 cursor-pointer"
+              />
+              <span className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">
+                Got it, don&apos;t show this again
+              </span>
+            </label>
+
+            {/* Action buttons */}
+            <div className="flex gap-2 ml-11">
+              <button
+                onClick={() => {
+                  if (dontShowFeedbackTipAgain) {
+                    localStorage.setItem('osqr-feedback-tip-dismissed', 'true')
+                    setHasSeenFeedbackTip(true)
+                  }
+                  setShowTeachingModal(false)
+                  setDontShowFeedbackTipAgain(false)
+                }}
+                className="flex-1 py-2 text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  if (dontShowFeedbackTipAgain) {
+                    localStorage.setItem('osqr-feedback-tip-dismissed', 'true')
+                    setHasSeenFeedbackTip(true)
+                  }
+                  setShowTeachingModal(false)
+                  setShowFeedbackModal(true)
+                }}
+                className="flex-1 py-2 bg-cyan-600 hover:bg-cyan-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Use form anyway
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Feedback Modal */}
       {showFeedbackModal && (

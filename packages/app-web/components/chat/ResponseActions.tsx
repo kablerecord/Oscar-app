@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   ThumbsUp,
   ThumbsDown,
@@ -13,6 +13,8 @@ import {
   Loader2,
   MessageSquare,
   X,
+  Pause,
+  Play,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,6 +23,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+
+type TTSState = 'idle' | 'loading' | 'playing' | 'paused' | 'error'
 
 interface ResponseActionsProps {
   content: string
@@ -47,13 +51,15 @@ export function ResponseActions({
 }: ResponseActionsProps) {
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<'good' | 'bad' | null>(initialFeedback)
-  const [isSpeaking, setIsSpeaking] = useState(false)
+  const [ttsState, setTtsState] = useState<TTSState>('idle')
   const [flagged, setFlagged] = useState(false)
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [showCommentForm, setShowCommentForm] = useState(false)
   const [comment, setComment] = useState('')
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [commentSubmitted, setCommentSubmitted] = useState(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const audioUrlRef = useRef<string | null>(null)
 
   // Copy to clipboard
   const handleCopy = async () => {
@@ -66,19 +72,95 @@ export function ResponseActions({
     }
   }
 
-  // Read aloud using Web Speech API
-  const handleReadAloud = () => {
-    if (isSpeaking) {
-      window.speechSynthesis.cancel()
-      setIsSpeaking(false)
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current)
+      }
+      if (audioRef.current) {
+        audioRef.current.pause()
+      }
+    }
+  }, [])
+
+  // Read aloud using OpenAI TTS API with fallback to Web Speech API
+  const handleReadAloud = async () => {
+    // If already playing, toggle pause/play
+    if (ttsState === 'playing' && audioRef.current) {
+      audioRef.current.pause()
+      setTtsState('paused')
       return
     }
 
+    // If paused, resume
+    if (ttsState === 'paused' && audioRef.current) {
+      audioRef.current.play()
+      setTtsState('playing')
+      return
+    }
+
+    // If loading, ignore
+    if (ttsState === 'loading') return
+
+    // Start loading TTS
+    setTtsState('loading')
+
+    try {
+      // Try OpenAI TTS first
+      const response = await fetch('/api/capabilities/speak', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: content,
+          voice: 'nova',
+          speed: 1.0,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('TTS API failed')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+
+      // Cleanup old URL
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current)
+      }
+      audioUrlRef.current = url
+
+      const audio = new Audio(url)
+      audioRef.current = audio
+
+      audio.onplay = () => setTtsState('playing')
+      audio.onpause = () => {
+        if (audio.currentTime < audio.duration) {
+          setTtsState('paused')
+        }
+      }
+      audio.onended = () => setTtsState('idle')
+      audio.onerror = () => {
+        setTtsState('error')
+        // Fallback to Web Speech API
+        fallbackToWebSpeech()
+      }
+
+      await audio.play()
+    } catch (error) {
+      console.error('TTS error, falling back to Web Speech:', error)
+      // Fallback to Web Speech API
+      fallbackToWebSpeech()
+    }
+  }
+
+  // Fallback to browser's Web Speech API
+  const fallbackToWebSpeech = () => {
     const utterance = new SpeechSynthesisUtterance(content)
     utterance.rate = 1.0
     utterance.pitch = 1.0
 
-    // Try to get a good voice
     const voices = window.speechSynthesis.getVoices()
     const preferredVoice = voices.find(
       v => v.name.includes('Samantha') || v.name.includes('Google') || v.lang.startsWith('en')
@@ -87,11 +169,21 @@ export function ResponseActions({
       utterance.voice = preferredVoice
     }
 
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
+    utterance.onstart = () => setTtsState('playing')
+    utterance.onend = () => setTtsState('idle')
+    utterance.onerror = () => setTtsState('error')
 
-    setIsSpeaking(true)
     window.speechSynthesis.speak(utterance)
+  }
+
+  // Stop audio playback
+  const handleStopAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+    }
+    window.speechSynthesis.cancel()
+    setTtsState('idle')
   }
 
   // Handle feedback (good/bad)
@@ -213,23 +305,54 @@ export function ResponseActions({
               variant="ghost"
               size="sm"
               onClick={handleReadAloud}
+              disabled={ttsState === 'loading'}
               className={`h-7 px-2 ${
-                isSpeaking
+                ttsState === 'playing' || ttsState === 'paused'
                   ? 'text-blue-400 bg-blue-500/20'
+                  : ttsState === 'loading'
+                  ? 'text-amber-400 bg-amber-500/20'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
               }`}
             >
-              {isSpeaking ? (
-                <VolumeX className="h-3.5 w-3.5" />
+              {ttsState === 'loading' ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : ttsState === 'playing' ? (
+                <Pause className="h-3.5 w-3.5" />
+              ) : ttsState === 'paused' ? (
+                <Play className="h-3.5 w-3.5" />
               ) : (
                 <Volume2 className="h-3.5 w-3.5" />
               )}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="bg-slate-800 border-slate-700">
-            <p className="text-xs">{isSpeaking ? 'Stop' : 'Read Aloud'}</p>
+            <p className="text-xs">
+              {ttsState === 'loading' ? 'Loading...' :
+               ttsState === 'playing' ? 'Pause' :
+               ttsState === 'paused' ? 'Resume' :
+               'Read Aloud'}
+            </p>
           </TooltipContent>
         </Tooltip>
+
+        {/* Stop Button - only show when playing or paused */}
+        {(ttsState === 'playing' || ttsState === 'paused') && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleStopAudio}
+                className="h-7 px-2 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+              >
+                <VolumeX className="h-3.5 w-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="bg-slate-800 border-slate-700">
+              <p className="text-xs">Stop</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
 
         {/* Divider */}
         <div className="w-px h-4 bg-slate-700 mx-1" />

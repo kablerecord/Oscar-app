@@ -138,7 +138,7 @@ export async function hasCouncilMode(workspaceId: string): Promise<TierCheckResu
     tier,
     config,
     allowed: config.limits.hasCouncilMode,
-    reason: config.limits.hasCouncilMode ? undefined : 'Council mode requires Master tier.',
+    reason: config.limits.hasCouncilMode ? undefined : 'Council mode requires Pro or Master tier.',
   }
 }
 
@@ -186,7 +186,7 @@ export async function canUseContemplate(workspaceId: string, userId: string): Pr
 }
 
 /**
- * Check daily Council usage (invisible throttle for Master tier)
+ * Check daily Council usage (invisible throttle for Pro and Master tiers)
  */
 export async function canUseCouncil(workspaceId: string, userId: string): Promise<TierCheckResult> {
   const tier = await getWorkspaceTier(workspaceId)
@@ -198,7 +198,7 @@ export async function canUseCouncil(workspaceId: string, userId: string): Promis
       tier,
       config,
       allowed: false,
-      reason: 'Council mode requires Master tier.',
+      reason: 'Council mode requires Pro or Master tier.',
     }
   }
 
