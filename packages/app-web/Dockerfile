@@ -15,12 +15,16 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
 # Copy all package sources (needed for workspace resolution)
 COPY packages/core/ ./packages/core/
+COPY packages/shared/ ./packages/shared/
 COPY packages/app-web/ ./packages/app-web/
 
 # Install all dependencies with workspace linking from root
 RUN pnpm install --frozen-lockfile
 
-# Build @osqr/core first (dist/ is gitignored, so we need to build it)
+# Build @osqr/shared first (dist/ is gitignored, so we need to build it)
+RUN cd packages/shared && pnpm exec tsc
+
+# Build @osqr/core (dist/ is gitignored, so we need to build it)
 RUN cd packages/core && pnpm exec tsc
 
 # Generate Prisma client
