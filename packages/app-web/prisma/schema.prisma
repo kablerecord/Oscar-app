@@ -44,6 +44,10 @@ model User {
   referralsMade        Referral[]              @relation("ReferralsMade")
   referralsReceived    Referral[]              @relation("ReferralsReceived")
   labMember            LabMember?
+  // TIL (Temporal Intelligence Layer) relations
+  commitments          TILCommitment[]
+  temporalPreferences  TILTemporalPreferences?
+  interruptBudgets     TILInterruptBudget[]
 
   @@index([email])
   @@index([referralCode])
@@ -80,15 +84,17 @@ model Workspace {
 }
 
 model Project {
-  id          String       @id @default(cuid())
-  workspaceId String
-  name        String
-  description String?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  threads     ChatThread[]
-  documents   Document[]
-  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id              String           @id @default(cuid())
+  workspaceId     String
+  name            String
+  description     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  threads         ChatThread[]
+  documents       Document[]
+  mentorScripts   MentorScript[]   // Project-level guidance rules
+  briefingScripts BriefingScript[] // Session-scoped briefings
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId])
 }
@@ -1481,4 +1487,160 @@ enum LabInsightStatus {
   IN_PROGRESS
   RESOLVED
   WONT_FIX
+}
+
+// ============================================
+// GUIDANCE SYSTEM (OSQR Mentorship-as-Code)
+// ============================================
+// Project-specific guidance that shapes OSQR behavior.
+// Implements the "Mentorship-as-Code" paradigm where preferences
+// become version-controlled, auditable artifacts.
+// @see osqr/src/guidance/
+
+// MentorScript: Project-scoped, permanent guidance rules
+// Can be user-defined or inferred from user corrections
+model MentorScript {
+  id          String   @id @default(cuid())
+  projectId   String
+  name        String   // Rule name/description
+  content     String   @db.Text // The actual guidance rule
+  priority    Int      @default(5) // 1-10, higher = more important
+  isActive    Boolean  @default(true)
+  source      String   @default("user_defined") // 'user_defined' | 'inferred'
+  appliedCount Int     @default(0) // How many times this rule was applied
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([projectId, isActive])
+  @@index([priority])
+}
+
+// BriefingScript: Session-scoped, temporary contextual guidance
+// Used for "just this session" instructions
+model BriefingScript {
+  id          String    @id @default(cuid())
+  projectId   String
+  sessionId   String?   // Optional session identifier
+  content     String    @db.Text // The briefing content
+  expiresAt   DateTime? // When this briefing becomes stale
+  createdAt   DateTime  @default(now())
+
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([sessionId])
+  @@index([expiresAt])
+}
+
+// ============================================
+// TIL (Temporal Intelligence Layer) - Core Learning System
+// ============================================
+// Enables OSQR to learn from user behavior by tracking commitments,
+// outcomes, and preferences. This is the "memory" that makes OSQR
+// smarter over time.
+//
+// Key insight: recordOutcome() was never being called - these models
+// enable the full learning loop.
+
+// Commitment extracted from conversations/documents
+model TILCommitment {
+  id          String   @id @default(cuid())
+  userId      String
+  text        String   @db.Text  // Full commitment text (e.g., "I'll call mom tomorrow")
+  who         String?  // Who made the commitment (user, assistant, both)
+  what        String   @db.Text  // The action to be taken
+  when        DateTime?  // Parsed date if available
+  whenVague   String?  // Vague reference (e.g., "next week", "soon")
+  source      String   // Where extracted from: text, email, voice, document, calendar, manual
+  sourceId    String?  // Reference to original source (threadId, documentId, etc.)
+  confidence  Float    // Extraction confidence (0.0-1.0)
+  category    String?  // Inferred category: financial, health, work, personal, etc.
+  status      String   @default("pending")  // pending, surfaced, completed, dismissed, expired
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  outcomes    TILNotificationOutcome[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId, status])
+}
+
+// Notification outcome - tracks user interaction with surfaced commitments
+// This is the critical feedback loop that enables learning
+model TILNotificationOutcome {
+  id              String   @id @default(cuid())
+  commitmentId    String
+  notificationType String  // digest, realtime, evening, passive
+  engagement      String   // opened, tapped, acted, dismissed, snoozed
+  engagedAt       DateTime?  // When user engaged
+  surfacedAt      DateTime @default(now())  // When notification was shown
+  timeToEngagement Int?    // Milliseconds from surfaced to engaged
+  feedback        String?  // Explicit feedback: stop_this_type, more_like_this
+
+  commitment      TILCommitment @relation(fields: [commitmentId], references: [id], onDelete: Cascade)
+
+  @@index([commitmentId])
+  @@index([notificationType])
+  @@index([engagement])
+  @@index([surfacedAt])
+}
+
+// User's temporal preferences - both configured and learned
+model TILTemporalPreferences {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+
+  // Configured preferences
+  quietHoursStart     String?  // e.g., "21:00"
+  quietHoursEnd       String?  // e.g., "07:00"
+  criticalCategories  String[]  // Categories that bypass quiet hours
+  preferredDigestTime String?  // When to send morning digest, e.g., "08:00"
+
+  // Learned preferences (adjusted by outcomes)
+  realtimeTolerance   Float    @default(0.5)  // How tolerant user is of real-time interrupts
+  categoryWeights     Json?    // Learned importance by category: { "work": 0.8, "personal": 0.5 }
+  typicalActionDelay  Json?    // Hours until user acts, by type: { "financial": 2, "social": 24 }
+
+  // Learning metadata
+  lastLearningRunAt   DateTime?  // When adjustPreferencesFromOutcomes last ran
+  outcomesProcessed   Int      @default(0)  // Total outcomes used for learning
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Daily interrupt budget - tracks interrupts per day per user
+model TILInterruptBudget {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime @db.Date  // Just the date portion
+
+  // Digest tracking
+  digestSent      Boolean  @default(false)  // Morning digest sent?
+  digestItemIds   String[]  // Commitment IDs included in digest
+
+  // Realtime interrupt tracking
+  realtimeUsed    Int      @default(0)  // Realtime interrupts used today
+  realtimeMax     Int      @default(2)  // Max allowed (learnable)
+
+  // Safety valve
+  forcedUsed      Int      @default(0)  // Forced interrupts (for critical items)
+  forcedItemIds   String[]  // Commitment IDs that were forced
+
+  // Evening review
+  eveningReviewSent Boolean @default(false)
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
 }

@@ -43,7 +43,10 @@ import { QuickReactionWidget } from '@/components/lab/QuickReactionWidget'
 import {
   type OnboardingState,
   getInitialOnboardingState,
+  getPostColdOpenState,
+  getCompletedOnboardingState,
   progressOnboarding,
+  getSuggestedFirstQuestion,
 } from '@/lib/onboarding/oscar-onboarding'
 import { ArtifactPanel } from '@/components/artifacts/ArtifactPanel'
 import type { ArtifactBlock } from '@/lib/artifacts/types'
@@ -137,6 +140,8 @@ import type { HighlightTarget } from '@/components/layout/RightPanelBar'
 interface RefineFireChatProps {
   workspaceId: string
   onboardingCompleted?: boolean
+  justCompletedColdOpen?: boolean
+  coldOpenData?: { name: string; workingOn: string } | null
   userTier?: 'free' | 'pro' | 'master'
   onHighlightElement?: (target: HighlightTarget) => void
 }
@@ -273,7 +278,7 @@ export interface RefineFireChatHandle {
 }
 
 export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatProps>(
-  function RefineFireChat({ workspaceId, onboardingCompleted = false, userTier = 'free', onHighlightElement }, ref) {
+  function RefineFireChat({ workspaceId, onboardingCompleted = false, justCompletedColdOpen = false, coldOpenData = null, userTier = 'free', onHighlightElement }, ref) {
   const router = useRouter()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -658,27 +663,25 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
   const [onboardingState, setOnboardingState] = useState<OnboardingState>(() => {
     // If onboarding is already completed in the database, skip to idle
     if (onboardingCompleted) {
-      return {
-        ...getInitialOnboardingState(),
-        stage: 'idle',
-        hasAskedFirstQuestion: true,
-        completedStages: ['welcome', 'got_name'],
-      }
+      return getCompletedOnboardingState()
     }
+    // If user just completed cold open, start at panel_intro with their data
+    if (justCompletedColdOpen && coldOpenData) {
+      return getPostColdOpenState(coldOpenData.name, coldOpenData.workingOn)
+    }
+    // New users who haven't done cold open yet (shouldn't happen normally)
     return getInitialOnboardingState()
   })
 
-  // Save onboarding completion to database when user finishes the intro
+  // Generate suggested first question based on what user is working on
+  const suggestedQuestion = getSuggestedFirstQuestion(onboardingState.workingOn || coldOpenData?.workingOn)
+
+  // Save onboarding completion to database when user finishes panel intro
   useEffect(() => {
     // Check if we just transitioned to 'idle' from an onboarding stage
-    // This means the user completed the onboarding flow
-    if (onboardingState.stage === 'idle' && !onboardingCompleted && onboardingState.completedStages.includes('got_name')) {
-      // Mark onboarding as completed in the database
-      fetch('/api/workspace/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workspaceId, completed: true }),
-      }).catch(err => console.error('Failed to save onboarding status:', err))
+    // This means the user completed the panel intro
+    if (onboardingState.stage === 'idle' && !onboardingCompleted && onboardingState.completedStages.includes('panel_intro')) {
+      // Already saved by cold open, no need to save again
     }
   }, [onboardingState.stage, workspaceId, onboardingCompleted, onboardingState.completedStages])
 

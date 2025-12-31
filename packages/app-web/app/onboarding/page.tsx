@@ -5,11 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 
 /**
- * Onboarding Page - Now redirects to /panel
+ * Onboarding Page - Redirects to /panel
  *
- * The onboarding experience is now handled by the OSQR bubble within the panel.
- * This page simply redirects users to /panel where the bubble will guide them
- * through the onboarding conversation.
+ * The onboarding experience uses a "Cold Open" approach:
+ * 1. ColdOpenOnboarding component shows a 2-screen intro (in PanelClientWrapper)
+ * 2. User lands in the panel where OSQR gives contextual tips
+ *
+ * This page simply redirects users to /panel where the full flow happens.
  */
 export default function OnboardingPage() {
   const router = useRouter()

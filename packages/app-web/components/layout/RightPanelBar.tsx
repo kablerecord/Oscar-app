@@ -23,6 +23,8 @@ import {
 } from 'lucide-react'
 import { MSCPanel } from '@/components/msc/MSCPanel'
 import { useTipsHighlight, type HighlightId } from '@/components/tips/TipsHighlightProvider'
+import { BubbleContainer } from '@/components/oscar/BubbleContainer'
+import { Bell } from 'lucide-react'
 
 // Legacy types - keeping for backwards compatibility but using new system
 export type HighlightTarget =
@@ -35,6 +37,7 @@ export type HighlightTarget =
   | 'focus-mode' // Focus mode toggle
   | 'sidebar' // Left sidebar
   | 'tips' // Tips icon in right panel
+  | 'osqr_bubble' // OSQR bubble position indicator
   | null
 
 interface RightPanelBarProps {
@@ -74,7 +77,7 @@ interface SidebarData {
   } | null
 }
 
-type PanelSection = 'command' | 'stats' | 'knowledge' | 'streak' | 'tips' | 'osqr' | null
+type PanelSection = 'command' | 'stats' | 'knowledge' | 'streak' | 'tips' | 'osqr' | 'suggestions' | null
 
 // Pending insight type from API
 interface PendingInsight {
@@ -809,6 +812,36 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
             </div>
           )}
 
+          {/* Suggestions Panel - TIL Bubble Suggestions */}
+          {activeSection === 'suggestions' && (
+            <div className="h-full flex flex-col">
+              <div className="px-4 py-4 border-b border-slate-700/50 bg-gradient-to-r from-green-950/50 to-emerald-950/50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 shadow-lg shadow-green-500/25">
+                      <Bell className="h-4 w-4 text-white" />
+                    </div>
+                    <h3 className="font-bold text-sm text-white">Suggestions</h3>
+                  </div>
+                  <button
+                    onClick={() => setActiveSection(null)}
+                    className="cursor-pointer p-1.5 rounded-lg hover:bg-slate-700/50 transition-colors"
+                  >
+                    <X className="h-4 w-4 text-slate-400 hover:text-white" />
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-2">Your commitments and reminders from conversations</p>
+              </div>
+              <div className="flex-1 overflow-hidden">
+                <BubbleContainer
+                  className="h-full"
+                  defaultExpanded={true}
+                  autoRefreshInterval={5 * 60 * 1000}
+                />
+              </div>
+            </div>
+          )}
+
           {/* OSQR Panel - with tail connecting to icon */}
           {activeSection === 'osqr' && (
             <div className="h-full flex flex-col relative">
@@ -1262,6 +1295,34 @@ export function RightPanelBar({ workspaceId, onAskOSQR, onHighlightElement, high
               </div>
             </div>
           )}
+
+          {/* Suggestions - TIL Bubble Suggestions */}
+          <div className="relative group">
+            <button
+              onClick={() => openSection('suggestions')}
+              className={cn(
+                'relative flex flex-col items-center gap-0.5 p-2 rounded-xl border transition-all cursor-pointer w-11',
+                'bg-green-500/10 border-green-500/20 hover:bg-green-500/20',
+                activeSection === 'suggestions' && 'ring-2 ring-green-400/50 bg-green-500/20'
+              )}
+            >
+              <Bell className="h-4 w-4 text-green-400" />
+              <span className="text-[9px] font-bold text-green-300">
+                TIL
+              </span>
+            </button>
+            {/* Tooltip */}
+            <div className="absolute right-full mr-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+              <div className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+                <div className="flex items-center gap-2 mb-1">
+                  <Bell className="h-3.5 w-3.5 text-green-400" />
+                  <span className="text-sm font-semibold text-white">Suggestions</span>
+                </div>
+                <p className="text-xs text-slate-400">Commitments & reminders from chats</p>
+              </div>
+              <div className="absolute top-1/2 -translate-y-1/2 -right-1 w-2 h-2 bg-slate-900 border-r border-t border-slate-700 rotate-45" />
+            </div>
+          </div>
 
           {/* Add button - shows when panels are hidden */}
           {availablePanels.length > 0 && (

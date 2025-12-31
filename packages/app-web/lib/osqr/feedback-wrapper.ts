@@ -1,9 +1,11 @@
 /**
- * Feedback Wrapper
+ * Feedback Wrapper with Error Recovery
  *
  * Wraps @osqr/core Feedback module for natural language feedback detection.
  * Enables users to provide feedback conversationally (e.g., "that was helpful")
  * instead of using the button.
+ *
+ * ERROR RECOVERY: On any error, skips analysis and returns null/false.
  */
 
 import { Feedback } from '@osqr/core';

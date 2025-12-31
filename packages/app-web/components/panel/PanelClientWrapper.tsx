@@ -7,6 +7,7 @@ import type { HighlightTarget } from '@/components/layout/RightPanelBar'
 import { useKeyboardShortcuts } from '@/lib/hooks/useKeyboardShortcuts'
 import { KeyboardShortcutsModal, SuggestShortcutModal } from '@/components/shortcuts/KeyboardShortcutsModal'
 import { CeremonyCheck } from '@/lib/ceremony/CeremonyCheck'
+import { ColdOpenOnboarding } from '@/components/onboarding/ColdOpenOnboarding'
 
 interface PanelClientWrapperProps {
   user: {
@@ -25,13 +26,18 @@ export function PanelClientWrapper({
   workspaceName,
   workspaceId,
   capabilityLevel,
-  onboardingCompleted,
+  onboardingCompleted: initialOnboardingCompleted,
   userTier,
 }: PanelClientWrapperProps) {
   const chatRef = useRef<RefineFireChatHandle>(null)
   const [highlightTarget, setHighlightTarget] = useState<HighlightTarget>(null)
   const [showSuggestModal, setShowSuggestModal] = useState(false)
   const [rightPanelExpanded, setRightPanelExpanded] = useState(false)
+
+  // Cold open onboarding state
+  const [showColdOpen, setShowColdOpen] = useState(!initialOnboardingCompleted)
+  const [onboardingCompleted, setOnboardingCompleted] = useState(initialOnboardingCompleted)
+  const [onboardingData, setOnboardingData] = useState<{ name: string; workingOn: string } | null>(null)
 
   // Keyboard shortcuts
   const { shortcuts, showShortcutsModal, setShowShortcutsModal } = useKeyboardShortcuts({
@@ -64,6 +70,34 @@ export function PanelClientWrapper({
     setHighlightTarget(target)
   }, [])
 
+  // Handle cold open onboarding completion
+  const handleColdOpenComplete = useCallback(async (data: { name: string; workingOn: string }) => {
+    setOnboardingData(data)
+    setShowColdOpen(false)
+    setOnboardingCompleted(true)
+
+    // Save to database
+    try {
+      await fetch('/api/workspace/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspaceId,
+          completed: true,
+          userName: data.name,
+          workingOn: data.workingOn,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to save onboarding data:', err)
+    }
+  }, [workspaceId])
+
+  // Show cold open for new users
+  if (showColdOpen) {
+    return <ColdOpenOnboarding onComplete={handleColdOpenComplete} />
+  }
+
   return (
     <CeremonyCheck>
       <MainLayout
@@ -84,7 +118,9 @@ export function PanelClientWrapper({
           <RefineFireChat
             ref={chatRef}
             workspaceId={workspaceId}
-            onboardingCompleted={onboardingCompleted}
+            onboardingCompleted={initialOnboardingCompleted}
+            justCompletedColdOpen={!initialOnboardingCompleted && onboardingCompleted}
+            coldOpenData={onboardingData}
             userTier={userTier}
             onHighlightElement={handleHighlightElement}
           />

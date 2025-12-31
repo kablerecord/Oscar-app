@@ -1,8 +1,10 @@
 /**
- * Document Indexing Wrapper
+ * Document Indexing Wrapper with Error Recovery
  *
  * Connects @osqr/core's Document Indexing Subsystem to app-web's adapters.
  * This file initializes adapters and provides a thin wrapper around the core pipeline.
+ *
+ * ERROR RECOVERY: On any error, skips indexing and returns empty results.
  */
 
 import { featureFlags } from './config'

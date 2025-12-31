@@ -1,8 +1,10 @@
 /**
- * Memory Vault Wrapper - Full Integration with @osqr/core
+ * Memory Vault Wrapper - Full Integration with @osqr/core (with Error Recovery)
  *
  * This wrapper provides the bridge between app-web and @osqr/core MemoryVault.
  * It enables persistent conversations with memory across sessions.
+ *
+ * ERROR RECOVERY: On any error, returns empty context (fail safe).
  *
  * IMPLEMENTATION STATUS (Dec 2024):
  * ✅ IMPLEMENTED:

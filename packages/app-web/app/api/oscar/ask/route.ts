@@ -19,6 +19,7 @@ import { routeQuestion } from '@/lib/ai/model-router'
 import { getCachedContext, getVaultStats } from '@/lib/context/prefetch'
 import { isDevWorkspace, createTimer, analyzeQuestion, logAnalytics, type AnalyticsEvent } from '@/lib/analytics/dev-analytics'
 import { getCrossSessionMemory, formatMemoryForPrompt, saveConversationSummary } from '@/lib/oscar/cross-session-memory'
+import { observability } from '@/lib/observability'
 
 // ==========================================================================
 // UIP (User Intelligence Profile) Integration
@@ -38,9 +39,22 @@ import { shouldAskQuestion, formatElicitationQuestion, processElicitationRespons
 // ==========================================================================
 import { checkInput, checkOutput, getDeclineMessage } from '@/lib/osqr/constitutional-wrapper'
 import { quickRoute, shouldUseFastPath } from '@/lib/osqr/router-wrapper'
-import { hasCommitmentSignals, extractCommitments } from '@/lib/osqr/temporal-wrapper'
+import { hasCommitmentSignals, extractCommitments, extractCommitmentsFromText } from '@/lib/osqr/temporal-wrapper'
 import { persistDecisions } from '@/lib/decisions/persister'
 import { featureFlags, throttleConfig } from '@/lib/osqr/config'
+
+// ==========================================================================
+// Guidance System - Project-specific context for responses
+// Implements "Mentorship-as-Code" - version-controlled, auditable guidance
+// ==========================================================================
+import {
+  getRelevantGuidance,
+  getActiveBriefings,
+  formatGuidanceForPrompt,
+  formatBriefingsForPrompt,
+  recordGuidanceUsage,
+  type GuidanceItem,
+} from '@/lib/osqr/guidance-wrapper'
 
 // New Phase 2 integrations: Throttle (I-10) & Cross-Project Memory (I-9)
 import {
@@ -279,6 +293,14 @@ export async function POST(req: NextRequest) {
         sessionId: `session_${workspaceId}`,
       })
 
+      // Log constitutional check
+      await observability.logConstitutionalCheck({
+        phase: 'input',
+        passed: constitutionalResult.allowed,
+        violations: (constitutionalResult.violations ?? []).map(v => v.type || 'unknown'),
+        confidence: constitutionalResult.confidence ?? 1.0,
+      }, userId, `session_${workspaceId}`)
+
       if (!constitutionalResult.allowed) {
         const violations = constitutionalResult.violations ?? []
         console.log('[OSQR Constitutional] Input blocked:', violations.length, 'violations')
@@ -337,6 +359,16 @@ export async function POST(req: NextRequest) {
         shouldUseFastPath: shouldUseFastPath(message),
       }
       console.log('[OSQR Router] Classification:', osqrRouting.tier, '→', osqrRouting.model)
+
+      // Log routing decision
+      await observability.logRoutingDecision({
+        taskType: routeResult.tier,
+        complexity: routeResult.tier === 'simple' ? 1 : routeResult.tier === 'moderate' ? 3 : 5,
+        selectedModel: routeResult.model,
+        selectedMode: osqrRouting.shouldUseFastPath ? 'quick' : 'standard',
+        confidence: 0.9,
+        reasons: [routeResult.tier, osqrRouting.shouldUseFastPath ? 'fast_path' : 'standard_path'],
+      }, userId, `session_${workspaceId}`)
     }
 
     // ==========================================================================
@@ -491,10 +523,33 @@ Guidelines:
 
       messages.push({ role: 'user', content: message })
 
+      // Log model call before request
+      const modelCallStart = Date.now()
+      const estimatedInputTokens = Math.ceil(messages.reduce((acc, m) => acc + m.content.length, 0) / 4)
+      await observability.logModelCall({
+        model: 'claude-sonnet-4-20250514',
+        provider: 'anthropic',
+        inputTokens: estimatedInputTokens,
+        promptLength: message.length,
+        purpose: 'fast_path_response',
+      }, userId, `session_${workspaceId}`)
+
       const answer = await provider.generate({
         messages,
         temperature: 0.3,
       })
+
+      // Log model response after request
+      const modelCallDuration = Date.now() - modelCallStart
+      const estimatedOutputTokens = Math.ceil(answer.length / 4)
+      await observability.logModelResponse({
+        model: 'claude-sonnet-4-20250514',
+        provider: 'anthropic',
+        inputTokens: estimatedInputTokens,
+        outputTokens: estimatedOutputTokens,
+        durationMs: modelCallDuration,
+        success: true,
+      }, userId, `session_${workspaceId}`)
 
       // Minimal database operations - create thread + messages in parallel
       const [thread] = await Promise.all([
@@ -883,6 +938,35 @@ Guidelines:
       }
     }
 
+    // ==========================================================================
+    // GUIDANCE SYSTEM: Load project-specific guidance (Mentorship-as-Code)
+    // MentorScripts provide project-level rules, BriefingScripts are session-scoped
+    // ==========================================================================
+    let guidanceContext: string | undefined
+    let loadedGuidanceItems: GuidanceItem[] = []
+    if (featureFlags.enableGuidance && projectId) {
+      try {
+        // Get relevant guidance for this query (scored by relevance)
+        loadedGuidanceItems = await getRelevantGuidance(projectId, message, 5)
+        const guidanceText = formatGuidanceForPrompt(loadedGuidanceItems)
+
+        // Get active briefings for this session
+        const briefings = await getActiveBriefings(projectId, conversationId)
+        const briefingText = formatBriefingsForPrompt(briefings)
+
+        // Combine guidance and briefings
+        if (guidanceText || briefingText) {
+          guidanceContext = [guidanceText, briefingText].filter(Boolean).join('\n\n')
+
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[OSQR Guidance] Loaded ${loadedGuidanceItems.length} mentor scripts, ${briefings.length} briefings`)
+          }
+        }
+      } catch (guidanceError) {
+        console.error('[OSQR Guidance] Error loading guidance:', guidanceError)
+      }
+    }
+
     const contextParts = [autoContext.context]
     if (tilContext) {
       contextParts.push(tilContext)
@@ -892,6 +976,10 @@ Guidelines:
     }
     if (crossProjectContext) {
       contextParts.push(crossProjectContext)
+    }
+    // Guidance: Add project-specific guidance from MentorScripts
+    if (guidanceContext) {
+      contextParts.push(guidanceContext)
     }
     // UIP: Add personalization context from User Intelligence Profile
     if (uipContext?.shouldPersonalize && uipContext.summary) {
@@ -904,6 +992,7 @@ Guidelines:
       console.log('[OSQR] Auto-context sources:', autoContext.sources)
       if (tilContext) console.log('[OSQR] TIL context included')
       if (crossProjectContext) console.log('[OSQR] Cross-project context included')
+      if (guidanceContext) console.log(`[OSQR] Guidance context included (${loadedGuidanceItems.length} items)`)
       if (uipContext?.shouldPersonalize) console.log('[OSQR] UIP personalization active (confidence:', uipContext.confidence.toFixed(2) + ')')
     }
 
@@ -927,6 +1016,14 @@ Guidelines:
     // ==========================================================================
     if (featureFlags.enableConstitutionalValidation) {
       const outputValidation = await checkOutput(processedAnswer, message, userId)
+
+      // Log output constitutional check
+      await observability.logConstitutionalCheck({
+        phase: 'output',
+        passed: outputValidation.allowed,
+        violations: (outputValidation.violations ?? []).map(v => v.type || 'unknown'),
+        confidence: outputValidation.confidence ?? 1.0,
+      }, userId, `session_${workspaceId}`)
 
       if (!outputValidation.allowed) {
         const violations = outputValidation.violations ?? []
@@ -1089,6 +1186,7 @@ Guidelines:
 
       // I-6: TEMPORAL INTELLIGENCE - Extract commitments from conversation
       // This tracks promises, deadlines, and follow-ups mentioned in chat
+      // NOW INTEGRATED: Persists to TILCommitment table for learning loop
       if (featureFlags.enableTemporalIntelligence) {
         try {
           // Check both user message and AI response for commitment signals
@@ -1097,24 +1195,29 @@ Guidelines:
 
           if (userHasCommitments || aiHasCommitments) {
             const combinedText = `User: ${message}\n\nAssistant: ${cleanAnswer}`
-            const commitments = await extractCommitments(combinedText, {
-              type: 'text', // 'text' is a valid CommitmentSourceType for chat conversations
+
+            // NEW: Extract and persist to TILCommitment table (enables learning loop)
+            const tilResult = await extractCommitmentsFromText(combinedText, userId, {
+              sourceType: 'text',
               sourceId: thread.id,
-              extractedAt: new Date(),
             })
 
-            if (commitments.length > 0) {
-              // Persist commitments to Decision table for morning digest and tracking
+            if (tilResult.persistedIds.length > 0) {
+              console.log(`[OSQR TIL] Persisted ${tilResult.persistedIds.length} commitments to TIL tables`)
+            }
+
+            // LEGACY: Also persist to Decision table for backward compatibility
+            if (tilResult.commitments.length > 0) {
               const { persisted, ids } = await persistDecisions({
                 workspaceId,
                 userId,
                 threadId: thread.id,
-                commitments,
+                commitments: tilResult.commitments,
                 source: 'web',
               })
 
               if (persisted > 0) {
-                console.log(`[OSQR Temporal] Persisted ${persisted} decisions:`, ids)
+                console.log(`[OSQR Temporal] Persisted ${persisted} decisions (legacy):`, ids)
               }
             }
           }
@@ -1132,6 +1235,17 @@ Guidelines:
         }
       } catch (error) {
         console.error('[UIP] Signal processing error:', error)
+      }
+
+      // Guidance: Track which guidance items were used in this response
+      if (loadedGuidanceItems.length > 0) {
+        try {
+          const itemIds = loadedGuidanceItems.map(item => item.id)
+          await recordGuidanceUsage(itemIds)
+          console.log(`[OSQR Guidance] Recorded usage for ${itemIds.length} guidance items`)
+        } catch (error) {
+          console.error('[OSQR Guidance] Usage tracking error:', error)
+        }
       }
     })
 
@@ -1254,6 +1368,11 @@ Guidelines:
         degraded: throttleResult?.degraded || false,
         // I-9: Cross-project context indicator
         usedCrossProjectContext: !!crossProjectContext,
+        // Guidance: Include guidance metadata
+        guidance: loadedGuidanceItems.length > 0 ? {
+          used: true,
+          itemCount: loadedGuidanceItems.length,
+        } : undefined,
         // UIP: Include personalization metadata
         uip: uipContext?.shouldPersonalize ? {
           personalized: true,
@@ -1273,6 +1392,14 @@ Guidelines:
     )
   } catch (error) {
     console.error('OSQR ask error:', error)
+
+    // Log error to observability
+    if (error instanceof Error) {
+      await observability.logError(error, {
+        endpoint: 'oscar/ask',
+        phase: 'request_processing',
+      }).catch(() => {}) // Don't fail on logging error
+    }
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
