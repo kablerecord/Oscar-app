@@ -1326,7 +1326,7 @@ export default function SettingsPage() {
         {/* AI Capabilities Section */}
         <AICapabilitiesSection />
 
-        {/* Oscar Lab Section */}
+        {/* OSQR Lab Section */}
         <LabFeedbackSection />
 
         {/* OSQR Bubble Settings Section */}

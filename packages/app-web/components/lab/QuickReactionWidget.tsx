@@ -133,7 +133,7 @@ export function QuickReactionWidget({
                 </button>
               </div>
               <p className="text-xs text-gray-400 mb-2">
-                Join Oscar Lab to share feedback and help shape OSQR.
+                Join OSQR Lab to share feedback and help shape OSQR.
               </p>
               <a
                 href="/lab"
@@ -150,7 +150,7 @@ export function QuickReactionWidget({
     return (
       <div className="flex items-center gap-2 text-sm text-gray-400 py-2">
         <a href="/lab" className="text-blue-400 hover:underline">
-          Join Oscar Lab
+          Join OSQR Lab
         </a>
         <span>to share feedback</span>
       </div>

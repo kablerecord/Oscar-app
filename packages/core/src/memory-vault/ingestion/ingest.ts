@@ -316,7 +316,7 @@ export async function ingestConversation(
     // 2. Get or create vault
     let vault = getVault(userId);
     if (!vault) {
-      vault = initializeVault(userId);
+      vault = await initializeVault(userId);
     }
 
     // 3. Create conversation

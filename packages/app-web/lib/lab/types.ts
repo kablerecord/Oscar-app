@@ -1,4 +1,4 @@
-// Oscar Lab TypeScript Types
+// OSQR Lab TypeScript Types
 
 export type LabTier = 'EXPLORER' | 'CONTRIBUTOR' | 'INSIDER'
 

@@ -170,6 +170,49 @@ export function recoverUserDEK(password: string, wrappedKey: WrappedKey): Buffer
 }
 
 /**
+ * Wrap (encrypt) a key with the master key (MEK)
+ * Returns concatenated: iv (12 bytes) + ciphertext + authTag (16 bytes)
+ * Used by prisma-key-adapter for vault DEK persistence
+ */
+export function wrapKey(key: Buffer, mek: Buffer): Buffer {
+  const iv = crypto.randomBytes(IV_LENGTH)
+  const cipher = crypto.createCipheriv(ALGORITHM, mek, iv)
+
+  const encrypted = Buffer.concat([cipher.update(key), cipher.final()])
+  const authTag = cipher.getAuthTag()
+
+  // Concatenate: iv + ciphertext + authTag
+  return Buffer.concat([iv, encrypted, authTag])
+}
+
+/**
+ * Unwrap (decrypt) a key using the master key (MEK)
+ * Expects concatenated format: iv (12 bytes) + ciphertext + authTag (16 bytes)
+ * Used by prisma-key-adapter for vault DEK persistence
+ */
+export function unwrapKey(wrappedKey: Buffer, mek: Buffer): Buffer {
+  const iv = wrappedKey.subarray(0, IV_LENGTH)
+  const authTag = wrappedKey.subarray(wrappedKey.length - AUTH_TAG_LENGTH)
+  const ciphertext = wrappedKey.subarray(
+    IV_LENGTH,
+    wrappedKey.length - AUTH_TAG_LENGTH
+  )
+
+  const decipher = crypto.createDecipheriv(ALGORITHM, mek, iv)
+  decipher.setAuthTag(authTag)
+
+  return Buffer.concat([decipher.update(ciphertext), decipher.final()])
+}
+
+/**
+ * Generate a vault DEK for a user
+ * This key encrypts all vault data
+ */
+export function generateVaultDEK(): Buffer {
+  return crypto.randomBytes(KEY_LENGTH)
+}
+
+/**
  * Re-encrypt DEK with new password (for password change)
  */
 export function rewrapDEK(

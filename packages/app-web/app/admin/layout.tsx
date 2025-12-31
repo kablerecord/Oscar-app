@@ -16,7 +16,7 @@ const navItems = [
   { href: '/admin/testimonials', label: 'Testimonials', icon: '💜' },
   { href: '/admin/health', label: 'Platform Health', icon: '💚' },
   { href: '/admin/cognitive', label: 'Cognitive Profiles', icon: '🧠' },
-  { href: '/admin/lab', label: 'Oscar Lab', icon: '🧪' },
+  { href: '/admin/lab', label: 'OSQR Lab', icon: '🧪' },
 ]
 
 export default function AdminLayout({

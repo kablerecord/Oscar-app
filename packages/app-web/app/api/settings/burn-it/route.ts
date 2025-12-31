@@ -1,7 +1,18 @@
+/**
+ * "Burn It" Button API
+ *
+ * Cryptographic deletion of all user data.
+ * This destroys encryption keys first, making vault data permanently inaccessible,
+ * then deletes the encrypted data itself.
+ *
+ * THIS CANNOT BE UNDONE.
+ */
+
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth/config'
 import { prisma } from '@/lib/db/prisma'
+import { cryptoDeleteUserData } from '@/lib/osqr/memory-wrapper'
 
 type PrismaTransaction = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 
@@ -15,7 +26,12 @@ export async function DELETE() {
 
     const userId = session.user.id
 
-    // Start a transaction to delete all user data
+    console.log('[BurnIt] Starting cryptographic deletion for user:', userId.slice(0, 8))
+
+    // 1. Crypto delete vault data (destroys keys first)
+    const vaultResult = await cryptoDeleteUserData(userId)
+
+    // 2. Start a transaction to delete all user data from Prisma
     await prisma.$transaction(async (tx: PrismaTransaction) => {
       // First, find the user's workspace
       const workspace = await tx.workspace.findFirst({
@@ -89,6 +105,16 @@ export async function DELETE() {
         where: { userId },
       })
 
+      // Delete encryption keys (cryptographic deletion)
+      await tx.encryptedKey.deleteMany({
+        where: { userId },
+      })
+
+      // Delete privacy settings
+      await tx.userPrivacySettings.deleteMany({
+        where: { userId },
+      })
+
       // Delete sessions (NextAuth)
       await tx.session.deleteMany({
         where: { userId },
@@ -105,10 +131,21 @@ export async function DELETE() {
       })
     })
 
+    console.log('[BurnIt] Complete:', {
+      userId: userId.slice(0, 8),
+      keysDestroyed: vaultResult.keysDestroyed,
+      dataCleared: vaultResult.dataCleared,
+    })
+
     // Return success - the frontend will redirect to home
     return NextResponse.json({
       success: true,
-      message: 'All data has been permanently deleted'
+      message: 'All your data has been cryptographically destroyed.',
+      details: {
+        encryptionKeysDestroyed: vaultResult.keysDestroyed,
+        vaultDataCleared: vaultResult.dataCleared,
+        databaseRecordsDeleted: true,
+      },
     })
   } catch (error) {
     console.error('Failed to delete user data:', error)

@@ -1,5 +1,5 @@
 /**
- * Oscar Lab Seed Script
+ * OSQR Lab Seed Script
  *
  * Seeds the Lab tables with starter challenges and deep dive forms.
  *
@@ -100,7 +100,7 @@ async function seedDeepDives() {
 
 async function main() {
   console.log('═══════════════════════════════════════════════════')
-  console.log('   Oscar Lab Seed Script')
+  console.log('   OSQR Lab Seed Script')
   console.log('═══════════════════════════════════════════════════\n')
 
   try {
@@ -114,7 +114,7 @@ async function main() {
     console.log(`   Deep dives seeded: ${deepDiveCount}`)
     console.log('═══════════════════════════════════════════════════\n')
   } catch (error) {
-    console.error('Error seeding Oscar Lab:', error)
+    console.error('Error seeding OSQR Lab:', error)
     throw error
   } finally {
     await prisma.$disconnect()

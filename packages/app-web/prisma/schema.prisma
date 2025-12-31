@@ -48,6 +48,9 @@ model User {
   commitments          TILCommitment[]
   temporalPreferences  TILTemporalPreferences?
   interruptBudgets     TILInterruptBudget[]
+  // Encryption key persistence (Constitutional compliance)
+  encryptedKeys        EncryptedKey[]
+  privacySettings      UserPrivacySettings?
 
   @@index([email])
   @@index([referralCode])
@@ -1544,6 +1547,45 @@ model BriefingScript {
 //
 // Key insight: recordOutcome() was never being called - these models
 // enable the full learning loop.
+
+// ============================================
+// ENCRYPTION KEY PERSISTENCE (Constitutional Compliance)
+// ============================================
+// Stores wrapped (encrypted) Data Encryption Keys for vault encryption.
+// Keys are wrapped with user's Master Encryption Key (MEK) before storage.
+// @see docs/BUILD-ENCRYPTION-REMEDIATION.md
+
+model EncryptedKey {
+  id          String    @id @default(cuid())
+  userId      String
+  keyId       String    @unique
+  wrappedKey  String    // Base64-encoded wrapped DEK
+  keyType     String    @default("vault_dek") // vault_dek, backup_key, etc.
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  rotatedAt   DateTime?
+  expiresAt   DateTime?
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyType])
+}
+
+// User privacy settings for vault encryption and data handling
+// Distinct from UserPrivacySetting (telemetry) - this controls vault behavior
+model UserPrivacySettings {
+  id                  String   @id @default(cuid())
+  userId              String   @unique
+  pluginAccessTier    String   @default("minimal") // none, minimal, contextual, full
+  dataRetentionDays   Int      @default(365)
+  allowCrossProject   Boolean  @default(true)
+  allowSynthesis      Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 
 // Commitment extracted from conversations/documents
 model TILCommitment {

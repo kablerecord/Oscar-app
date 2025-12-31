@@ -108,6 +108,10 @@ export const featureFlags = {
   enableCrossProjectMemory: true,
   enableThrottle: true,
 
+  // Encryption at rest (Constitutional compliance)
+  // When enabled, vault data is encrypted with per-user keys
+  enableVaultEncryption: process.env.ENABLE_VAULT_ENCRYPTION === 'true',
+
   // V3.0 Features - Execution Orchestrator (disabled until V3.0)
   // See: docs/features/EXECUTION_ORCHESTRATOR_SPEC.md
   enableExecutionOrchestrator: false,      // Master toggle for Execution Orchestrator

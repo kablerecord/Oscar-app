@@ -1624,7 +1624,7 @@ export const RefineFireChat = forwardRef<RefineFireChatHandle, RefineFireChatPro
                       />
                     )}
 
-                    {/* Oscar Lab Quick Reaction Widget */}
+                    {/* OSQR Lab Quick Reaction Widget */}
                     {!message.thinking && message.content && message.messageId && (
                       <QuickReactionWidget
                         messageId={message.messageId}

@@ -62,6 +62,33 @@ import {
   updateUserPrivacySettings,
 } from './privacy/gate';
 
+import {
+  enableEncryption,
+  disableEncryption,
+  isEncryptionEnabled,
+  encryptContent,
+  decryptContent,
+} from './encryption/encrypted-store';
+import {
+  setKeyPersistence,
+  deleteUserKeys,
+} from './encryption/key-manager';
+
+/**
+ * Encryption configuration for vault initialization
+ */
+export interface VaultEncryptionConfig {
+  /** Enable encryption at rest */
+  encryptionEnabled?: boolean;
+  /** Encryption key (raw bytes) */
+  encryptionKey?: Uint8Array;
+  /** Key persistence callbacks */
+  keyPersistence?: {
+    onLoad: (keyId: string) => Promise<Uint8Array | null>;
+    onPersist: (keyId: string, key: Uint8Array) => Promise<void>;
+  };
+}
+
 /**
  * Memory Vault instance storage
  */
@@ -74,6 +101,7 @@ class MemoryVaultInstance {
   public readonly userId: string;
   public config: VaultConfig;
   public workingMemory: WorkingMemoryBuffer;
+  private encryptionEnabled: boolean = false;
 
   constructor(userId: string, config: Partial<VaultConfig> = {}) {
     this.userId = userId;
@@ -90,6 +118,71 @@ class MemoryVaultInstance {
       tokensUsed: 0,
       fullHistoryTokens: 0,
     };
+  }
+
+  /**
+   * Enable encryption for this vault instance
+   */
+  async enableVaultEncryption(): Promise<void> {
+    await enableEncryption(this.userId);
+    this.encryptionEnabled = true;
+    console.log('[Vault] Encryption enabled for user:', this.userId.slice(0, 8));
+  }
+
+  /**
+   * Disable encryption for this vault instance
+   */
+  disableVaultEncryption(): void {
+    disableEncryption();
+    this.encryptionEnabled = false;
+    console.log('[Vault] Encryption disabled for user:', this.userId.slice(0, 8));
+  }
+
+  /**
+   * Check if encryption is enabled for this vault
+   */
+  isEncryptionEnabled(): boolean {
+    return this.encryptionEnabled;
+  }
+
+  /**
+   * Cryptographic deletion - destroys all encryption keys making data permanently inaccessible
+   * This is the "Burn It" button implementation
+   */
+  async cryptoDelete(): Promise<{ success: boolean; keysDestroyed: number }> {
+    try {
+      // 1. Delete all encryption keys (makes data permanently inaccessible)
+      await deleteUserKeys(this.userId);
+
+      // 2. Clear in-memory vault data
+      this.workingMemory = {
+        sessionId: '',
+        fullHistory: [],
+        workingWindow: [],
+        windowConfig: { ...DEFAULT_WINDOW_CONFIG },
+        currentConversation: null,
+        retrievedContext: [],
+        pendingCommitments: [],
+        tokenBudget: this.config.maxWorkingMemoryTokens,
+        tokensUsed: 0,
+        fullHistoryTokens: 0,
+      };
+
+      // 3. Clear episodic, semantic, and procedural stores
+      episodicStore.deleteUserData(this.userId);
+      semanticStore.deleteAllMemories();
+      proceduralStore.deleteAllData();
+
+      // 4. Disable encryption
+      this.encryptionEnabled = false;
+      disableEncryption();
+
+      console.log('[Vault] Crypto deletion complete for user:', this.userId.slice(0, 8));
+      return { success: true, keysDestroyed: 1 };
+    } catch (error) {
+      console.error('[Vault] Crypto deletion failed:', error);
+      return { success: false, keysDestroyed: 0 };
+    }
   }
 
   /**
@@ -342,17 +435,49 @@ export interface EndConversationResult {
 
 /**
  * Initialize a memory vault for a user
+ * @param userId - User identifier
+ * @param config - Vault configuration options
+ * @param encryptionConfig - Optional encryption configuration
  */
-export function initializeVault(
+export async function initializeVault(
   userId: string,
-  config: Partial<VaultConfig> = {}
-): MemoryVaultInstance {
+  config: Partial<VaultConfig> = {},
+  encryptionConfig?: VaultEncryptionConfig
+): Promise<MemoryVaultInstance> {
   const existing = vaults.get(userId);
   if (existing) {
     return existing;
   }
 
   const vault = new MemoryVaultInstance(userId, config);
+
+  // Enable encryption if configured
+  if (encryptionConfig?.encryptionEnabled) {
+    // Set up key persistence callbacks if provided
+    if (encryptionConfig.keyPersistence) {
+      setKeyPersistence({
+        onPersist: async (userId, keys) => {
+          // Convert UserKey[] to individual key persistence
+          for (const key of keys) {
+            if (key.isActive && encryptionConfig.keyPersistence) {
+              await encryptionConfig.keyPersistence.onPersist(
+                key.keyId,
+                new Uint8Array(key.key)
+              );
+            }
+          }
+        },
+        onLoad: async (userId) => {
+          // Load is handled by the key manager internally
+          return null;
+        },
+      });
+    }
+
+    // Enable encryption on the vault
+    await vault.enableVaultEncryption();
+  }
+
   vaults.set(userId, vault);
   return vault;
 }

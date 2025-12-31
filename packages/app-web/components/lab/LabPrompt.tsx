@@ -76,10 +76,10 @@ export function LabPrompt() {
           </div>
           <div className="flex-1 pr-4">
             <h3 className="font-medium text-white text-sm mb-1">
-              Help shape Oscar
+              Help shape OSQR
             </h3>
             <p className="text-xs text-gray-300 mb-3">
-              Join Oscar Lab to share feedback and earn rewards. Your insights directly influence what we build.
+              Join OSQR Lab to share feedback and earn rewards. Your insights directly influence what we build.
             </p>
             <Button
               onClick={handleJoin}

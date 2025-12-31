@@ -21,6 +21,12 @@
 
 import { MemoryVault } from '@osqr/core';
 import { featureFlags } from './config';
+import { getPrismaKeyAdapter, type KeyPersistenceAdapter } from '@/lib/adapters/prisma-key-adapter';
+import {
+  loadPrivacySettings,
+  deletePrivacySettings,
+} from '@/lib/adapters/prisma-privacy-adapter';
+import { generateVaultDEK, deriveMasterKey, generateSalt } from '@/lib/encryption/user-encryption';
 
 // Type aliases for cleaner code - inferred from @osqr/core MemoryVault functions
 type MemoryCategory = NonNullable<NonNullable<Parameters<typeof MemoryVault.searchUserMemories>[2]>['categories']>[0];
@@ -68,14 +74,119 @@ export interface SourceContext {
   timestamp: Date;
 }
 
+// Key adapter singleton - initialized on first use
+let keyAdapter: KeyPersistenceAdapter | null = null;
+
+// In-memory cache of MEKs (Master Encryption Keys) per user
+// In production, these would be session-based and cleared on logout
+const mekCache = new Map<string, Buffer>();
+
+/**
+ * Get or derive MEK for a user
+ * Note: In production, this would be derived from user's password during login
+ * For now, we generate a deterministic key per user (NOT SECURE - for dev only)
+ */
+async function getMasterKeyForUser(userId: string): Promise<Buffer> {
+  if (mekCache.has(userId)) {
+    return mekCache.get(userId)!;
+  }
+
+  // TODO: In production, derive from user's password during login
+  // For development, we use a deterministic derivation
+  const salt = Buffer.from(`osqr-dev-salt-${userId}`.slice(0, 32).padEnd(32, '0'));
+  const mek = deriveMasterKey(`dev-password-${userId}`, salt);
+  mekCache.set(userId, mek);
+  return mek;
+}
+
 /**
  * Initialize a memory vault for a user/workspace
+ * Now async to support encryption initialization
  */
-export function initializeVault(workspaceId: string): void {
+export async function initializeVault(workspaceId: string): Promise<void> {
   if (!featureFlags.enableMemoryVault) {
     return;
   }
-  MemoryVault.initializeVault(workspaceId);
+
+  // Set up key adapter if not already done
+  if (!keyAdapter) {
+    keyAdapter = getPrismaKeyAdapter(getMasterKeyForUser);
+  }
+
+  // Check if encryption is enabled
+  if (featureFlags.enableVaultEncryption) {
+    // Try to load existing DEK
+    let dek = await keyAdapter.loadKey(workspaceId, `vault_dek_${workspaceId}`);
+
+    if (!dek) {
+      // Generate new DEK for new users
+      dek = new Uint8Array(generateVaultDEK());
+      await keyAdapter.persistKey(workspaceId, `vault_dek_${workspaceId}`, dek);
+      console.log('[Memory] Generated new vault DEK for workspace');
+    }
+
+    // Initialize vault with encryption
+    await MemoryVault.initializeVault(workspaceId, {}, {
+      encryptionEnabled: true,
+      encryptionKey: dek,
+      keyPersistence: {
+        onLoad: (keyId) => keyAdapter!.loadKey(workspaceId, keyId),
+        onPersist: (keyId, key) => keyAdapter!.persistKey(workspaceId, keyId, key),
+      },
+    });
+
+    // Load privacy settings from DB
+    const privacySettings = await loadPrivacySettings(workspaceId);
+    if (privacySettings) {
+      MemoryVault.updatePrivacySettings(workspaceId, privacySettings);
+    }
+
+    console.log('[Memory] Vault initialized with encryption for workspace');
+  } else {
+    // Initialize without encryption (legacy mode)
+    await MemoryVault.initializeVault(workspaceId);
+  }
+}
+
+/**
+ * Cryptographic deletion - "Burn It" button
+ * Destroys all encryption keys, making vault data permanently inaccessible
+ */
+export async function cryptoDeleteUserData(userId: string): Promise<{
+  success: boolean;
+  keysDestroyed: number;
+  dataCleared: boolean;
+}> {
+  if (!keyAdapter) {
+    return { success: false, keysDestroyed: 0, dataCleared: false };
+  }
+
+  try {
+    // 1. Get vault and trigger crypto deletion
+    const vault = MemoryVault.getVault(userId);
+    let keysDestroyed = 0;
+
+    if (vault) {
+      const result = await vault.cryptoDelete();
+      keysDestroyed = result.keysDestroyed;
+    }
+
+    // 2. Delete all keys from database
+    await keyAdapter.deleteAllKeys(userId);
+
+    // 3. Delete privacy settings
+    await deletePrivacySettings(userId);
+
+    // 4. Clear MEK from cache
+    mekCache.delete(userId);
+
+    console.log('[Memory] Crypto deletion complete:', { userId: userId.slice(0, 8), keysDestroyed });
+
+    return { success: true, keysDestroyed, dataCleared: true };
+  } catch (error) {
+    console.error('[Memory] Crypto deletion failed:', error);
+    return { success: false, keysDestroyed: 0, dataCleared: false };
+  }
 }
 
 /**
