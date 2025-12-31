@@ -45,20 +45,32 @@ export default async function VaultPage() {
     )
   }
 
-  // Get document count
-  const totalDocuments = await prisma.document.count({ where: { workspaceId: workspace.id } })
+  // Only show user-uploaded documents in the vault view
+  const allowedSourceTypes = ['upload', 'file_upload', 'note']
 
-  // Get indexed document count (documents with at least one chunk)
+  // Get document count (only user uploads)
+  const totalDocuments = await prisma.document.count({
+    where: {
+      workspaceId: workspace.id,
+      sourceType: { in: allowedSourceTypes },
+    },
+  })
+
+  // Get indexed document count (documents with at least one chunk, only user uploads)
   const indexedDocuments = await prisma.document.count({
     where: {
       workspaceId: workspace.id,
+      sourceType: { in: allowedSourceTypes },
       chunks: { some: {} },
     },
   })
 
-  // Get initial documents
+  // Get initial documents (only user uploads)
   const documents = await prisma.document.findMany({
-    where: { workspaceId: workspace.id },
+    where: {
+      workspaceId: workspace.id,
+      sourceType: { in: allowedSourceTypes },
+    },
     select: {
       id: true,
       title: true,

@@ -10,7 +10,9 @@ import type {
   Conversation,
   Message,
   CompactionResult,
+  WindowConfig,
 } from '../types';
+import { DEFAULT_WINDOW_CONFIG } from '../types';
 import * as episodicStore from '../stores/episodic.store';
 
 /**
@@ -24,14 +26,14 @@ export interface CompactionConfig {
 
 const DEFAULT_CONFIG: CompactionConfig = {
   compactionThreshold: 0.8,
-  preserveRecentMessages: 4,
-  minCompactableMessages: 4,
+  preserveRecentMessages: 50, // Increased from 4 to preserve conversation continuity
+  minCompactableMessages: 10, // Increased from 4 - don't compact until we have meaningful history
 };
 
 /**
  * Estimate token count for text
  */
-function estimateTokens(text: string): number {
+export function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
@@ -283,4 +285,129 @@ export function recalculateTokenUsage(
 
   workingMemory.tokensUsed = tokens;
   return tokens;
+}
+
+// ============================================================================
+// Working Window Computation
+// ============================================================================
+
+/**
+ * Result of computing a working window
+ */
+export interface WorkingWindowResult {
+  /** The computed window of messages */
+  window: Message[];
+  /** Total tokens in the window */
+  tokensUsed: number;
+  /** Number of messages excluded from full history */
+  messagesExcluded: number;
+}
+
+/**
+ * Compute the working window from full history
+ *
+ * This is the core function that creates a "view" into the full history
+ * that will be sent to the model. The full history is NEVER modified.
+ *
+ * @param fullHistory - Complete message history (never modified)
+ * @param config - Window configuration
+ * @returns The computed window and stats
+ */
+export function computeWorkingWindow(
+  fullHistory: Message[],
+  config: Partial<WindowConfig> = {}
+): WorkingWindowResult {
+  const cfg: WindowConfig = { ...DEFAULT_WINDOW_CONFIG, ...config };
+
+  if (fullHistory.length === 0) {
+    return {
+      window: [],
+      tokensUsed: 0,
+      messagesExcluded: 0,
+    };
+  }
+
+  // Separate system messages if we need to preserve them
+  const systemMessages: Message[] = [];
+  const nonSystemMessages: Message[] = [];
+
+  if (cfg.preserveSystemMessages) {
+    for (const msg of fullHistory) {
+      if (msg.role === 'system') {
+        systemMessages.push(msg);
+      } else {
+        nonSystemMessages.push(msg);
+      }
+    }
+  } else {
+    nonSystemMessages.push(...fullHistory);
+  }
+
+  let selectedMessages: Message[];
+
+  if (cfg.mode === 'messages') {
+    // Message-based windowing: take the last N messages
+    selectedMessages = nonSystemMessages.slice(-cfg.size);
+  } else {
+    // Token-based windowing: take as many recent messages as fit
+    selectedMessages = [];
+    let tokenCount = 0;
+
+    // Start from the end and work backwards
+    for (let i = nonSystemMessages.length - 1; i >= 0; i--) {
+      const msg = nonSystemMessages[i];
+      if (tokenCount + msg.tokens <= cfg.size) {
+        selectedMessages.unshift(msg);
+        tokenCount += msg.tokens;
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Combine system messages with selected messages
+  // System messages go first, then selected messages in order
+  const window = [...systemMessages, ...selectedMessages];
+
+  // Calculate total tokens
+  const tokensUsed = window.reduce((sum, msg) => sum + msg.tokens, 0);
+
+  return {
+    window,
+    tokensUsed,
+    messagesExcluded: fullHistory.length - window.length,
+  };
+}
+
+/**
+ * Get a summary of what's been excluded from the working window
+ *
+ * This can be used to generate a context summary for the model
+ * about what happened earlier in the conversation.
+ */
+export function getExcludedMessagesSummary(
+  fullHistory: Message[],
+  workingWindow: Message[]
+): string | null {
+  const windowIds = new Set(workingWindow.map((m) => m.id));
+  const excluded = fullHistory.filter((m) => !windowIds.has(m.id));
+
+  if (excluded.length === 0) {
+    return null;
+  }
+
+  // Generate a simple summary
+  const userMessages = excluded.filter((m) => m.role === 'user').length;
+  const assistantMessages = excluded.filter((m) => m.role === 'assistant').length;
+
+  // Extract topics from excluded messages
+  const topics = new Set<string>();
+  for (const msg of excluded) {
+    const words = msg.content.toLowerCase().match(/\b\w{5,}\b/g) || [];
+    words.slice(0, 3).forEach((w) => topics.add(w));
+  }
+
+  const topicList = Array.from(topics).slice(0, 5).join(', ');
+
+  return `[Earlier in this conversation: ${userMessages} user messages and ${assistantMessages} assistant responses. Topics discussed: ${topicList || 'various topics'}]`;
 }

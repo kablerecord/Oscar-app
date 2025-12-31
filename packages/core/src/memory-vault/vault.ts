@@ -30,8 +30,9 @@ import type {
   VaultStats,
   ExportedVault,
   MemorySource,
+  WindowConfig,
 } from './types';
-import { DEFAULT_VAULT_CONFIG } from './types';
+import { DEFAULT_VAULT_CONFIG, DEFAULT_WINDOW_CONFIG } from './types';
 
 import * as episodicStore from './stores/episodic.store';
 import * as semanticStore from './stores/semantic.store';
@@ -45,10 +46,14 @@ import {
   runProspectiveReflection,
 } from './synthesis/prospective';
 import { updateUtilityScores } from './synthesis/retrospective';
+import { synthesizeWithLLM } from './synthesis/llm-extractor';
+import { enqueue as enqueueSynthesis } from './synthesis/queue';
 import {
   compactWorkingMemory,
   isCompactionNeeded,
   calculateTokenUsage,
+  computeWorkingWindow,
+  estimateTokens,
 } from './synthesis/compaction';
 
 import {
@@ -75,11 +80,15 @@ class MemoryVaultInstance {
     this.config = { ...DEFAULT_VAULT_CONFIG, ...config };
     this.workingMemory = {
       sessionId: '',
+      fullHistory: [],
+      workingWindow: [],
+      windowConfig: { ...DEFAULT_WINDOW_CONFIG },
       currentConversation: null,
       retrievedContext: [],
       pendingCommitments: [],
       tokenBudget: this.config.maxWorkingMemoryTokens,
       tokensUsed: 0,
+      fullHistoryTokens: 0,
     };
   }
 
@@ -105,7 +114,99 @@ class MemoryVaultInstance {
       projectId
     );
     this.workingMemory.currentConversation = conversation;
+    // Reset history for new conversation
+    this.workingMemory.fullHistory = [];
+    this.workingMemory.workingWindow = [];
+    this.workingMemory.tokensUsed = 0;
+    this.workingMemory.fullHistoryTokens = 0;
     return conversation.id;
+  }
+
+  /**
+   * Add a message to the conversation
+   * This is the primary way to add messages - it updates both fullHistory and workingWindow
+   */
+  addMessage(message: Omit<Message, 'id'>): Message | null {
+    if (!this.workingMemory.currentConversation) {
+      return null;
+    }
+
+    // Add to episodic store (persistent)
+    const storedMessage = episodicStore.addMessage(
+      this.workingMemory.currentConversation.id,
+      message
+    );
+
+    if (!storedMessage) {
+      return null;
+    }
+
+    // Add to fullHistory (permanent, never compacted)
+    this.workingMemory.fullHistory.push(storedMessage);
+    this.workingMemory.fullHistoryTokens += storedMessage.tokens;
+
+    // Recompute working window
+    this.recomputeWorkingWindow();
+
+    return storedMessage;
+  }
+
+  /**
+   * Recompute the working window from fullHistory
+   */
+  recomputeWorkingWindow(): void {
+    const { window, tokensUsed } = computeWorkingWindow(
+      this.workingMemory.fullHistory,
+      this.workingMemory.windowConfig
+    );
+    this.workingMemory.workingWindow = window;
+    this.workingMemory.tokensUsed = tokensUsed;
+  }
+
+  /**
+   * Get the full conversation history (for UI display/scrolling)
+   */
+  getFullHistory(): Message[] {
+    return this.workingMemory.fullHistory;
+  }
+
+  /**
+   * Get the working window (for model context)
+   */
+  getWorkingWindow(): Message[] {
+    return this.workingMemory.workingWindow;
+  }
+
+  /**
+   * Update window configuration
+   */
+  setWindowConfig(config: Partial<WindowConfig>): void {
+    this.workingMemory.windowConfig = {
+      ...this.workingMemory.windowConfig,
+      ...config,
+    };
+    this.recomputeWorkingWindow();
+  }
+
+  /**
+   * Load existing conversation into working memory
+   */
+  loadConversation(conversationId: string): boolean {
+    const conversation = episodicStore.getConversation(conversationId);
+    if (!conversation) {
+      return false;
+    }
+
+    this.workingMemory.currentConversation = conversation;
+    // Load all messages into fullHistory
+    this.workingMemory.fullHistory = [...conversation.messages];
+    this.workingMemory.fullHistoryTokens = this.workingMemory.fullHistory.reduce(
+      (sum, m) => sum + m.tokens,
+      0
+    );
+    // Compute working window
+    this.recomputeWorkingWindow();
+    return true;
   }
 
   /**
@@ -118,6 +219,121 @@ class MemoryVaultInstance {
       procedural: proceduralStore.getProceduralStore(),
     };
   }
+
+  /**
+   * End the current conversation and trigger synthesis
+   * LEARNING LAYER: Auto-synthesis on conversation end
+   */
+  async endConversation(options?: EndConversationOptions): Promise<EndConversationResult> {
+    if (!this.workingMemory.currentConversation) {
+      return { success: false, reason: 'no_active_conversation' };
+    }
+
+    const conversation = this.workingMemory.currentConversation;
+
+    // 1. Mark conversation as ended in episodic store
+    episodicStore.endConversation(conversation.id);
+
+    // 2. Synthesize or queue based on options
+    if (options?.synthesizeImmediately) {
+      try {
+        // Use LLM-based extraction if enabled (default), fallback to regex
+        const existingMemories = semanticStore.getAllMemories();
+        const llmResult = await synthesizeWithLLM(conversation, existingMemories);
+
+        // Create memories from extracted facts
+        const newMemories: SemanticMemory[] = [];
+        for (const fact of llmResult.facts) {
+          const { embedding } = await generateEmbedding(fact.content);
+          const source: MemorySource = {
+            type: 'conversation',
+            sourceId: conversation.id,
+            timestamp: new Date(),
+            confidence: fact.confidence,
+          };
+
+          const memory = semanticStore.createMemory(
+            fact.content,
+            fact.category,
+            source,
+            embedding,
+            fact.confidence
+          );
+
+          // Add topics
+          if (fact.topics.length > 0) {
+            semanticStore.addTopics(memory.id, fact.topics);
+          }
+
+          // Mark supersessions
+          if (fact.supersedes) {
+            for (const supersededId of fact.supersedes) {
+              semanticStore.markSupersession(memory.id, supersededId);
+            }
+          }
+
+          newMemories.push(memory);
+        }
+
+        // Update conversation summary
+        if (llmResult.summary) {
+          episodicStore.updateConversationSummary(conversation.id, llmResult.summary);
+        }
+
+        return {
+          success: true,
+          synthesisResult: {
+            newMemories,
+            conversationSummary: llmResult.summary,
+            contradictionsResolved: llmResult.contradictions.filter(
+              (c) => c.resolution === 'replace_with_new'
+            ).length,
+          },
+        };
+      } catch (error) {
+        console.error('[Vault] Immediate synthesis failed, queueing instead:', error);
+        // Fall through to queue
+      }
+    }
+
+    // Queue for async synthesis
+    const jobId = await enqueueSynthesis(conversation.id, this.userId);
+    return { success: true, queued: true, jobId };
+  }
+
+  /**
+   * Check if conversation should auto-end due to inactivity
+   */
+  checkConversationTimeout(timeoutMinutes: number = 30): boolean {
+    if (!this.workingMemory.currentConversation) return false;
+
+    const lastMessage = this.workingMemory.fullHistory.at(-1);
+    if (!lastMessage) return false;
+
+    const inactiveMinutes = (Date.now() - lastMessage.timestamp.getTime()) / 60000;
+    return inactiveMinutes > timeoutMinutes;
+  }
+}
+
+/**
+ * Options for ending a conversation
+ */
+export interface EndConversationOptions {
+  /** Synthesize immediately instead of queueing */
+  synthesizeImmediately?: boolean;
+  /** Use LLM-based extraction (default: true) */
+  useLLMExtraction?: boolean;
+}
+
+/**
+ * Result from ending a conversation
+ */
+export interface EndConversationResult {
+  success: boolean;
+  reason?: 'no_active_conversation';
+  queued?: boolean;
+  jobId?: string;
+  synthesisResult?: SynthesisResult;
 }
 
 // ============================================================================
@@ -165,13 +381,67 @@ export async function retrieveContextForUser(
 }
 
 /**
- * Get conversation history
+ * Get conversation history (full history from episodic store)
  */
 export function getConversationHistory(
   conversationId: string,
   limit?: number
 ): Message[] {
   return episodicStore.getMessages(conversationId, limit);
+}
+
+/**
+ * Get full conversation history for a user's current conversation (for UI scrollback)
+ */
+export function getFullHistoryForUser(userId: string): Message[] {
+  const vault = getVault(userId);
+  if (!vault) return [];
+  return vault.getFullHistory();
+}
+
+/**
+ * Get working window for a user (for model context)
+ */
+export function getWorkingWindowForUser(userId: string): Message[] {
+  const vault = getVault(userId);
+  if (!vault) return [];
+  return vault.getWorkingWindow();
+}
+
+/**
+ * Add a message to a user's current conversation
+ */
+export function addMessageForUser(
+  userId: string,
+  message: Omit<Message, 'id'>
+): Message | null {
+  const vault = getVault(userId);
+  if (!vault) return null;
+  return vault.addMessage(message);
+}
+
+/**
+ * Update window configuration for a user
+ */
+export function setWindowConfigForUser(
+  userId: string,
+  config: Partial<WindowConfig>
+): void {
+  const vault = getVault(userId);
+  if (!vault) return;
+  vault.setWindowConfig(config);
+}
+
+/**
+ * Load an existing conversation for a user
+ */
+export function loadConversationForUser(
+  userId: string,
+  conversationId: string
+): boolean {
+  const vault = getVault(userId);
+  if (!vault) return false;
+  return vault.loadConversation(conversationId);
 }
 
 /**
@@ -421,6 +691,58 @@ export function deleteUserData(userId: string): void {
   semanticStore.deleteAllMemories();
   proceduralStore.deleteAllData();
   vaults.delete(userId);
+}
+
+// ============================================================================
+// Learning Layer - Conversation Lifecycle
+// ============================================================================
+
+/**
+ * End a conversation for a user and trigger synthesis
+ */
+export async function endConversationForUser(
+  userId: string,
+  options?: EndConversationOptions
+): Promise<EndConversationResult> {
+  const vault = getVault(userId);
+  if (!vault) {
+    return { success: false, reason: 'no_active_conversation' };
+  }
+  return vault.endConversation(options);
+}
+
+/**
+ * Check if a user's conversation has timed out
+ */
+export function checkConversationTimeoutForUser(
+  userId: string,
+  timeoutMinutes: number = 30
+): boolean {
+  const vault = getVault(userId);
+  if (!vault) return false;
+  return vault.checkConversationTimeout(timeoutMinutes);
+}
+
+/**
+ * Get all active vaults (for scheduler)
+ */
+export function getAllVaults(): MemoryVaultInstance[] {
+  return Array.from(vaults.values());
+}
+
+/**
+ * Get unsynthesized conversations for a user
+ */
+export function getUnsynthesizedConversations(
+  userId: string,
+  since?: Date
+): Conversation[] {
+  const store = episodicStore.getEpisodicStore(userId);
+  return store.conversations.filter((c) =>
+    c.endedAt !== null &&
+    (!c.summary || c.summary === '') &&
+    (!since || (c.endedAt && c.endedAt >= since))
+  );
 }
 
 // ============================================================================

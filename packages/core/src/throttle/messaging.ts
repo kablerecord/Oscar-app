@@ -328,21 +328,27 @@ export function getReferralPrompt(tier: Tier): string {
  * Get feature lock message
  */
 export function getFeatureLockMessage(
-  feature: 'councilMode' | 'contemplateMode' | 'voiceMode' | 'customPersona',
+  feature: 'councilMode' | 'contemplateMode' | 'voiceMode' | 'priorityProcessing' | 'weeklyReviews' | 'vscodeExtension' | 'apiAccess',
   tier: Tier
 ): string {
   const featureNames: Record<string, string> = {
     councilMode: 'Council mode',
     contemplateMode: 'Contemplate mode',
     voiceMode: 'Voice mode',
-    customPersona: 'Custom persona',
+    priorityProcessing: 'Priority processing',
+    weeklyReviews: 'Weekly automated reviews',
+    vscodeExtension: 'VS Code extension',
+    apiAccess: 'API access',
   };
 
   const featureTiers: Record<string, Tier> = {
     councilMode: 'master',
     contemplateMode: 'pro',
     voiceMode: 'pro',
-    customPersona: 'master',
+    priorityProcessing: 'master',
+    weeklyReviews: 'master',
+    vscodeExtension: 'pro',
+    apiAccess: 'enterprise',
   };
 
   const featureName = featureNames[feature] || feature;

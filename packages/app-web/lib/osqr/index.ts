@@ -860,6 +860,14 @@ export function hasFeatureAccess(
   if (!featureFlags.enableThrottle) {
     return true;
   }
+  // Map wrapper feature names to core feature names
+  if (feature === 'customPersona') {
+    // customPersona is only for master/enterprise tiers
+    return tier === 'master' || tier === 'enterprise';
+  }
+  if (feature === 'prioritySupport') {
+    return Throttle.hasFeatureAccess(mapTier(tier), 'priorityProcessing');
+  }
   return Throttle.hasFeatureAccess(mapTier(tier), feature);
 }
 

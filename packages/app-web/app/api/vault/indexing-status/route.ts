@@ -30,14 +30,21 @@ export async function GET(req: NextRequest) {
       return Response.json({ error: 'workspaceId required' }, { status: 400 })
     }
 
+    // Only count user-uploaded documents (hide conversations, auto-indexed code, etc.)
+    const allowedSourceTypes = ['upload', 'file_upload', 'note']
+
     // Get document counts
     const [totalDocuments, indexedDocuments] = await Promise.all([
       prisma.document.count({
-        where: { workspaceId }
+        where: {
+          workspaceId,
+          sourceType: { in: allowedSourceTypes },
+        }
       }),
       prisma.document.count({
         where: {
           workspaceId,
+          sourceType: { in: allowedSourceTypes },
           chunks: { some: {} }
         }
       })

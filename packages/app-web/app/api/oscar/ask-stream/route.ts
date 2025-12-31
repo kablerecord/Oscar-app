@@ -388,11 +388,13 @@ export async function POST(req: NextRequest) {
         // Track telemetry
         try {
           const collector = getTelemetryCollector()
+          // Map 'mixed' sentiment to 'neutral' for telemetry (which only accepts positive/negative/neutral)
+          const telemetrySentiment = feedbackDetection.sentiment === 'mixed' ? 'neutral' : feedbackDetection.sentiment
           await collector.trackFeedbackSubmitted(
             userId,
             workspaceId,
             'natural_language',
-            feedbackDetection.sentiment
+            telemetrySentiment
           )
         } catch (telemetryError) {
           console.error('[Stream][Feedback] Telemetry error:', telemetryError)

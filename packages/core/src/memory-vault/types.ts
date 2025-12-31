@@ -261,13 +261,48 @@ export interface PluginPermission {
 // Working Memory
 // ============================================================================
 
+/**
+ * Window configuration for working memory
+ * Controls how messages are windowed for model context
+ */
+export interface WindowConfig {
+  /** Window sizing mode */
+  mode: 'messages' | 'tokens';
+  /** Max messages (if mode='messages') or max tokens (if mode='tokens') */
+  size: number;
+  /** Strategy for selecting messages when window is full */
+  strategy: 'recent' | 'semantic';
+  /** Always include system messages regardless of window */
+  preserveSystemMessages: boolean;
+}
+
+/**
+ * Default window configuration
+ */
+export const DEFAULT_WINDOW_CONFIG: WindowConfig = {
+  mode: 'messages',
+  size: 50,
+  strategy: 'recent',
+  preserveSystemMessages: true,
+};
+
 export interface WorkingMemoryBuffer {
   sessionId: string;
+  /** Full conversation history - NEVER modified by compaction, used for display/scroll */
+  fullHistory: Message[];
+  /** Windowed messages sent to model - computed from fullHistory based on windowConfig */
+  workingWindow: Message[];
+  /** Window configuration */
+  windowConfig: WindowConfig;
+  /** Current conversation metadata (without messages - those are in fullHistory) */
   currentConversation: Conversation | null;
   retrievedContext: RetrievedMemory[];
   pendingCommitments: Commitment[];
   tokenBudget: number;
+  /** Tokens used by workingWindow (not fullHistory) */
   tokensUsed: number;
+  /** Total tokens in fullHistory (for stats) */
+  fullHistoryTokens: number;
 }
 
 export interface RetrievedMemory {
@@ -400,7 +435,7 @@ export interface PrivacyDefaults {
 }
 
 export const DEFAULT_VAULT_CONFIG: VaultConfig = {
-  maxWorkingMemoryTokens: 8000,
+  maxWorkingMemoryTokens: 100000, // Increased from 8000 to leverage Claude's full context window
   compactionThreshold: 0.8,
   utilityDecayRate: 0.05,
   synthesisFrequency: 'hourly',

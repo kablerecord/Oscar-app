@@ -26,6 +26,7 @@ export {
   Tier,
   TierConfig,
   TIER_CONFIGS,
+  ACTIVE_TIERS,
   DailyBudget,
   BudgetState,
   RequestClassification,
@@ -219,7 +220,7 @@ export async function processQueryRequest(
  */
 export function hasFeatureAccess(
   tier: Tier,
-  feature: 'contemplateMode' | 'councilMode' | 'voiceMode' | 'customPersona' | 'prioritySupport'
+  feature: 'contemplateMode' | 'councilMode' | 'voiceMode' | 'priorityProcessing' | 'weeklyReviews' | 'vscodeExtension' | 'apiAccess'
 ): boolean {
   const config = TIER_CONFIGS[tier];
 
@@ -230,10 +231,14 @@ export function hasFeatureAccess(
       return config.councilMode;
     case 'voiceMode':
       return config.voiceMode;
-    case 'customPersona':
-      return config.customPersona;
-    case 'prioritySupport':
-      return config.prioritySupport;
+    case 'priorityProcessing':
+      return config.priorityProcessing;
+    case 'weeklyReviews':
+      return config.weeklyReviews;
+    case 'vscodeExtension':
+      return config.vscodeExtension;
+    case 'apiAccess':
+      return config.apiAccess;
     default:
       return false;
   }
@@ -246,7 +251,8 @@ export function getUpgradePath(currentTier: Tier): Tier | null {
   const path: Record<Tier, Tier | null> = {
     lite: 'pro',
     pro: 'master',
-    master: 'enterprise',
+    master: 'elite',
+    elite: 'enterprise',
     enterprise: null,
   };
 
@@ -261,7 +267,8 @@ export function getDowngradePath(currentTier: Tier): Tier | null {
     lite: null,
     pro: 'lite',
     master: 'pro',
-    enterprise: 'master',
+    elite: 'master',
+    enterprise: 'elite',
   };
 
   return path[currentTier];

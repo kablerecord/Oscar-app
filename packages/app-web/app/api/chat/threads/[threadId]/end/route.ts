@@ -46,7 +46,7 @@ export async function POST(
     const thread = await prisma.chatThread.findFirst({
       where: {
         id: threadId,
-        workspace: { userId: session.user.id },
+        workspace: { ownerId: session.user.id },
       },
       include: {
         workspace: true,

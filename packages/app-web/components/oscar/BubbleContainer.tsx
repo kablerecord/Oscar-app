@@ -79,11 +79,15 @@ export function BubbleContainer({
 
     try {
       // First check if we can show bubbles
-      const stateRes = await fetch('/api/temporal/bubble-state')
-      if (stateRes.ok) {
-        const stateData: BubbleStateResponse = await stateRes.json()
-        setCanShow(stateData.canShow)
-        setIsQuietHours(stateData.isQuietHours || false)
+      try {
+        const stateRes = await fetch('/api/temporal/bubble-state')
+        if (stateRes.ok) {
+          const stateData: BubbleStateResponse = await stateRes.json()
+          setCanShow(stateData.canShow)
+          setIsQuietHours(stateData.isQuietHours || false)
+        }
+      } catch (stateErr) {
+        console.warn('[BubbleContainer] Failed to fetch bubble state:', stateErr)
       }
 
       // Fetch suggestions

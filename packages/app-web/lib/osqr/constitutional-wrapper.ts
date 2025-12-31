@@ -26,6 +26,7 @@ export interface ConstitutionalCheckResult {
   }>;
   sanitizedInput?: string;
   suggestedRevision?: string;
+  confidence?: number;
 }
 
 /**
@@ -80,6 +81,7 @@ export async function checkInput(
         requestId: options?.requestId || crypto.randomUUID(),
         conversationId: options?.sessionId || '',
         previousToolCalls: [],
+        honestyTier: 'BASE',
       };
 
       const result = await Constitutional.validateIntent(input, context);
@@ -87,7 +89,7 @@ export async function checkInput(
       if (!result.allowed) {
         const violations = result.violations.map(v => ({
           type: v.violationType,
-          clauseId: v.clauseId || 'UNKNOWN',
+          clauseId: v.clauseViolated || 'UNKNOWN',
           severity: v.action === 'SILENT_INTERCEPT' ? 'high' : 'medium',
         }));
 
@@ -113,6 +115,7 @@ export async function checkInput(
       requestId: options?.requestId || crypto.randomUUID(),
       conversationId: options?.sessionId || '',
       previousToolCalls: [],
+      honestyTier: 'BASE',
     };
 
     const result = await Constitutional.validateIntent(input, context);
@@ -120,7 +123,7 @@ export async function checkInput(
     if (!result.allowed) {
       const violations = result.violations.map(v => ({
         type: v.violationType,
-        clauseId: v.clauseId || 'UNKNOWN',
+        clauseId: v.clauseViolated || 'UNKNOWN',
         severity: v.action === 'SILENT_INTERCEPT' ? 'high' : 'medium',
       }));
 
@@ -206,7 +209,7 @@ export async function checkOutput(
     if (!result.valid) {
       const violations = result.violations.map(v => ({
         type: v.violationType,
-        clauseId: v.clauseId || 'UNKNOWN',
+        clauseId: v.clauseViolated || 'UNKNOWN',
         severity: v.action === 'SILENT_INTERCEPT' ? 'high' : 'medium',
       }));
 

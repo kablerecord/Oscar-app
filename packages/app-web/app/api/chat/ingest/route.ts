@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const workspace = await prisma.workspace.findFirst({
       where: {
         id: workspaceId,
-        userId: session.user.id,
+        ownerId: session.user.id,
       },
     });
 
@@ -86,8 +86,10 @@ export async function POST(req: NextRequest) {
       transcript,
       metadata: {
         projectId,
-        importedAt: new Date().toISOString(),
-        ...metadata,
+        timestamp: new Date(),
+        originalId: metadata?.originalId as string | undefined,
+        participants: metadata?.participants as string[] | undefined,
+        tags: metadata?.tags as string[] | undefined,
       },
     });
 

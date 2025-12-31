@@ -3,6 +3,7 @@
  *
  * Tracks daily usage budget per user with midnight resets.
  * Supports optional persistence adapter for database storage.
+ * Also tracks capability costs (web search, code execution, etc.)
  */
 
 import {
@@ -11,6 +12,10 @@ import {
   BudgetStatus,
   BudgetState,
   TIER_CONFIGS,
+  CapabilityType,
+  CapabilityCost,
+  CapabilityUsage,
+  CAPABILITY_COSTS,
 } from './types';
 import { getPersistenceAdapter, hasPersistenceAdapter } from './persistence';
 
@@ -559,4 +564,163 @@ export function getQueriesRemaining(userId: string, tier: Tier): number {
  */
 export function resetDailyBudget(userId: string, _tier: Tier): void {
   resetUserBudget(userId);
+}
+
+// ============================================================================
+// Capability Cost Tracking
+// ============================================================================
+
+/**
+ * In-memory store for capability usage
+ */
+const capabilityUsage = new Map<string, {
+  usageByCapability: Record<CapabilityType, { count: number; totalCost: number }>;
+  totalCost: number;
+}>();
+
+/**
+ * Get capability usage key
+ */
+function getCapabilityUsageKey(userId: string, date: string): string {
+  return `cap:${userId}:${date}`;
+}
+
+/**
+ * Initialize capability usage for a user if not exists
+ */
+function initCapabilityUsage(userId: string, date: string): void {
+  const key = getCapabilityUsageKey(userId, date);
+  if (!capabilityUsage.has(key)) {
+    capabilityUsage.set(key, {
+      usageByCapability: {
+        web_search: { count: 0, totalCost: 0 },
+        code_execution: { count: 0, totalCost: 0 },
+        image_generation: { count: 0, totalCost: 0 },
+        vision_analysis: { count: 0, totalCost: 0 },
+        file_search: { count: 0, totalCost: 0 },
+        deep_research: { count: 0, totalCost: 0 },
+        voice_input: { count: 0, totalCost: 0 },
+        voice_output: { count: 0, totalCost: 0 },
+      },
+      totalCost: 0,
+    });
+  }
+}
+
+/**
+ * Calculate cost for a capability usage
+ */
+export function calculateCapabilityCost(usage: CapabilityUsage): number {
+  const config = CAPABILITY_COSTS[usage.capability];
+  let total = config.baseCost;
+
+  if (config.variableCost) {
+    let units = 0;
+    switch (config.variableCost.unit) {
+      case 'token':
+        units = usage.tokens || 0;
+        break;
+      case 'second':
+        units = usage.seconds || 0;
+        break;
+      case 'character':
+        units = usage.characters || 0;
+        break;
+      case 'image':
+        units = usage.images || 0;
+        break;
+    }
+    total += units * config.variableCost.rate;
+  }
+
+  return total;
+}
+
+/**
+ * Track capability usage for a user
+ */
+export function trackCapabilityUsage(userId: string, usage: CapabilityUsage): number {
+  const timezone = getUserTimezone(userId);
+  const date = getDateInTimezone(timezone);
+  const key = getCapabilityUsageKey(userId, date);
+
+  initCapabilityUsage(userId, date);
+
+  const cost = calculateCapabilityCost(usage);
+  const record = capabilityUsage.get(key)!;
+
+  record.usageByCapability[usage.capability].count++;
+  record.usageByCapability[usage.capability].totalCost += cost;
+  record.totalCost += cost;
+
+  return cost;
+}
+
+/**
+ * Track capability usage (async version)
+ */
+export async function trackCapabilityUsageAsync(
+  userId: string,
+  usage: CapabilityUsage
+): Promise<number> {
+  // For now, just use sync version
+  // In the future, this could persist to a database
+  return trackCapabilityUsage(userId, usage);
+}
+
+/**
+ * Get capability usage for a user on a given date
+ */
+export function getCapabilityUsage(userId: string, date?: string): {
+  usageByCapability: Record<CapabilityType, { count: number; totalCost: number }>;
+  totalCost: number;
+} | null {
+  const timezone = getUserTimezone(userId);
+  const targetDate = date || getDateInTimezone(timezone);
+  const key = getCapabilityUsageKey(userId, targetDate);
+
+  return capabilityUsage.get(key) || null;
+}
+
+/**
+ * Get total capability cost for today
+ */
+export function getTodayCapabilityCost(userId: string): number {
+  const usage = getCapabilityUsage(userId);
+  return usage?.totalCost || 0;
+}
+
+/**
+ * Get usage count for a specific capability today
+ */
+export function getCapabilityUsageCount(userId: string, capability: CapabilityType): number {
+  const usage = getCapabilityUsage(userId);
+  return usage?.usageByCapability[capability]?.count || 0;
+}
+
+/**
+ * Estimate cost for a capability before usage
+ */
+export function estimateCapabilityCost(
+  capability: CapabilityType,
+  estimatedUsage?: Partial<Omit<CapabilityUsage, 'capability'>>
+): number {
+  return calculateCapabilityCost({
+    capability,
+    ...estimatedUsage,
+  });
+}
+
+/**
+ * Clear capability usage (for testing)
+ */
+export function clearCapabilityUsage(): void {
+  capabilityUsage.clear();
+}
+
+/**
+ * Get all capability cost definitions
+ */
+export function getAllCapabilityCosts(): Record<CapabilityType, CapabilityCost> {
+  return { ...CAPABILITY_COSTS };
 }

@@ -153,7 +153,7 @@ export function getThrottleStatus(userId: string, tier: UserTier): ThrottleStatu
     return {
       tier,
       canQuery: coreStatus.canMakeQuery,
-      queriesRemaining: coreStatus.budget.premiumQueriesLimit - coreStatus.budget.premiumQueriesUsed,
+      queriesRemaining: coreStatus.budget.queriesLimit - coreStatus.budget.queriesUsed,
       queriesTotal: tierConfig.queriesPerDay,
       budgetState,
       statusMessage: coreStatus.statusMessage,
@@ -386,8 +386,19 @@ export function purchaseOverage(
   ensureInitialized();
 
   try {
-    const result = Throttle.purchaseOverage(userId, packageId);
-    return result;
+    const coreTier = mapUserTierToCoreTier(tier);
+    const result = Throttle.purchaseOverage(userId, coreTier, packageId);
+    if (result) {
+      return {
+        success: true,
+        queriesAdded: result.queriesRemaining,
+      };
+    }
+    return {
+      success: false,
+      queriesAdded: 0,
+      error: 'Package not found',
+    };
   } catch (error) {
     return {
       success: false,

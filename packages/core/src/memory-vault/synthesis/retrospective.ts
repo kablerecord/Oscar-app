@@ -3,6 +3,12 @@
  *
  * Updates memory utility scores based on retrieval outcomes.
  * Implements Bayesian smoothing for reliable utility estimation.
+ *
+ * LEARNING LAYER ENHANCEMENTS:
+ * - Recency boost for new memories
+ * - Outcome-based learning from retrieval feedback
+ * - Minimum score floor to prevent permanent loss
+ * - Enhanced tracking and statistics
  */
 
 import type {
@@ -18,10 +24,13 @@ import { getRetrievalRecords, getMemoryRetrievalStats } from '../retrieval/retri
  */
 export interface UtilityUpdateConfig {
   timeWindowDays: number;
-  bayesianAlpha: number; // Prior successes
-  bayesianBeta: number;  // Prior failures
-  momentum: number;      // Blend with previous score
-  decayRate: number;     // Decay for unretrieved memories
+  bayesianAlpha: number;   // Prior successes
+  bayesianBeta: number;    // Prior failures
+  momentum: number;        // Blend with previous score
+  decayRate: number;       // Decay for unretrieved memories
+  recencyBoost: number;    // Boost for recently created memories
+  minimumScore: number;    // Floor for utility scores
+  outcomeWeight: number;   // How much outcomes affect score
 }
 
 const DEFAULT_CONFIG: UtilityUpdateConfig = {
@@ -30,6 +39,9 @@ const DEFAULT_CONFIG: UtilityUpdateConfig = {
   bayesianBeta: 1,
   momentum: 0.7,
   decayRate: 0.05,
+  recencyBoost: 0.1,
+  minimumScore: 0.1,
+  outcomeWeight: 0.3,
 };
 
 /**
@@ -277,4 +289,251 @@ export function resetUtilityScores(defaultScore: number = 0.5): number {
   }));
 
   return semanticStore.batchUpdateUtility(updates);
+}
+
+// ============================================================================
+// Learning Layer Enhancements
+// ============================================================================
+
+/**
+ * Outcome tracking for learning from retrieval results
+ */
+export interface OutcomeRecord {
+  memoryId: string;
+  conversationId: string;
+  outcome: 'used' | 'helpful' | 'not_helpful' | 'ignored';
+  timestamp: Date;
+  context?: string;
+}
+
+/** In-memory outcome storage for learning */
+const outcomeHistory: OutcomeRecord[] = [];
+
+/**
+ * Record an outcome for a retrieved memory
+ * LEARNING LAYER: Explicit feedback mechanism
+ */
+export function recordOutcome(
+  memoryId: string,
+  conversationId: string,
+  outcome: OutcomeRecord['outcome'],
+  context?: string
+): void {
+  outcomeHistory.push({
+    memoryId,
+    conversationId,
+    outcome,
+    timestamp: new Date(),
+    context,
+  });
+
+  // Apply immediate score adjustment based on outcome
+  const memory = semanticStore.getMemory(memoryId);
+  if (!memory) return;
+
+  const adjustments: Record<OutcomeRecord['outcome'], number> = {
+    used: 0.02,        // Small boost for being used
+    helpful: 0.1,      // Significant boost for being helpful
+    not_helpful: -0.05, // Small penalty for not being helpful
+    ignored: -0.02,    // Small penalty for being ignored
+  };
+
+  const adjustment = adjustments[outcome];
+  const newScore = Math.max(
+    DEFAULT_CONFIG.minimumScore,
+    Math.min(1, memory.utilityScore + adjustment)
+  );
+
+  semanticStore.updateUtilityScore(memoryId, newScore);
+}
+
+/**
+ * Get outcome history for a memory
+ */
+export function getOutcomeHistory(memoryId: string): OutcomeRecord[] {
+  return outcomeHistory.filter((r) => r.memoryId === memoryId);
+}
+
+/**
+ * Calculate recency boost for a memory
+ * Newer memories get a temporary boost to give them a chance to prove useful
+ */
+export function calculateRecencyBoost(
+  createdAt: Date,
+  config: Partial<UtilityUpdateConfig> = {}
+): number {
+  const cfg = { ...DEFAULT_CONFIG, ...config };
+  const ageInDays = (Date.now() - createdAt.getTime()) / (24 * 60 * 60 * 1000);
+
+  // Exponential decay over 7 days
+  if (ageInDays <= 7) {
+    return cfg.recencyBoost * Math.exp(-ageInDays / 7);
+  }
+
+  return 0;
+}
+
+/**
+ * Apply recency boosts to all memories
+ */
+export function applyRecencyBoosts(
+  config: Partial<UtilityUpdateConfig> = {}
+): number {
+  const allMemories = semanticStore.getAllMemories();
+  let updated = 0;
+
+  for (const memory of allMemories) {
+    const boost = calculateRecencyBoost(memory.createdAt, config);
+    if (boost > 0.001) {
+      const newScore = Math.min(1, memory.utilityScore + boost);
+      if (newScore !== memory.utilityScore) {
+        semanticStore.updateUtilityScore(memory.id, newScore);
+        updated++;
+      }
+    }
+  }
+
+  return updated;
+}
+
+/**
+ * Enhanced utility update with all Learning Layer features
+ */
+export async function updateUtilityScoresEnhanced(
+  config: Partial<UtilityUpdateConfig> = {}
+): Promise<UtilityUpdateResult & { recencyBoosts: number }> {
+  const cfg = { ...DEFAULT_CONFIG, ...config };
+
+  // First, run standard utility update
+  const baseResult = await updateUtilityScores(config);
+
+  // Apply recency boosts
+  const recencyBoosts = applyRecencyBoosts(config);
+
+  // Enforce minimum score floor
+  const allMemories = semanticStore.getAllMemories();
+  let floored = 0;
+
+  for (const memory of allMemories) {
+    if (memory.utilityScore < cfg.minimumScore) {
+      semanticStore.updateUtilityScore(memory.id, cfg.minimumScore);
+      floored++;
+    }
+  }
+
+  return {
+    ...baseResult,
+    memoriesUpdated: baseResult.memoriesUpdated + floored,
+    recencyBoosts,
+  };
+}
+
+/**
+ * Get learning statistics
+ */
+export function getLearningStats(): {
+  totalOutcomes: number;
+  outcomeBreakdown: Record<OutcomeRecord['outcome'], number>;
+  averageScoreByOutcome: Record<OutcomeRecord['outcome'], number>;
+  recentOutcomes: OutcomeRecord[];
+} {
+  const breakdown: Record<OutcomeRecord['outcome'], number> = {
+    used: 0,
+    helpful: 0,
+    not_helpful: 0,
+    ignored: 0,
+  };
+
+  const scoreSums: Record<OutcomeRecord['outcome'], { sum: number; count: number }> = {
+    used: { sum: 0, count: 0 },
+    helpful: { sum: 0, count: 0 },
+    not_helpful: { sum: 0, count: 0 },
+    ignored: { sum: 0, count: 0 },
+  };
+
+  for (const outcome of outcomeHistory) {
+    breakdown[outcome.outcome]++;
+
+    const memory = semanticStore.getMemory(outcome.memoryId);
+    if (memory) {
+      scoreSums[outcome.outcome].sum += memory.utilityScore;
+      scoreSums[outcome.outcome].count++;
+    }
+  }
+
+  const averageScoreByOutcome: Record<OutcomeRecord['outcome'], number> = {
+    used: scoreSums.used.count > 0 ? scoreSums.used.sum / scoreSums.used.count : 0,
+    helpful: scoreSums.helpful.count > 0 ? scoreSums.helpful.sum / scoreSums.helpful.count : 0,
+    not_helpful: scoreSums.not_helpful.count > 0 ? scoreSums.not_helpful.sum / scoreSums.not_helpful.count : 0,
+    ignored: scoreSums.ignored.count > 0 ? scoreSums.ignored.sum / scoreSums.ignored.count : 0,
+  };
+
+  // Get recent outcomes (last 24 hours)
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const recentOutcomes = outcomeHistory.filter((o) => o.timestamp > dayAgo);
+
+  return {
+    totalOutcomes: outcomeHistory.length,
+    outcomeBreakdown: breakdown,
+    averageScoreByOutcome,
+    recentOutcomes,
+  };
+}
+
+/**
+ * Clear outcome history (for testing)
+ */
+export function clearOutcomeHistory(): void {
+  outcomeHistory.length = 0;
+}
+
+/**
+ * Analyze memory performance over time
+ */
+export function analyzeMemoryPerformance(
+  memoryId: string
+): {
+  totalRetrievals: number;
+  helpfulRate: number;
+  scoreHistory: Array<{ date: Date; score: number }>;
+  trend: 'improving' | 'declining' | 'stable';
+} | null {
+  const memory = semanticStore.getMemory(memoryId);
+  if (!memory) return null;
+
+  const outcomes = getOutcomeHistory(memoryId);
+  const stats = getMemoryRetrievalStats(memoryId);
+
+  // Calculate helpful rate
+  const helpfulCount = outcomes.filter((o) => o.outcome === 'helpful').length;
+  const helpfulRate = outcomes.length > 0 ? helpfulCount / outcomes.length : 0;
+
+  // Determine trend based on recent outcomes
+  const recentOutcomes = outcomes.slice(-10);
+  let helpfulInRecent = 0;
+  let earlierHelpful = 0;
+
+  for (let i = 0; i < recentOutcomes.length; i++) {
+    if (recentOutcomes[i].outcome === 'helpful') {
+      if (i >= recentOutcomes.length / 2) {
+        helpfulInRecent++;
+      } else {
+        earlierHelpful++;
+      }
+    }
+  }
+
+  let trend: 'improving' | 'declining' | 'stable' = 'stable';
+  if (helpfulInRecent > earlierHelpful + 1) {
+    trend = 'improving';
+  } else if (earlierHelpful > helpfulInRecent + 1) {
+    trend = 'declining';
+  }
+
+  return {
+    totalRetrievals: stats.retrievals,
+    helpfulRate,
+    scoreHistory: [], // Would need persistent storage for full history
+    trend,
+  };
 }

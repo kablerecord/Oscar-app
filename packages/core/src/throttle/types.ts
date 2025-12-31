@@ -3,95 +3,212 @@
  *
  * Manages usage costs, throttling behavior, and overage pricing
  * with graceful degradation instead of hard cutoffs.
+ *
+ * PRICING UPDATED: December 30, 2024
+ * Source of truth: https://www.osqr.app/pricing
+ *
+ * Current live tiers:
+ * - Pro: $49/mo ($39 founder) - 75 queries/day, 5 councils/day
+ * - Master: $149/mo ($119 founder) - 200 queries/day, 15 councils/day
+ * - Elite: Custom (invite-only) - Unlimited with soft caps
+ * - Enterprise: Custom - Team tier
+ *
+ * Lite tier: Planned for future (post-1,000 users), not currently visible
+ * Founder pricing: First 500 users get locked pricing for life
  */
 
 // ============================================================================
 // Tier Definitions
 // ============================================================================
 
-export type Tier = 'lite' | 'pro' | 'master' | 'enterprise';
+// Note: 'lite' is kept in type for future use but not currently active/visible
+// Note: 'elite' is invite-only and not publicly visible
+export type Tier = 'lite' | 'pro' | 'master' | 'elite' | 'enterprise';
+
+// Tiers that are currently active and visible to users
+// Note: 'elite' is invite-only and not publicly visible
+export const ACTIVE_TIERS: Tier[] = ['pro', 'master', 'enterprise'];
+export const ALL_TIERS: Tier[] = ['lite', 'pro', 'master', 'elite', 'enterprise'];
 
 export interface TierConfig {
   name: string;
-  monthlyPrice: number;
+  monthlyPrice: number; // Regular pricing
+  futurePrice: number; // Price after founder period ends
+  founderPrice: number; // Price for first 500 users
+  founderCutoff: number; // Number of founder spots (500)
+  isActive: boolean; // Whether this tier is currently available
+  isInviteOnly?: boolean; // Whether this tier requires invitation
   documentsInVault: number;
   queriesPerDay: number;
+  councilsPerDay: number; // Council sessions per day
   storageGB: number;
+  // Response modes
+  quickMode: boolean;
   thoughtfulMode: boolean;
   contemplateMode: boolean;
   councilMode: boolean;
+  // Features
   voiceMode: boolean;
-  customPersona: boolean;
-  prioritySupport: boolean;
-  imageAnalysesPerMonth: number;
-  pluginAccess: 'trial' | 'full' | 'priority';
-  chatHistoryDays: number;
+  priorityProcessing: boolean;
+  weeklyReviews: boolean;
+  customAgentBuilder: boolean; // Coming soon
+  vscodeExtension: boolean;
+  apiAccess: boolean;
+  teamCollaboration: boolean; // Coming soon
+  ssoSecurity: boolean;
+  // Limits
+  maxFileSizeMB: number;
+  aiModelsAvailable: number;
 }
 
 export const TIER_CONFIGS: Record<Tier, TierConfig> = {
+  // LITE: Future tier (post-1,000 users) - NOT CURRENTLY ACTIVE
   lite: {
     name: 'Lite',
-    monthlyPrice: 19,
-    documentsInVault: 5,
-    queriesPerDay: 10,
-    storageGB: 1,
+    monthlyPrice: 29, // Planned price
+    futurePrice: 49,
+    founderPrice: 29,
+    founderCutoff: 0, // Not applicable - launches post-founder
+    isActive: false, // NOT VISIBLE TO USERS
+    documentsInVault: 50,
+    queriesPerDay: 25,
+    councilsPerDay: 0,
+    storageGB: 2,
+    // Response modes
+    quickMode: true,
     thoughtfulMode: false,
     contemplateMode: false,
     councilMode: false,
+    // Features
     voiceMode: false,
-    customPersona: false,
-    prioritySupport: false,
-    imageAnalysesPerMonth: 10,
-    pluginAccess: 'trial',
-    chatHistoryDays: 7,
+    priorityProcessing: false,
+    weeklyReviews: false,
+    customAgentBuilder: false,
+    vscodeExtension: false,
+    apiAccess: false,
+    teamCollaboration: false,
+    ssoSecurity: false,
+    // Limits
+    maxFileSizeMB: 10,
+    aiModelsAvailable: 1,
   },
   pro: {
     name: 'Pro',
-    monthlyPrice: 49,
-    documentsInVault: 25,
-    queriesPerDay: 100,
+    monthlyPrice: 49, // CHANGED from 99
+    futurePrice: 49, // Same as monthly (no future increase planned)
+    founderPrice: 39, // Founder pricing
+    founderCutoff: 500, // First 500 users
+    isActive: true,
+    documentsInVault: 500,
+    queriesPerDay: 75, // CHANGED from 100
+    councilsPerDay: 5, // Council limit
     storageGB: 10,
+    // Response modes
+    quickMode: true,
     thoughtfulMode: true,
     contemplateMode: true,
-    councilMode: false,
+    councilMode: true, // CHANGED from false - Pro now gets Council!
+    // Features
     voiceMode: true,
-    customPersona: false,
-    prioritySupport: false,
-    imageAnalysesPerMonth: 100,
-    pluginAccess: 'full',
-    chatHistoryDays: 30,
+    priorityProcessing: false,
+    weeklyReviews: false,
+    customAgentBuilder: false,
+    vscodeExtension: true,
+    apiAccess: false,
+    teamCollaboration: false,
+    ssoSecurity: false,
+    // Limits
+    maxFileSizeMB: 25,
+    aiModelsAvailable: 3, // CHANGED from 2 (for Council)
   },
   master: {
     name: 'Master',
-    monthlyPrice: 149,
-    documentsInVault: 100,
-    queriesPerDay: Infinity,
+    monthlyPrice: 149, // CHANGED from 249
+    futurePrice: 149, // Same as monthly
+    founderPrice: 119, // Founder pricing
+    founderCutoff: 500, // First 500 users
+    isActive: true,
+    documentsInVault: 1500,
+    queriesPerDay: 200, // CHANGED from 300
+    councilsPerDay: 15, // Council limit
     storageGB: 100,
+    // Response modes
+    quickMode: true,
     thoughtfulMode: true,
     contemplateMode: true,
     councilMode: true,
+    // Features
     voiceMode: true,
-    customPersona: true,
-    prioritySupport: true,
-    imageAnalysesPerMonth: Infinity,
-    pluginAccess: 'priority',
-    chatHistoryDays: Infinity,
+    priorityProcessing: true,
+    weeklyReviews: true,
+    customAgentBuilder: true, // Coming soon
+    vscodeExtension: true,
+    apiAccess: false,
+    teamCollaboration: false,
+    ssoSecurity: false,
+    // Limits
+    maxFileSizeMB: 50,
+    aiModelsAvailable: 4,
+  },
+  // ELITE: Secret, invite-only tier for power users
+  elite: {
+    name: 'Elite',
+    monthlyPrice: 0, // Custom pricing
+    futurePrice: 0, // Custom pricing
+    founderPrice: 0, // Custom pricing
+    founderCutoff: 0, // Not applicable
+    isActive: true, // Active but invite-only
+    isInviteOnly: true,
+    documentsInVault: Infinity,
+    queriesPerDay: Infinity, // Soft cap at 1000 (enforced separately)
+    councilsPerDay: Infinity, // Soft cap at 50 (enforced separately)
+    storageGB: Infinity,
+    // Response modes
+    quickMode: true,
+    thoughtfulMode: true,
+    contemplateMode: true,
+    councilMode: true,
+    // Features
+    voiceMode: true,
+    priorityProcessing: true,
+    weeklyReviews: true,
+    customAgentBuilder: true,
+    vscodeExtension: true,
+    apiAccess: true, // Elite gets API access
+    teamCollaboration: false,
+    ssoSecurity: false,
+    // Limits
+    maxFileSizeMB: 100,
+    aiModelsAvailable: Infinity,
   },
   enterprise: {
     name: 'Enterprise',
     monthlyPrice: 0, // Custom pricing
+    futurePrice: 0,
+    founderPrice: 0, // Not applicable
+    founderCutoff: 0, // Not applicable
+    isActive: true,
     documentsInVault: Infinity,
     queriesPerDay: Infinity,
+    councilsPerDay: Infinity,
     storageGB: Infinity,
+    // Response modes
+    quickMode: true,
     thoughtfulMode: true,
     contemplateMode: true,
     councilMode: true,
+    // Features
     voiceMode: true,
-    customPersona: true,
-    prioritySupport: true,
-    imageAnalysesPerMonth: Infinity,
-    pluginAccess: 'priority',
-    chatHistoryDays: Infinity,
+    priorityProcessing: true,
+    weeklyReviews: true,
+    customAgentBuilder: true,
+    vscodeExtension: true,
+    apiAccess: true,
+    teamCollaboration: true, // Coming soon
+    ssoSecurity: true,
+    // Limits
+    maxFileSizeMB: 100,
+    aiModelsAvailable: Infinity,
   },
 };
 
@@ -253,6 +370,14 @@ export const OVERAGE_PACKAGES: OveragePackage[] = [
     description: 'Deep analysis queries',
   },
   {
+    id: 'council-5',
+    name: '5 Council Sessions',
+    price: 12,
+    queries: 5,
+    type: 'council',
+    description: 'Multi-perspective analysis (Pro tier)',
+  },
+  {
     id: 'council-10',
     name: '10 Council Sessions',
     price: 20,
@@ -330,4 +455,99 @@ export interface ThrottleEvent {
   userId: string;
   timestamp: Date;
   data: Record<string, unknown>;
+}
+
+// ============================================================================
+// Capability Cost Tracking
+// ============================================================================
+
+/**
+ * AI capability types that can be tracked for costs
+ */
+export type CapabilityType =
+  | 'web_search'
+  | 'code_execution'
+  | 'image_generation'
+  | 'vision_analysis'
+  | 'file_search'
+  | 'deep_research'
+  | 'voice_input'
+  | 'voice_output';
+
+/**
+ * Cost configuration for a capability
+ */
+export interface CapabilityCost {
+  capability: CapabilityType;
+  baseCost: number;               // Base cost per use in USD
+  variableCost?: {
+    unit: 'token' | 'second' | 'character' | 'image';
+    rate: number;                 // Cost per unit
+  };
+}
+
+/**
+ * Capability cost definitions
+ */
+export const CAPABILITY_COSTS: Record<CapabilityType, CapabilityCost> = {
+  web_search: {
+    capability: 'web_search',
+    baseCost: 0.01,
+  },
+  code_execution: {
+    capability: 'code_execution',
+    baseCost: 0.03,
+    variableCost: { unit: 'second', rate: 0.001 },
+  },
+  image_generation: {
+    capability: 'image_generation',
+    baseCost: 0.04,               // Standard 1024x1024
+  },
+  vision_analysis: {
+    capability: 'vision_analysis',
+    baseCost: 0.01,
+    variableCost: { unit: 'token', rate: 0.00001 },
+  },
+  file_search: {
+    capability: 'file_search',
+    baseCost: 0.005,
+  },
+  deep_research: {
+    capability: 'deep_research',
+    baseCost: 0.20,               // Multiple searches + synthesis
+  },
+  voice_input: {
+    capability: 'voice_input',
+    baseCost: 0,
+    variableCost: { unit: 'second', rate: 0.0001 },  // ~$0.006/min
+  },
+  voice_output: {
+    capability: 'voice_output',
+    baseCost: 0,
+    variableCost: { unit: 'character', rate: 0.000015 },
+  },
+};
+
+/**
+ * Usage data for capability cost calculation
+ */
+export interface CapabilityUsage {
+  capability: CapabilityType;
+  tokens?: number;
+  seconds?: number;
+  characters?: number;
+  images?: number;
+}
+
+/**
+ * Daily capability usage record
+ */
+export interface DailyCapabilityUsage {
+  userId: string;
+  date: string;                   // YYYY-MM-DD
+  usageByCapability: Record<CapabilityType, {
+    count: number;                // Number of times used
+    totalCost: number;            // Total cost in USD
+  }>;
+  totalCost: number;              // Sum of all capability costs
 }

@@ -506,10 +506,5 @@ export function AudioWaveform({
   )
 }
 
-// Type declarations for speech recognition
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
-  }
-}
+// Speech recognition types are provided by the DOM lib
+// Window.SpeechRecognition and Window.webkitSpeechRecognition are typed as SpeechRecognitionConstructor

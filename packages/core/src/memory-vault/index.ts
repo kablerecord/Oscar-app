@@ -40,6 +40,9 @@ export {
   updateUtilityScores,
   compactWorkingMemory,
   isCompactionNeeded,
+  computeWorkingWindow,
+  getExcludedMessagesSummary,
+  type WorkingWindowResult,
 } from './synthesis';
 
 // Privacy
@@ -60,6 +63,11 @@ export {
   getVault,
   retrieveContextForUser,
   getConversationHistory,
+  getFullHistoryForUser,
+  getWorkingWindowForUser,
+  addMessageForUser,
+  setWindowConfigForUser,
+  loadConversationForUser,
   searchUserMemories,
   storeMessage,
   storeMemory,
@@ -72,7 +80,7 @@ export {
   processPluginDataRequest,
   getPrivacySettings,
   updatePrivacySettings,
-  recordOutcome,
+  recordOutcome as recordVaultOutcome,
   getMentorScripts,
   storeMentorRule,
   getBriefingScript,
@@ -80,6 +88,12 @@ export {
   exportUserData,
   deleteUserData,
   clearAllStores,
+  endConversationForUser,
+  checkConversationTimeoutForUser,
+  getAllVaults,
+  getUnsynthesizedConversations,
+  type EndConversationOptions,
+  type EndConversationResult,
 } from './vault';
 
 // Cross-Project Query
@@ -97,3 +111,68 @@ export {
   clearCrossProjectData,
   getCrossProjectStats,
 } from './cross-project';
+
+// Learning Layer - LLM Extraction
+export {
+  extractFacts,
+  generateSummary,
+  detectContradictions as detectLLMContradictions,
+  synthesizeWithLLM,
+  type ExtractedFact,
+  type ContradictionResult,
+  type LLMExtractorConfig,
+} from './synthesis/llm-extractor';
+
+// Learning Layer - Synthesis Queue
+export {
+  enqueue as enqueueSynthesis,
+  dequeue as dequeueSynthesis,
+  getJob as getSynthesisJob,
+  processNext as processNextSynthesis,
+  processAll as processAllSynthesis,
+  getPendingCount as getSynthesisPendingCount,
+  getQueueStats as getSynthesisQueueStats,
+  getFailedJobs as getFailedSynthesisJobs,
+  retryFailed as retryFailedSynthesis,
+  clearQueue as clearSynthesisQueue,
+  on as onSynthesisEvent,
+  type SynthesisJob,
+  type SynthesisPriority,
+} from './synthesis/queue';
+
+// Learning Layer - Scheduler
+export {
+  startScheduler,
+  stopScheduler,
+  getSchedulerStatus,
+  updateSchedulerConfig,
+  triggerSynthesisProcessing,
+  triggerUtilityUpdate,
+  triggerOrphanCheck,
+  type SchedulerConfig,
+  type SchedulerStatus,
+} from './synthesis/scheduler';
+
+// Learning Layer - External Ingestion
+export {
+  ingestConversation,
+  ingestBatch,
+  checkDuplicate,
+  getIngestionStats,
+  type IngestRequest,
+  type IngestResult,
+  type IngestSource,
+} from './ingestion';
+
+// Learning Layer - Enhanced Utility
+export {
+  recordOutcome,
+  getOutcomeHistory,
+  calculateRecencyBoost,
+  applyRecencyBoosts,
+  updateUtilityScoresEnhanced,
+  getLearningStats,
+  clearOutcomeHistory,
+  analyzeMemoryPerformance,
+  type OutcomeRecord,
+} from './synthesis/retrospective';

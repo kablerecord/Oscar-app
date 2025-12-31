@@ -46,10 +46,20 @@ export async function GET(req: NextRequest) {
       ]
     }
 
+    // Only show user-uploaded documents in the vault view
+    // Hide conversations, auto-indexed code, and system documents
+    const allowedSourceTypes = ['upload', 'file_upload', 'note']
+
+    // Add filter to only show user uploads
+    const whereWithFilter = {
+      ...where,
+      sourceType: { in: allowedSourceTypes },
+    }
+
     // Get documents with pagination
     const [documents, total] = await Promise.all([
       prisma.document.findMany({
-        where,
+        where: whereWithFilter,
         select: {
           id: true,
           title: true,
@@ -66,7 +76,7 @@ export async function GET(req: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.document.count({ where }),
+      prisma.document.count({ where: whereWithFilter }),
     ])
 
     // Get source type breakdown for filters
