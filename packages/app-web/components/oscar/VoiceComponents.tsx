@@ -119,6 +119,18 @@ export function VoiceInput({
     onStateChange?.(newState)
   }, [onStateChange])
 
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop()
+      recognitionRef.current = null
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+    updateState('idle')
+  }, [updateState])
+
   const startListening = useCallback(() => {
     if (!isSupported || disabled) return
 
@@ -185,19 +197,7 @@ export function VoiceInput({
     timeoutRef.current = setTimeout(() => {
       stopListening()
     }, maxDuration * 1000)
-  }, [isSupported, disabled, continuous, language, maxDuration, onTranscript, onError, onRecordingStart, onRecordingStop, updateState])
-
-  const stopListening = useCallback(() => {
-    if (recognitionRef.current) {
-      recognitionRef.current.stop()
-      recognitionRef.current = null
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
-    }
-    updateState('idle')
-  }, [updateState])
+  }, [isSupported, disabled, continuous, language, maxDuration, onTranscript, onError, onRecordingStart, onRecordingStop, updateState, stopListening])
 
   const toggleListening = useCallback(() => {
     if (state === 'listening') {
@@ -476,16 +476,19 @@ interface AudioWaveformProps {
   className?: string
 }
 
+// Pre-defined bar heights for waveform visualization (deterministic for pure rendering)
+const WAVEFORM_BAR_HEIGHTS = [65, 82, 48, 91, 55, 73, 40, 88, 62, 95, 52, 78]
+
 export function AudioWaveform({
   isPlaying = false,
   progress = 0,
   className,
 }: AudioWaveformProps) {
-  const bars = 12
+  const bars = WAVEFORM_BAR_HEIGHTS.length
 
   return (
     <div className={cn('flex items-center gap-0.5 h-4', className)}>
-      {Array.from({ length: bars }).map((_, i) => (
+      {WAVEFORM_BAR_HEIGHTS.map((height, i) => (
         <div
           key={i}
           className={cn(
@@ -494,7 +497,7 @@ export function AudioWaveform({
             isPlaying && 'animate-pulse'
           )}
           style={{
-            height: `${Math.random() * 60 + 40}%`,
+            height: `${height}%`,
             animationDelay: `${i * 50}ms`,
           }}
         />

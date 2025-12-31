@@ -299,11 +299,15 @@ function JsonPreview({ content }: { content: string }) {
 
 function ResearchPreview({ content }: { content: string }) {
   // Research reports are stored as JSON
+  let report: ResearchReport | null = null
   try {
-    const report = JSON.parse(content) as ResearchReport
-    return <ResearchReportView report={report} />
+    report = JSON.parse(content) as ResearchReport
   } catch {
     // Fallback to code preview if not valid JSON
-    return <CodePreview content={content} language="json" />
   }
+
+  if (report) {
+    return <ResearchReportView report={report} />
+  }
+  return <CodePreview content={content} language="json" />
 }

@@ -314,7 +314,7 @@ export function useCapabilities(): UseCapabilitiesReturn {
 }
 
 // Context for sharing capability state across components
-interface CapabilityContextType extends UseCapabilitiesReturn {}
+type CapabilityContextType = UseCapabilitiesReturn
 
 const CapabilityContext = createContext<CapabilityContextType | undefined>(undefined)
 

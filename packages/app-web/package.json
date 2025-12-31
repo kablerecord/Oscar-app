@@ -9,7 +9,7 @@
     "dev": "next dev -p 3001",
     "build": "next build --webpack",
     "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings 500",
     "test": "vitest",
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",

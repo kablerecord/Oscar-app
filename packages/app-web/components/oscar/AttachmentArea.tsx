@@ -92,27 +92,7 @@ export function AttachmentArea({
     setIsDragging(false)
   }, [])
 
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-
-    if (disabled || isUploading) return
-
-    const files = Array.from(e.dataTransfer.files)
-    await processFiles(files)
-  }, [disabled, isUploading])
-
-  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    await processFiles(files)
-    // Reset input so same file can be selected again
-    if (inputRef.current) {
-      inputRef.current.value = ''
-    }
-  }, [])
-
-  const processFiles = async (files: File[]) => {
+  const processFiles = useCallback(async (files: File[]) => {
     setUploadError(null)
 
     // Validate file count
@@ -135,7 +115,27 @@ export function AttachmentArea({
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Upload failed')
     }
-  }
+  }, [attachments, maxFiles, maxSizeMB, onUpload, onAttachmentsChange])
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+
+    if (disabled || isUploading) return
+
+    const files = Array.from(e.dataTransfer.files)
+    await processFiles(files)
+  }, [disabled, isUploading, processFiles])
+
+  const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    await processFiles(files)
+    // Reset input so same file can be selected again
+    if (inputRef.current) {
+      inputRef.current.value = ''
+    }
+  }, [processFiles])
 
   const handleRemove = useCallback((id: string) => {
     onAttachmentsChange(attachments.filter(a => a.id !== id))
