@@ -13,11 +13,17 @@ WORKDIR /app
 # Copy workspace config files
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 
+# Copy shared package (marketing depends on it)
+COPY packages/shared/ ./packages/shared/
+
 # Copy marketing site source
 COPY websites/marketing/ ./websites/marketing/
 
 # Install all dependencies with workspace linking from root
 RUN pnpm install --frozen-lockfile
+
+# Build @osqr/shared first (dist/ is gitignored, so we need to build it)
+RUN cd packages/shared && pnpm exec tsc
 
 # Build the marketing site
 RUN pnpm --filter @osqr/marketing build
