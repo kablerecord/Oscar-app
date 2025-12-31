@@ -90,7 +90,7 @@ export function LabFeedbackSection() {
             <Beaker className="h-5 w-5 text-blue-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Oscar Lab</h2>
+            <h2 className="text-xl font-semibold text-white">OSQR Lab</h2>
             <p className="text-sm text-neutral-400">Loading...</p>
           </div>
         </div>
@@ -106,7 +106,7 @@ export function LabFeedbackSection() {
             <Beaker className="h-5 w-5 text-blue-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Oscar Lab</h2>
+            <h2 className="text-xl font-semibold text-white">OSQR Lab</h2>
             <p className="text-sm text-neutral-400">
               {isLabMember ? 'Help shape the future of OSQR' : 'Join our feedback program'}
             </p>
@@ -149,7 +149,7 @@ export function LabFeedbackSection() {
               variant="outline"
               className="w-full border-neutral-700 hover:bg-neutral-800 cursor-pointer"
             >
-              Go to Oscar Lab
+              Go to OSQR Lab
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </Link>
@@ -157,7 +157,7 @@ export function LabFeedbackSection() {
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-neutral-400">
-            Join Oscar Lab to share feedback, complete challenges, and earn rewards.
+            Join OSQR Lab to share feedback, complete challenges, and earn rewards.
             Your insights directly influence what we build next.
           </p>
           <div className="flex gap-3">
@@ -166,7 +166,7 @@ export function LabFeedbackSection() {
               disabled={joining}
               className="bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
             >
-              {joining ? 'Joining...' : 'Join Oscar Lab'}
+              {joining ? 'Joining...' : 'Join OSQR Lab'}
             </Button>
             <Link href="/lab">
               <Button variant="outline" className="border-neutral-700 hover:bg-neutral-800 cursor-pointer">

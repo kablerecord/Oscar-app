@@ -128,13 +128,23 @@ export function ChallengeFlow({ challengeId }: ChallengeFlowProps) {
             </div>
           )}
 
-          <Button
-            onClick={() => setStep(challenge.promptToTry ? 'task' : 'questions')}
-            className="w-full bg-blue-600 hover:bg-blue-700"
-          >
-            Start Challenge
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/lab')}
+              className="border-gray-700 text-gray-300 hover:bg-gray-700"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <Button
+              onClick={() => setStep(challenge.promptToTry ? 'task' : 'questions')}
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+            >
+              Start Challenge
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     )
@@ -164,13 +174,23 @@ export function ChallengeFlow({ challengeId }: ChallengeFlowProps) {
             Open Chat in New Tab
           </Button>
 
-          <Button
-            onClick={() => setStep('questions')}
-            className="w-full bg-blue-600 hover:bg-blue-700"
-          >
-            I&apos;ve Tried It - Continue
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setStep('intro')}
+              className="border-gray-700 text-gray-300 hover:bg-gray-700"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back
+            </Button>
+            <Button
+              onClick={() => setStep('questions')}
+              className="flex-1 bg-blue-600 hover:bg-blue-700"
+            >
+              I&apos;ve Tried It - Continue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     )

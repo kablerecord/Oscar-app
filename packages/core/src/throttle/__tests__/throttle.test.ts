@@ -55,9 +55,13 @@ describe('Throttle Architecture', () => {
 
   describe('Tier Configurations', () => {
     it('defines correct query limits per tier', () => {
-      expect(TIER_CONFIGS.lite.queriesPerDay).toBe(10);
-      expect(TIER_CONFIGS.pro.queriesPerDay).toBe(100);
-      expect(TIER_CONFIGS.master.queriesPerDay).toBe(Infinity);
+      // Lite is a future tier (not currently active)
+      expect(TIER_CONFIGS.lite.queriesPerDay).toBe(25);
+      expect(TIER_CONFIGS.lite.isActive).toBe(false);
+      // Active tiers (UPDATED December 2024)
+      expect(TIER_CONFIGS.pro.queriesPerDay).toBe(75);
+      expect(TIER_CONFIGS.master.queriesPerDay).toBe(200);
+      expect(TIER_CONFIGS.elite.queriesPerDay).toBe(Infinity);
       expect(TIER_CONFIGS.enterprise.queriesPerDay).toBe(Infinity);
     });
 
@@ -67,6 +71,18 @@ describe('Throttle Architecture', () => {
       expect(TIER_CONFIGS.lite.councilMode).toBe(false);
       expect(TIER_CONFIGS.master.councilMode).toBe(true);
     });
+
+    it('defines correct pricing', () => {
+      // Regular pricing (UPDATED December 2024)
+      expect(TIER_CONFIGS.pro.monthlyPrice).toBe(49);
+      expect(TIER_CONFIGS.master.monthlyPrice).toBe(149);
+      // Founder pricing
+      expect(TIER_CONFIGS.pro.founderPrice).toBe(39);
+      expect(TIER_CONFIGS.master.founderPrice).toBe(119);
+      // Future pricing (same as monthly - no increases planned)
+      expect(TIER_CONFIGS.pro.futurePrice).toBe(49);
+      expect(TIER_CONFIGS.master.futurePrice).toBe(149);
+    });
   });
 
   describe('Budget Tracking', () => {
@@ -74,7 +90,7 @@ describe('Throttle Architecture', () => {
       const budget = getUserBudget('user-1', 'lite');
 
       expect(budget.queriesUsed).toBe(0);
-      expect(budget.queriesLimit).toBe(10);
+      expect(budget.queriesLimit).toBe(25); // Lite tier has 25 queries/day
       expect(budget.overageQueries).toBe(0);
     });
 
@@ -95,21 +111,22 @@ describe('Throttle Architecture', () => {
       // Start fresh
       expect(getBudgetState('user-1', 'lite')).toBe('healthy');
 
-      // Use 8 queries (80%)
-      for (let i = 0; i < 8; i++) {
+      // Use 18 queries (72% of 25) - should be warning
+      for (let i = 0; i < 18; i++) {
         recordQuery('user-1', 'lite', 'gpt-4');
       }
       expect(getBudgetState('user-1', 'lite')).toBe('warning');
 
-      // Use 2 more (100%)
-      recordQuery('user-1', 'lite', 'gpt-4');
-      recordQuery('user-1', 'lite', 'gpt-4');
+      // Use 7 more (100% of 25)
+      for (let i = 0; i < 7; i++) {
+        recordQuery('user-1', 'lite', 'gpt-4');
+      }
       expect(getBudgetState('user-1', 'lite')).toBe('exhausted');
     });
 
     it('allows overage queries after exhaustion', () => {
-      // Exhaust budget
-      for (let i = 0; i < 10; i++) {
+      // Exhaust budget (25 queries for lite tier)
+      for (let i = 0; i < 25; i++) {
         recordQuery('user-1', 'lite', 'gpt-4');
       }
 
@@ -136,7 +153,7 @@ describe('Throttle Architecture', () => {
       recordQuery('user-1', 'lite', 'gpt-4');
 
       const remaining = getQueriesRemaining('user-1', 'lite');
-      expect(remaining).toBe(7);
+      expect(remaining).toBe(22); // 25 - 3 = 22
     });
 
     it('resets budget daily', () => {
@@ -150,12 +167,23 @@ describe('Throttle Architecture', () => {
     });
 
     it('handles unlimited tiers correctly', () => {
+      // Enterprise has truly unlimited queries
       for (let i = 0; i < 1000; i++) {
+        recordQuery('user-1', 'enterprise', 'gpt-4');
+      }
+
+      expect(canQuery('user-1', 'enterprise')).toBe(true);
+      expect(getBudgetState('user-1', 'enterprise')).toBe('healthy');
+    });
+
+    it('handles master tier with high limit correctly', () => {
+      // Master has 200 queries/day (UPDATED Dec 2024) - use 100 (50%)
+      for (let i = 0; i < 100; i++) {
         recordQuery('user-1', 'master', 'gpt-4');
       }
 
       expect(canQuery('user-1', 'master')).toBe(true);
-      expect(getBudgetState('user-1', 'master')).toBe('healthy');
+      expect(getBudgetState('user-1', 'master')).toBe('healthy'); // Under 70%
     });
   });
 
@@ -167,8 +195,8 @@ describe('Throttle Architecture', () => {
     });
 
     it('degrades model selection when budget low', () => {
-      // Use 95% of budget
-      for (let i = 0; i < 95; i++) {
+      // Use 95% of budget (Pro now has 75 queries/day)
+      for (let i = 0; i < 71; i++) {
         recordQuery('user-1', 'pro', 'gpt-4');
       }
 
@@ -179,8 +207,8 @@ describe('Throttle Architecture', () => {
     });
 
     it('uses economy model when budget exhausted (graceful degradation)', () => {
-      // Exhaust budget
-      for (let i = 0; i < 100; i++) {
+      // Exhaust budget (Pro now has 75 queries/day)
+      for (let i = 0; i < 75; i++) {
         recordQuery('user-1', 'pro', 'gpt-4');
       }
 
@@ -249,14 +277,14 @@ describe('Throttle Architecture', () => {
 
       const status = getBudgetStatusMessage('user-1', 'lite');
 
-      expect(status).toContain('8');
+      expect(status).toContain('23'); // 25 - 2 = 23 remaining
       expect(status).not.toContain('limit');
       expect(status).not.toContain('restrict');
     });
 
     it('provides graceful degradation message', () => {
-      // Use most of budget
-      for (let i = 0; i < 9; i++) {
+      // Use most of budget (23 of 25)
+      for (let i = 0; i < 23; i++) {
         recordQuery('user-1', 'lite', 'gpt-4');
       }
 
@@ -285,7 +313,7 @@ describe('Throttle Architecture', () => {
     it('generates welcome message for tier', () => {
       const message = getWelcomeMessage('pro');
 
-      expect(message).toContain('100');
+      expect(message).toContain('75'); // Pro now has 75 queries/day
       expect(message).toContain('Contemplate');
     });
 
@@ -297,7 +325,7 @@ describe('Throttle Architecture', () => {
       const message = getQueryCountMessage('user-1', 'lite');
 
       expect(message).toContain('3');
-      expect(message).toContain('10');
+      expect(message).toContain('25'); // Lite has 25 queries/day
     });
   });
 
@@ -319,8 +347,8 @@ describe('Throttle Architecture', () => {
     });
 
     it('adds queries after purchase', () => {
-      // Exhaust budget
-      for (let i = 0; i < 10; i++) {
+      // Exhaust budget (25 for lite tier)
+      for (let i = 0; i < 25; i++) {
         recordQuery('user-1', 'lite', 'gpt-4');
       }
 
@@ -445,14 +473,16 @@ describe('Throttle Architecture', () => {
     it('checks feature access correctly', () => {
       expect(hasFeatureAccess('lite', 'contemplateMode')).toBe(false);
       expect(hasFeatureAccess('pro', 'contemplateMode')).toBe(true);
-      expect(hasFeatureAccess('pro', 'councilMode')).toBe(false);
+      // Pro now has council mode (UPDATED December 2024)
+      expect(hasFeatureAccess('pro', 'councilMode')).toBe(true);
       expect(hasFeatureAccess('master', 'councilMode')).toBe(true);
     });
 
     it('returns correct upgrade path', () => {
       expect(getUpgradePath('lite')).toBe('pro');
       expect(getUpgradePath('pro')).toBe('master');
-      expect(getUpgradePath('master')).toBe('enterprise');
+      expect(getUpgradePath('master')).toBe('elite');
+      expect(getUpgradePath('elite')).toBe('enterprise');
       expect(getUpgradePath('enterprise')).toBeNull();
     });
   });
@@ -487,8 +517,8 @@ describe('Throttle Architecture', () => {
     });
 
     it('frames constraints as collaboration', () => {
-      // Use most of budget
-      for (let i = 0; i < 9; i++) {
+      // Use most of budget (23 of 25)
+      for (let i = 0; i < 23; i++) {
         recordQuery('user-1', 'lite', 'gpt-4');
       }
 
@@ -504,8 +534,8 @@ describe('Throttle Architecture', () => {
     });
 
     it('always provides a path forward', () => {
-      // Exhaust budget completely
-      for (let i = 0; i < 10; i++) {
+      // Exhaust budget completely (25 for lite tier)
+      for (let i = 0; i < 25; i++) {
         recordQuery('user-1', 'lite', 'gpt-4');
       }
 

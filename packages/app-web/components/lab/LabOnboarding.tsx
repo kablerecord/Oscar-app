@@ -25,7 +25,7 @@ export function LabOnboarding({ onJoin }: LabOnboardingProps) {
         <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mb-4">
           <Beaker className="h-8 w-8 text-white" />
         </div>
-        <h1 className="text-3xl font-bold text-white">Welcome to Oscar Lab</h1>
+        <h1 className="text-3xl font-bold text-white">Welcome to OSQR Lab</h1>
         <p className="text-gray-400 text-lg max-w-md mx-auto">
           Shape the future of OSQR by sharing your feedback. Your insights directly
           influence what we build next.
@@ -117,7 +117,7 @@ export function LabOnboarding({ onJoin }: LabOnboardingProps) {
             'Joining...'
           ) : (
             <>
-              Join Oscar Lab
+              Join OSQR Lab
               <ArrowRight className="ml-2 h-4 w-4" />
             </>
           )}

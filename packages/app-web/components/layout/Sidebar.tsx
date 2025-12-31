@@ -69,10 +69,10 @@ const navigation = [
     description: 'Browse your indexed documents',
   },
   {
-    name: 'Oscar Lab',
+    name: 'OSQR Lab',
     href: '/lab',
     icon: FlaskConical,
-    description: 'Help improve Oscar with feedback',
+    description: 'Help improve OSQR with feedback',
     isNew: true,
   },
   {

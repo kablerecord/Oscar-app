@@ -75,7 +75,7 @@ export function LabHub() {
         <div>
           <div className="flex items-center gap-3">
             <Beaker className="h-8 w-8 text-blue-400" />
-            <h1 className="text-3xl font-bold text-white">Oscar Lab</h1>
+            <h1 className="text-3xl font-bold text-white">OSQR Lab</h1>
           </div>
           <p className="text-gray-400 mt-1">
             Help shape OSQR by sharing your feedback
